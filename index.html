@@ -1,0 +1,919 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css">
+<style>
+:root{ --da-accent:#4FB99A; --da-accent-deep:#2E8B72; --da-accent-warm:#E8895C; }
+.da-app{font-family:var(--font-sans);max-width:640px;margin:0 auto}
+.da-view{display:none; animation: daFadeIn 0.25s ease}
+.da-view.active{display:block}
+@keyframes daFadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
+.da-header{display:flex;align-items:center;gap:10px;padding:2px 0 1.1rem;border-bottom:0.5px solid var(--border);margin-bottom:1.1rem}
+.da-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg, var(--da-accent), var(--da-accent-deep));display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
+.da-brand{font-weight:600;font-size:15px;letter-spacing:-0.01em}
+.da-brand-sub{font-size:11px;color:var(--text-secondary);margin-top:-1px}
+.da-steps{display:flex;align-items:center;gap:4px;margin-bottom:1.25rem}
+.da-step{flex:1;height:3px;border-radius:2px;background:var(--border)}
+.da-step.done{background:var(--da-accent)}
+.da-step.current{background:var(--da-accent-warm)}
+.da-card{background:var(--surface-2);border:0.5px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1rem;transition:border-color 0.15s}
+.da-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;font-size:14px;border-radius:10px;border:0.5px solid var(--border-strong);background:transparent;cursor:pointer;color:var(--text-primary);transition:transform 0.1s, background 0.15s}
+.da-btn:hover{background:var(--surface-1); transform:translateY(-1px)}
+.da-btn:active{transform:translateY(0)}
+.da-btn-primary{background:var(--da-accent);color:#fff;border:none;box-shadow:0 2px 8px -2px rgba(79,185,154,0.5)}
+.da-btn-primary:hover{background:var(--da-accent-deep)}
+.da-muted{color:var(--text-secondary);font-size:13px}
+.da-title{font-size:16px;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em}
+.da-h1{font-size:21px;font-weight:600;margin:0 0 1rem;letter-spacing:-0.01em}
+.da-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.da-stat{background:var(--surface-1);border-radius:12px;padding:1rem;border:0.5px solid var(--border)}
+.da-stat .n{font-size:22px;font-weight:600;color:var(--da-accent-deep)}
+.da-stat .l{font-size:12px;color:var(--text-secondary);margin-top:2px}
+.da-obj{background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color 0.15s, transform 0.1s}
+.da-obj:hover{border-color:var(--da-accent); transform:translateX(2px)}
+.da-obj-icon{width:34px;height:34px;border-radius:9px;background:rgba(79,185,154,0.12);color:var(--da-accent-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;margin-right:10px}
+.da-progress{display:flex;flex-direction:column;align-items:center;gap:14px;padding:3rem 0}
+.da-spinner{width:26px;height:26px;border-radius:50%;border:2.5px solid var(--border);border-top-color:var(--da-accent);animation:daspin 0.7s linear infinite}
+@keyframes daspin{to{transform:rotate(360deg)}}
+.da-err{color:var(--text-danger,#c0432b);font-size:13px;margin-top:8px}
+.da-list-item{padding:11px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:opacity 0.15s}
+.da-list-item:hover{opacity:0.7}
+.da-list-item:last-child{border-bottom:none}
+.da-empty{text-align:center;padding:2rem 1rem;color:var(--text-secondary)}
+.da-empty i{font-size:28px;color:var(--da-accent);margin-bottom:8px;display:block}
+.da-chart-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.da-chart-tab{font-size:12px;padding:6px 10px;border-radius:20px;border:0.5px solid var(--border-strong);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px}
+.da-chart-tab.active{background:var(--da-accent);color:#fff;border-color:var(--da-accent)}
+.da-chart-tab.disabled{opacity:0.35;cursor:not-allowed}
+</style>
+
+<div class="da-app" id="daApp">
+
+<div class="da-header">
+  <div class="da-logo"><i class="ti ti-chart-histogram"></i></div>
+  <div><div class="da-brand">Data Analyzer</div><div class="da-brand-sub">Upload → Inspect → Analyze → Export</div></div>
+</div>
+
+<div class="da-steps" id="da-steps">
+  <div class="da-step" data-step="1"></div>
+  <div class="da-step" data-step="2"></div>
+  <div class="da-step" data-step="3"></div>
+  <div class="da-step" data-step="4"></div>
+</div>
+
+<div class="da-view active" id="view-landing">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0">Overview</p>
+    <button class="da-btn da-btn-primary" onclick="daGoUpload()"><i class="ti ti-upload"></i>Upload data</button>
+  </div>
+  <div class="da-grid2" style="margin-bottom:1rem">
+    <div class="da-stat"><div class="n" id="stat-count">0</div><div class="l">Datasets analyzed</div></div>
+    <div class="da-stat"><div class="n" id="stat-obj" style="font-size:15px">–</div><div class="l">Most used objective</div></div>
+  </div>
+  <p class="da-title">Recent analyses</p>
+  <div id="recent-list"><div class="da-empty"><i class="ti ti-database-off"></i>No analyses yet — upload a file to get started.</div></div>
+</div>
+
+<div class="da-view" id="view-upload">
+  <p class="da-h1">Upload data</p>
+  <div class="da-card">
+    <p class="da-title" style="margin-bottom:8px"><i class="ti ti-file-upload" style="color:var(--da-accent);margin-right:4px"></i>Choose a file</p>
+    <p class="da-muted" style="margin-bottom:8px">CSV, Excel (.xlsx/.xls), or JSON</p>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json">
+    <p class="da-muted" style="margin-top:8px">If tapping this does nothing, use paste below instead — some in-chat previews block the native file picker.</p>
+  </div>
+  <div class="da-card">
+    <p class="da-title" style="margin-bottom:8px"><i class="ti ti-clipboard-text" style="color:var(--da-accent);margin-right:4px"></i>Or paste your data here</p>
+    <p class="da-muted" style="margin-bottom:8px">Paste CSV (with header row) or JSON array of objects, then tap the button below</p>
+    <textarea id="pasteInput" rows="10" style="width:100%;font-family:var(--font-mono);font-size:13px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box" placeholder="name,revenue,date&#10;Acme,1200,2024-01-05&#10;Beta,900,2024-01-06"></textarea>
+    <button class="da-btn da-btn-primary" style="margin-top:10px;width:100%;justify-content:center" onclick="daHandlePaste()"><i class="ti ti-sparkles"></i>Analyze this data</button>
+  </div>
+  <div id="upload-err" class="da-err"></div>
+</div>
+
+
+<div class="da-view" id="view-inspect">
+  <p class="da-h1">Inspecting data</p>
+  <div class="da-progress"><div class="da-spinner"></div><span id="inspect-status" class="da-muted">Reading file…</span></div>
+</div>
+
+<div class="da-view" id="view-objective">
+  <p class="da-h1">Choose objective</p>
+  <div class="da-card" id="quality-card"></div>
+  <p class="da-title">Suggested for this data</p>
+  <div id="suggested-objectives"></div>
+  <button class="da-btn" onclick="daShowAllObjectives()" id="show-all-btn">See all objectives</button>
+  <div id="all-objectives" style="display:none;margin-top:8px"></div>
+  <div id="objective-err" class="da-err"></div>
+</div>
+
+<div class="da-view" id="view-processing">
+  <p class="da-h1">Processing</p>
+  <div class="da-progress"><div class="da-spinner"></div><span id="processing-status" class="da-muted">Running analysis…</span></div>
+</div>
+
+<div class="da-view" id="view-dashboard">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" id="dash-title">Dashboard</p>
+    <button class="da-btn" onclick="daGoLanding()">Done</button>
+  </div>
+  <div class="da-grid2" id="dash-kpis" style="margin-bottom:1rem"></div>
+  <div class="da-card">
+    <div id="dash-chart-tabs" class="da-chart-tabs"></div>
+    <div id="dash-chart-active"></div>
+  </div>
+  <div class="da-card">
+    <p class="da-title">AI insights</p>
+    <ul id="dash-insights" style="margin:0;padding-left:18px;font-size:14px;line-height:1.7"></ul>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem">
+    <button class="da-btn da-btn-primary" onclick="daShowReport()">View full report</button>
+    <button class="da-btn" onclick="daExportJSON()">Show as JSON</button>
+    <button class="da-btn" onclick="daExportCSV()">Show as CSV</button>
+  </div>
+  <div id="export-panel" style="display:none;margin-top:12px">
+    <textarea id="export-output" readonly rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box"></textarea>
+    <p class="da-muted" style="margin-top:6px">Tap the box, select all, and copy — downloads aren't supported in this preview.</p>
+  </div>
+</div>
+
+<div class="da-view" id="view-report">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem" class="da-no-print">
+    <p class="da-h1" style="margin:0">Analysis report</p>
+    <button class="da-btn" onclick="daShowView('view-dashboard')">Back</button>
+  </div>
+  <div id="print-report-area">
+    <p class="da-h1" style="display:none" id="print-only-title">Analysis report</p>
+    <div class="da-card">
+      <p class="da-title" id="report-filename"></p>
+      <p class="da-muted" id="report-meta"></p>
+    </div>
+    <div class="da-grid2" id="report-kpis" style="margin-bottom:1rem"></div>
+    <div class="da-card" id="report-chart-bar-card"><div id="report-chart-bar"></div></div>
+    <div class="da-card" id="report-chart-line-card" style="display:none"><div id="report-chart-line"></div></div>
+    <div class="da-card" id="report-chart-area-card" style="display:none"><div id="report-chart-area"></div></div>
+    <div class="da-card" id="report-chart-pie-card" style="display:none"><div id="report-chart-pie"></div></div>
+    <div class="da-card" id="report-chart-scatter-card" style="display:none"><div id="report-chart-scatter"></div></div>
+    <div class="da-card" id="report-chart-histogram-card" style="display:none"><div id="report-chart-histogram"></div></div>
+    <div class="da-card" id="report-chart-stacked-card" style="display:none"><div id="report-chart-stacked"></div></div>
+    <div class="da-card">
+      <p class="da-title">Insights</p>
+      <ul id="report-insights" style="margin:0;padding-left:18px;font-size:14px;line-height:1.7"></ul>
+    </div>
+  </div>
+  <div class="da-no-print" style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:1.25rem">
+    <button class="da-btn da-btn-primary" style="width:100%;justify-content:center" onclick="daPrintReport()"><i class="ti ti-printer"></i>Save as PDF / Print</button>
+    <p class="da-muted" style="text-align:center">If the print dialog doesn't open here, open this file outside the chat (locally or once hosted) and try again — or screenshot this page instead.</p>
+  </div>
+</div>
+
+<style>
+@media print {
+  body * { visibility: hidden; }
+  #print-report-area, #print-report-area * { visibility: visible; }
+  #print-report-area { position: absolute; left: 0; top: 0; width: 100%; }
+  #print-only-title { display: block !important; }
+  .da-card { border: 1px solid #ccc !important; background: #fff !important; break-inside: avoid; }
+  .da-stat { border: 1px solid #ccc !important; background: #fff !important; }
+}
+</style>
+
+</div>
+
+<script>
+const OBJECTIVES = [
+  {id:'sales_prediction', label:'Sales prediction', needs:'numeric + date columns'},
+  {id:'customer_churn', label:'Customer churn', needs:'categorical status column'},
+  {id:'customer_analysis', label:'Customer analysis', needs:'customer/id column'},
+  {id:'financial_analysis', label:'Financial analysis', needs:'numeric currency columns'},
+  {id:'marketing_analysis', label:'Marketing analysis', needs:'campaign/channel columns'},
+  {id:'forecasting', label:'Forecasting', needs:'date + numeric columns'},
+  {id:'custom_analysis', label:'Custom analysis', needs:'any data'}
+];
+
+let daState = { rows: [], columns: [], filename: '', summary: null, objective: null, result: null };
+
+const DA_STEP_MAP = { 'view-landing':0, 'view-upload':1, 'view-inspect':1, 'view-objective':2, 'view-processing':3, 'view-dashboard':4, 'view-report':4 };
+function daShowView(id){
+  document.querySelectorAll('.da-view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const step = DA_STEP_MAP[id] ?? 0;
+  const stepsBar = document.getElementById('da-steps');
+  stepsBar.style.display = step===0 ? 'none' : 'flex';
+  document.querySelectorAll('.da-step').forEach(el=>{
+    const n = parseInt(el.dataset.step, 10);
+    el.classList.remove('done','current');
+    if(n < step) el.classList.add('done');
+    else if(n === step) el.classList.add('current');
+  });
+}
+function daGoUpload(){ daShowView('view-upload'); }
+function daGoLanding(){ daShowView('view-landing'); daLoadRecent(); }
+
+function daDetectType(values){
+  const nonNull = values.filter(v=>v!==null && v!==undefined && v!=='');
+  if(nonNull.length===0) return 'unknown';
+  const numCount = nonNull.filter(v=>!isNaN(parseFloat(v)) && isFinite(v)).length;
+  if(numCount/nonNull.length > 0.9) return 'numeric';
+  const dateCount = nonNull.filter(v=>!isNaN(Date.parse(v))).length;
+  if(dateCount/nonNull.length > 0.9) return 'date';
+  return 'categorical';
+}
+
+function daAnalyzeColumns(rows){
+  if(rows.length===0) return [];
+  const keys = Object.keys(rows[0]);
+  return keys.map(k=>{
+    const values = rows.map(r=>r[k]);
+    const type = daDetectType(values);
+    const missing = values.filter(v=>v===null||v===undefined||v==='').length;
+    const unique = new Set(values.map(v=>String(v))).size;
+    let stats = {};
+    if(type==='numeric'){
+      const nums = values.map(v=>parseFloat(v)).filter(v=>!isNaN(v));
+      const mean = nums.reduce((a,b)=>a+b,0)/(nums.length||1);
+      stats = {mean: mean, min: Math.min(...nums), max: Math.max(...nums)};
+    }
+    return {name:k, type, missing, unique, ...stats, sample: values.slice(0,3)};
+  });
+}
+
+function daGenerateQualitySummary(columns, duplicates, rowCount){
+  const missingCols = columns.filter(c=>c.missing>0);
+  const totalMissing = columns.reduce((a,c)=>a+c.missing,0);
+  const numCount = columns.filter(c=>c.type==='numeric').length;
+  const catCount = columns.filter(c=>c.type==='categorical').length;
+  const dateCount = columns.filter(c=>c.type==='date').length;
+  const dupPct = rowCount ? Math.round((duplicates/rowCount)*1000)/10 : 0;
+  let quality = 'Good';
+  if(dupPct>10 || totalMissing/(rowCount*columns.length||1) > 0.1) quality = 'Fair';
+  if(dupPct>25) quality = 'Needs cleanup';
+  return `${quality} quality: ${rowCount.toLocaleString()} rows, ${columns.length} columns (${numCount} numeric, ${catCount} categorical, ${dateCount} date). ${missingCols.length} column(s) have missing values (${totalMissing} cells total). ${duplicates} duplicate rows (${dupPct}%).`;
+}
+
+function daSuggestObjectives(columns){
+  const names = columns.map(c=>c.name.toLowerCase());
+  const hasDate = columns.some(c=>c.type==='date' || (c.type==='numeric' && c.mean>1900 && c.mean<2100));
+  const numCols = columns.filter(c=>c.type==='numeric' && !(c.mean>1900 && c.mean<2100));
+  const scored = [];
+  const nameHas = (kw)=>names.some(n=>n.includes(kw));
+  if(hasDate && numCols.length>0) scored.push({id:'sales_prediction', reason:'Has a date/year column plus numeric metrics — enough to model a trend and predict future values.'});
+  if(hasDate && numCols.length>0) scored.push({id:'forecasting', reason:'Time-based column detected, suitable for projecting future values with regression.'});
+  if(['status','churn','active','cancel','subscription'].some(nameHas)) scored.push({id:'customer_churn', reason:'A status-like column suggests churn/retention can be scored directly.'});
+  if(['customer','user','client'].some(nameHas)) scored.push({id:'customer_analysis', reason:'Customer/user identifier column found — good for segmentation.'});
+  if(['price','revenue','cost','profit','amount','stream','sales'].some(nameHas)) scored.push({id:'financial_analysis', reason:'Numeric financial/volume columns found.'});
+  if(['campaign','channel','ad','marketing','genre','platform'].some(nameHas)) scored.push({id:'marketing_analysis', reason:'Category columns present that map well to marketing segmentation.'});
+  const seen = new Set(); const deduped = scored.filter(s=>{ if(seen.has(s.id)) return false; seen.add(s.id); return true; });
+  if(deduped.length===0) deduped.push({id:'custom_analysis', reason:'No strong pattern detected — a flexible custom pass is the safest starting point.'});
+  return deduped.slice(0,3);
+}
+
+function daLinearRegression(xs, ys){
+  const n = xs.length;
+  const meanX = xs.reduce((a,b)=>a+b,0)/n, meanY = ys.reduce((a,b)=>a+b,0)/n;
+  let num=0, den=0;
+  for(let i=0;i<n;i++){ num += (xs[i]-meanX)*(ys[i]-meanY); den += (xs[i]-meanX)**2; }
+  const slope = den===0 ? 0 : num/den;
+  const intercept = meanY - slope*meanX;
+  let ssTot=0, ssRes=0;
+  for(let i=0;i<n;i++){ const pred = slope*xs[i]+intercept; ssRes += (ys[i]-pred)**2; ssTot += (ys[i]-meanY)**2; }
+  const r2 = ssTot===0 ? 1 : 1 - (ssRes/ssTot);
+  return { slope, intercept, r2 };
+}
+
+function daPearsonCorrelation(xs, ys){
+  const n = xs.length;
+  const meanX = xs.reduce((a,b)=>a+b,0)/n, meanY = ys.reduce((a,b)=>a+b,0)/n;
+  let num=0, dx=0, dy=0;
+  for(let i=0;i<n;i++){ num += (xs[i]-meanX)*(ys[i]-meanY); dx += (xs[i]-meanX)**2; dy += (ys[i]-meanY)**2; }
+  const den = Math.sqrt(dx*dy);
+  return den===0 ? 0 : num/den;
+}
+
+async function daProcessRows(rows, filename){
+  document.getElementById('upload-err').textContent = '';
+  daState.filename = filename;
+  daShowView('view-inspect');
+  try {
+    rows = rows.filter(r=>Object.values(r).some(v=>v!==null && v!==''));
+    if(rows.length===0) throw new Error('No data rows found');
+    daState.rows = rows;
+    document.getElementById('inspect-status').textContent = 'Detecting columns and quality…';
+    const columns = daAnalyzeColumns(rows);
+    daState.columns = columns;
+    const duplicates = rows.length - new Set(rows.map(r=>JSON.stringify(r))).size;
+
+    document.getElementById('inspect-status').textContent = 'Running local analysis…';
+    const qualitySummary = daGenerateQualitySummary(columns, duplicates, rows.length);
+    const suggestedObjectives = daSuggestObjectives(columns);
+    daState.summary = { qualitySummary, suggestedObjectives, duplicates, rowCount: rows.length };
+    daRenderObjectiveView();
+    daShowView('view-objective');
+  } catch(err){
+    daShowView('view-upload');
+    document.getElementById('upload-err').textContent = 'Could not process data: ' + err.message;
+  }
+}
+
+function daParseCSVText(text){
+  const result = Papa.parse(text.trim(), {header:true, dynamicTyping:true, skipEmptyLines:true});
+  return result.data;
+}
+
+function daHandlePaste(){
+  const raw = document.getElementById('pasteInput').value.trim();
+  document.getElementById('upload-err').textContent = '';
+  if(!raw){ document.getElementById('upload-err').textContent = 'Paste some data first.'; return; }
+  let rows;
+  try {
+    if(raw.startsWith('[') || raw.startsWith('{')){
+      rows = JSON.parse(raw);
+      if(!Array.isArray(rows)) rows = [rows];
+    } else {
+      rows = daParseCSVText(raw);
+    }
+  } catch(err){
+    document.getElementById('upload-err').textContent = 'Could not read data: ' + err.message;
+    return;
+  }
+  daProcessRows(rows, 'pasted-data');
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('upload-err').textContent = '';
+  try {
+    let rows = [];
+    if(file.name.endsWith('.csv')){
+      const text = await file.text();
+      rows = daParseCSVText(text);
+    } else if(file.name.endsWith('.xlsx')||file.name.endsWith('.xls')){
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+    } else if(file.name.endsWith('.json')){
+      const text = await file.text();
+      rows = JSON.parse(text);
+      if(!Array.isArray(rows)) rows = [rows];
+    } else {
+      throw new Error('Unsupported file type — use CSV, Excel, or JSON');
+    }
+    daProcessRows(rows, file.name);
+  } catch(err){
+    document.getElementById('upload-err').textContent = 'Could not read file: ' + err.message + ' — try pasting the data instead.';
+  }
+});
+
+const OBJECTIVE_ICONS = {
+  sales_prediction:'ti-trending-up', customer_churn:'ti-user-x', customer_analysis:'ti-users',
+  financial_analysis:'ti-currency-dollar', marketing_analysis:'ti-speakerphone',
+  forecasting:'ti-chart-line', custom_analysis:'ti-adjustments'
+};
+function daRenderObjectiveView(){
+  document.getElementById('quality-card').innerHTML =
+    `<p class="da-title"><i class="ti ti-shield-check" style="color:var(--da-accent);margin-right:4px"></i>Data quality</p><p class="da-muted" style="font-size:14px;color:var(--text-primary)">${daState.summary.qualitySummary}</p>
+     <p class="da-muted" style="margin-top:8px">${daState.summary.rowCount} rows · ${daState.summary.duplicates} duplicate rows</p>`;
+  const sugg = document.getElementById('suggested-objectives');
+  sugg.innerHTML = '';
+  daState.summary.suggestedObjectives.forEach(s=>{
+    const obj = OBJECTIVES.find(o=>o.id===s.id) || {label:s.id};
+    const div = document.createElement('div');
+    div.className = 'da-obj';
+    div.onclick = ()=>daSelectObjective(obj.id, obj.label);
+    div.innerHTML = `<div style="display:flex;align-items:center"><div class="da-obj-icon"><i class="ti ${OBJECTIVE_ICONS[obj.id]||'ti-chart-bar'}"></i></div><div><p style="margin:0;font-weight:600;font-size:14px">${obj.label}</p><p class="da-muted" style="margin:2px 0 0">${s.reason}</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i>`;
+    sugg.appendChild(div);
+  });
+  const allDiv = document.getElementById('all-objectives');
+  allDiv.innerHTML = '';
+  OBJECTIVES.forEach(o=>{
+    const div = document.createElement('div');
+    div.className = 'da-obj';
+    div.onclick = ()=>daSelectObjective(o.id, o.label);
+    div.innerHTML = `<div style="display:flex;align-items:center"><div class="da-obj-icon"><i class="ti ${OBJECTIVE_ICONS[o.id]||'ti-chart-bar'}"></i></div><p style="margin:0;font-weight:600;font-size:14px">${o.label}</p></div><i class="ti ti-chevron-right" aria-hidden="true"></i>`;
+    allDiv.appendChild(div);
+  });
+}
+function daShowAllObjectives(){
+  const el = document.getElementById('all-objectives');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function daComputeTopPerformers(catCols, numericCols, rows){
+  if(catCols.length===0 || numericCols.length===0) return null;
+  const nameHints = ['artist','track','name','product','customer','category','channel'];
+  let catCol = catCols.find(c=>nameHints.some(h=>c.name.toLowerCase().includes(h)));
+  if(!catCol){
+    catCol = catCols.filter(c=>c.unique>=2 && c.unique<=rows.length*0.7).sort((a,b)=>b.unique-a.unique)[0] || catCols[0];
+  }
+  const metricHints = ['stream','count','revenue','sales','amount','total','views','popularity','price'];
+  let numCol = numericCols.find(c=>metricHints.some(h=>c.name.toLowerCase().includes(h)));
+  if(!numCol){
+    numCol = numericCols.filter(c=>!(c.mean>1900 && c.mean<2100)).sort((a,b)=>b.mean-a.mean)[0] || numericCols[0];
+  }
+  const sums = {};
+  rows.forEach(r=>{
+    const key = String(r[catCol.name]);
+    const val = parseFloat(r[numCol.name]);
+    if(!isNaN(val)) sums[key] = (sums[key]||0) + val;
+  });
+  const ranked = Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  return {catColumn: catCol.name, numColumn: numCol.name, ranked};
+}
+
+function daRunLocalML(objective, columns, rows, trend, topPerformers, catCols, numericCols){
+  const kpis = [];
+  const insights = [];
+  let chartTitle = objective + ' analysis';
+
+  // Regression-based trend/forecast (used by sales_prediction, forecasting, and as a bonus for others with a date column)
+  if(trend && trend.items.length>=2){
+    const xs = trend.items.map((it,i)=>i);
+    const ys = trend.items.map(it=>it.value);
+    const reg = daLinearRegression(xs, ys);
+    const nextVal = reg.slope*xs.length + reg.intercept;
+    const lastLabel = trend.items[trend.items.length-1].label;
+    const direction = reg.slope>0 ? 'upward' : (reg.slope<0 ? 'downward' : 'flat');
+    kpis.push({label:`${trend.metric} trend`, value: `${direction} (${daFmtNum(reg.slope)}/period)`});
+    kpis.push({label:'Model fit (R²)', value: `${Math.round(reg.r2*100)}%`});
+    kpis.push({label:`Projected next period`, value: daFmtNum(nextVal)});
+    insights.push(`Linear regression on ${trend.metric} by ${trend.xColumn} shows a ${direction} trend of ${daFmtNum(reg.slope)} per period, with R² = ${Math.round(reg.r2*100)}% (higher R² means the trend line fits the data more reliably).`);
+    insights.push(`Extrapolating the fitted line one period past ${lastLabel}, the projected ${trend.metric} value is ${daFmtNum(nextVal)}.`);
+  }
+
+  if(objective==='customer_churn'){
+    const statusCol = catCols.find(c=>/status|churn|active|cancel|subscription/.test(c.name.toLowerCase()));
+    if(statusCol){
+      const churnWords = ['churn','cancel','inactive','lost','no','0','false'];
+      let churnCount = 0;
+      rows.forEach(r=>{ const v = String(r[statusCol.name]).toLowerCase(); if(churnWords.some(w=>v===w||v.includes(w))) churnCount++; });
+      const rate = Math.round((churnCount/rows.length)*1000)/10;
+      kpis.push({label:'Churn rate', value: rate+'%'});
+      insights.push(`Based on the "${statusCol.name}" column, ${rate}% of rows match churn/inactive-type values — a direct, rule-based churn rate rather than an estimate.`);
+    } else if(topPerformers){
+      const vals = topPerformers.ranked.map(r=>r[1]).sort((a,b)=>a-b);
+      const q1 = vals[Math.floor(vals.length*0.25)] ?? vals[0];
+      const atRisk = topPerformers.ranked.filter(r=>r[1]<=q1).length;
+      const pct = Math.round((atRisk/topPerformers.ranked.length)*1000)/10;
+      kpis.push({label:'At-risk share (bottom 25%)', value: pct+'%'});
+      insights.push(`No explicit churn/status column was found, so risk was approximated: entities in the bottom 25% of ${topPerformers.numColumn} (${pct}% of ${topPerformers.catColumn} values) are flagged as at-risk.`);
+    }
+  }
+
+  if(['customer_analysis','financial_analysis','marketing_analysis','custom_analysis'].includes(objective) && numericCols.length>=2){
+    let best = {a:null,b:null,r:0};
+    for(let i=0;i<numericCols.length;i++){
+      for(let j=i+1;j<numericCols.length;j++){
+        const xs = rows.map(r=>parseFloat(r[numericCols[i].name])).filter(v=>!isNaN(v));
+        const ys = rows.map(r=>parseFloat(r[numericCols[j].name])).filter(v=>!isNaN(v));
+        const n = Math.min(xs.length, ys.length);
+        if(n<3) continue;
+        const r = daPearsonCorrelation(xs.slice(0,n), ys.slice(0,n));
+        if(Math.abs(r) > Math.abs(best.r)) best = {a:numericCols[i].name, b:numericCols[j].name, r};
+      }
+    }
+    if(best.a){
+      kpis.push({label:'Strongest correlation', value: `${best.a} ↔ ${best.b} (r=${Math.round(best.r*100)/100})`});
+      const strength = Math.abs(best.r)>0.7 ? 'strong' : (Math.abs(best.r)>0.4 ? 'moderate' : 'weak');
+      insights.push(`${best.a} and ${best.b} have a ${strength} ${best.r>0?'positive':'negative'} correlation (Pearson r = ${Math.round(best.r*100)/100}), computed directly from the data.`);
+    }
+  }
+
+  if(topPerformers){
+    const top = topPerformers.ranked[0];
+    kpis.push({label:`Top ${topPerformers.catColumn}`, value: `${top[0]} (${daFmtNum(top[1])})`});
+    insights.push(`${top[0]} leads on ${topPerformers.numColumn} with a total of ${daFmtNum(top[1])}, computed by summing ${topPerformers.numColumn} grouped by ${topPerformers.catColumn}.`);
+  }
+
+  if(kpis.length===0){
+    kpis.push({label:'Rows analyzed', value: rows.length});
+    insights.push('Not enough numeric/categorical structure was found to run regression or correlation — try a dataset with clearer numeric and category columns.');
+  }
+  return { kpis: kpis.slice(0,4), insights: insights.slice(0,5), chartTitle };
+}
+
+async function daSelectObjective(id, label){
+  daState.objective = {id, label};
+  document.getElementById('objective-err').textContent = '';
+  daShowView('view-processing');
+  document.getElementById('processing-status').textContent = 'Computing statistics…';
+  try {
+    const numericCols = daState.columns.filter(c=>c.type==='numeric');
+    const catCols = daState.columns.filter(c=>c.type==='categorical');
+    const dateCols = daState.columns.filter(c=>c.type==='date');
+    const processed = {
+      numericSummary: numericCols.map(c=>({name:c.name, mean:c.mean, min:c.min, max:c.max})),
+      hasDate: dateCols.length>0
+    };
+    const topPerformers = daComputeTopPerformers(catCols, numericCols, daState.rows);
+    daState.topPerformers = topPerformers;
+    daState.trend = daComputeTrend(daState.columns, daState.rows, topPerformers ? topPerformers.numColumn : null);
+    daState.categoryBreakdown = daComputeCategoryBreakdown(catCols, daState.rows, topPerformers ? topPerformers.catColumn : null);
+    daState.scatter = daComputeScatter(numericCols, daState.rows);
+    daState.histogram = daComputeHistogram(numericCols, daState.rows);
+    daState.stacked = daState.categoryBreakdown ? daComputeStackedBreakdown(catCols, daState.rows, daState.categoryBreakdown.column) : null;
+
+    document.getElementById('processing-status').textContent = 'Running regression and correlation analysis…';
+    const result = daRunLocalML(id, daState.columns, daState.rows, daState.trend, topPerformers, catCols, numericCols);
+    daState.result = result;
+    daState.processed = processed;
+    daRenderDashboard();
+    await daSaveAnalysis();
+    daShowView('view-dashboard');
+  } catch(err){
+    daShowView('view-objective');
+    document.getElementById('objective-err').textContent = 'Could not generate dashboard: ' + err.message;
+  }
+}
+
+function daEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function daFmtNum(n){ if(Math.abs(n)>=1000) return Math.round(n).toLocaleString(); return Math.round(n*100)/100; }
+
+function daSvgBarChart(items){
+  const width = 320, barHeight = 26, gap = 10, leftPad = 96, rightPad = 46, topPad = 8;
+  const maxVal = Math.max(...items.map(i=>i.value), 1);
+  const height = topPad*2 + items.length*(barHeight+gap);
+  let inner = '';
+  items.forEach((it,i)=>{
+    const y = topPad + i*(barHeight+gap);
+    const barW = Math.max(2, (width-leftPad-rightPad) * (it.value/maxVal));
+    inner += `<text x="${leftPad-8}" y="${y+barHeight/2}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="var(--text-secondary)">${daEsc(String(it.label)).slice(0,14)}</text>
+      <rect x="${leftPad}" y="${y}" width="${barW}" height="${barHeight}" rx="4" fill="#5DCAA5"/>
+      <text x="${leftPad+barW+6}" y="${y+barHeight/2}" dominant-baseline="middle" font-size="11" fill="var(--text-primary)">${daFmtNum(it.value)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-height:340px" role="img" aria-label="Ranked bar chart">${inner}</svg>`;
+}
+
+function daSvgLineChart(items){
+  const width = 320, height = 200, padL = 42, padR = 15, padT = 15, padB = 28;
+  const vals = items.map(i=>i.value);
+  const maxVal = Math.max(...vals), minVal = Math.min(...vals, 0);
+  const range = (maxVal-minVal) || 1;
+  const stepX = (width-padL-padR) / ((items.length-1) || 1);
+  const pt = (i,v)=>{ const x = padL + i*stepX; const y = padT + (height-padT-padB) * (1 - (v-minVal)/range); return [x,y]; };
+  const points = items.map((it,i)=>pt(i,it.value).join(',')).join(' ');
+  const dots = items.map((it,i)=>{ const [x,y]=pt(i,it.value); return `<circle cx="${x}" cy="${y}" r="3" fill="#5DCAA5"/>`; }).join('');
+  const labels = items.map((it,i)=>{ const [x]=pt(i,it.value); return `<text x="${x}" y="${height-8}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${daEsc(String(it.label))}</text>`; }).join('');
+  const yTop = `<text x="4" y="${padT+4}" font-size="10" fill="var(--text-secondary)">${daFmtNum(maxVal)}</text>`;
+  const yBot = `<text x="4" y="${height-padB}" font-size="10" fill="var(--text-secondary)">${daFmtNum(minVal)}</text>`;
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-height:220px" role="img" aria-label="Trend line chart">
+    <polyline points="${points}" fill="none" stroke="#5DCAA5" stroke-width="2"/>${dots}${labels}${yTop}${yBot}</svg>`;
+}
+
+function daComputeTrend(columns, rows, metricColName){
+  let xCol = columns.find(c=>c.type==='date');
+  if(!xCol) xCol = columns.find(c=>c.type==='numeric' && c.mean>1900 && c.mean<2100);
+  if(!xCol) return null;
+  const metric = columns.find(c=>c.name===metricColName) || columns.filter(c=>c.type==='numeric' && c.name!==xCol.name && !(c.mean>1900&&c.mean<2100)).sort((a,b)=>b.mean-a.mean)[0];
+  if(!metric) return null;
+  const sums = {};
+  rows.forEach(r=>{
+    let key = r[xCol.name];
+    if(xCol.type==='date'){ const d = new Date(key); if(isNaN(d)) return; key = d.getFullYear(); }
+    const val = parseFloat(r[metric.name]);
+    if(isNaN(val)) return;
+    sums[key] = (sums[key]||0) + val;
+  });
+  const items = Object.entries(sums).map(([k,v])=>({label:k, value:v})).sort((a,b)=> a.label>b.label?1:-1);
+  if(items.length<2) return null;
+  return { xColumn: xCol.name, metric: metric.name, items };
+}
+
+function daSvgPieChart(items){
+  const total = items.reduce((a,i)=>a+i.value,0) || 1;
+  const cx=90, cy=90, r=70;
+  let startAngle = -90;
+  const colors = ['#4FB99A','#E8895C','#5B8DEF','#D6BC5D','#B07AA1','#9AA7B0'];
+  let paths = '', legend = '';
+  items.forEach((it,i)=>{
+    const angle = (it.value/total)*360;
+    const endAngle = startAngle+angle;
+    const largeArc = angle>180 ? 1 : 0;
+    const startRad = Math.PI/180*startAngle, endRad = Math.PI/180*endAngle;
+    const x1 = cx + r*Math.cos(startRad), y1 = cy + r*Math.sin(startRad);
+    const x2 = cx + r*Math.cos(endRad), y2 = cy + r*Math.sin(endRad);
+    const color = colors[i%colors.length];
+    if(items.length===1){
+      paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>`;
+    } else {
+      paths += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z" fill="${color}" stroke="var(--surface-2)" stroke-width="1.5"/>`;
+    }
+    const pct = Math.round((it.value/total)*1000)/10;
+    legend += `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:3px;background:${color};display:inline-block;flex-shrink:0"></span>${daEsc(String(it.label))} — ${pct}%</div>`;
+    startAngle = endAngle;
+  });
+  return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><svg viewBox="0 0 180 180" width="150" height="150" role="img" aria-label="Category breakdown pie chart">${paths}</svg><div>${legend}</div></div>`;
+}
+
+function daSvgAreaChart(items){
+  const width = 320, height = 200, padL = 42, padR = 15, padT = 15, padB = 28;
+  const vals = items.map(i=>i.value);
+  const maxVal = Math.max(...vals), minVal = Math.min(...vals, 0);
+  const range = (maxVal-minVal) || 1;
+  const stepX = (width-padL-padR) / ((items.length-1) || 1);
+  const pt = (i,v)=>{ const x = padL + i*stepX; const y = padT + (height-padT-padB) * (1 - (v-minVal)/range); return [x,y]; };
+  const linePts = items.map((it,i)=>pt(i,it.value).join(',')).join(' ');
+  const baseY = padT + (height-padT-padB);
+  const areaPath = `M${padL},${baseY} L` + items.map((it,i)=>pt(i,it.value).join(',')).join(' L') + ` L${padL+stepX*(items.length-1)},${baseY} Z`;
+  const labels = items.map((it,i)=>{ const [x]=pt(i,it.value); return `<text x="${x}" y="${height-8}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${daEsc(String(it.label))}</text>`; }).join('');
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-height:220px" role="img" aria-label="Area chart">
+    <path d="${areaPath}" fill="#4FB99A" fill-opacity="0.25" stroke="none"/>
+    <polyline points="${linePts}" fill="none" stroke="#4FB99A" stroke-width="2"/>${labels}</svg>`;
+}
+
+function daSvgScatterChart(points, xLabel, yLabel){
+  const width = 320, height = 220, padL = 46, padR = 15, padT = 15, padB = 34;
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const xMin=Math.min(...xs), xMax=Math.max(...xs), yMin=Math.min(...ys), yMax=Math.max(...ys);
+  const xRange = (xMax-xMin)||1, yRange=(yMax-yMin)||1;
+  const dots = points.map(p=>{
+    const x = padL + (width-padL-padR) * ((p.x-xMin)/xRange);
+    const y = padT + (height-padT-padB) * (1 - (p.y-yMin)/yRange);
+    return `<circle cx="${x}" cy="${y}" r="3.5" fill="#4FB99A" fill-opacity="0.7"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-height:240px" role="img" aria-label="Scatter plot">
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height-padB}" stroke="var(--border)" stroke-width="1"/>
+    <line x1="${padL}" y1="${height-padB}" x2="${width-padR}" y2="${height-padB}" stroke="var(--border)" stroke-width="1"/>
+    ${dots}
+    <text x="${width/2}" y="${height-6}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${daEsc(xLabel)}</text>
+    <text x="10" y="${padT}" font-size="10" fill="var(--text-secondary)">${daEsc(yLabel)}</text></svg>`;
+}
+
+function daSvgHistogram(bins){
+  const width = 320, barGap = 3, leftPad = 34, rightPad = 10, topPad = 12, bottomPad = 28;
+  const n = bins.length;
+  const barW = (width-leftPad-rightPad-barGap*(n-1)) / n;
+  const maxCount = Math.max(...bins.map(b=>b.count), 1);
+  const chartH = 160;
+  let inner = '';
+  bins.forEach((b,i)=>{
+    const h = (chartH) * (b.count/maxCount);
+    const x = leftPad + i*(barW+barGap);
+    const y = topPad + (chartH - h);
+    inner += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="#4FB99A" rx="2"/>
+      <text x="${x+barW/2}" y="${topPad+chartH+14}" text-anchor="middle" font-size="9" fill="var(--text-secondary)">${b.rangeLabel}</text>`;
+  });
+  return `<svg viewBox="0 0 ${width} ${topPad+chartH+bottomPad}" width="100%" style="max-height:220px" role="img" aria-label="Histogram">${inner}</svg>`;
+}
+
+function daSvgStackedBarChart(categories, segmentNames, matrix){
+  const width = 320, barHeight = 26, gap = 12, leftPad = 90, rightPad = 15, topPad = 8;
+  const colors = ['#4FB99A','#E8895C','#5B8DEF','#D6BC5D','#B07AA1'];
+  const totals = matrix.map(row=>row.reduce((a,b)=>a+b,0));
+  const maxTotal = Math.max(...totals, 1);
+  const height = topPad*2 + categories.length*(barHeight+gap);
+  let bars = '';
+  categories.forEach((cat,ci)=>{
+    const y = topPad + ci*(barHeight+gap);
+    let xOffset = leftPad;
+    bars += `<text x="${leftPad-8}" y="${y+barHeight/2}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="var(--text-secondary)">${daEsc(String(cat)).slice(0,12)}</text>`;
+    matrix[ci].forEach((val,si)=>{
+      const w = (width-leftPad-rightPad) * (val/maxTotal);
+      bars += `<rect x="${xOffset}" y="${y}" width="${w}" height="${barHeight}" fill="${colors[si%colors.length]}"/>`;
+      xOffset += w;
+    });
+  });
+  const legend = segmentNames.map((s,i)=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px"><span style="width:9px;height:9px;border-radius:3px;background:${colors[i%colors.length]};display:inline-block"></span>${daEsc(String(s))}</div>`).join('');
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-height:300px" role="img" aria-label="Stacked bar chart">${bars}</svg>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">${legend}</div>`;
+}
+
+function daComputeScatter(numericCols, rows){
+  if(numericCols.length<2) return null;
+  let best = {a:null,b:null,r:0};
+  for(let i=0;i<numericCols.length;i++){
+    for(let j=i+1;j<numericCols.length;j++){
+      const xs = [], ys = [];
+      rows.forEach(r=>{
+        const x = parseFloat(r[numericCols[i].name]), y = parseFloat(r[numericCols[j].name]);
+        if(!isNaN(x) && !isNaN(y)){ xs.push(x); ys.push(y); }
+      });
+      if(xs.length<3) continue;
+      const r = daPearsonCorrelation(xs, ys);
+      if(Math.abs(r) > Math.abs(best.r)) best = {a:numericCols[i].name, b:numericCols[j].name, r, xs, ys};
+    }
+  }
+  if(!best.a) return null;
+  const points = best.xs.slice(0,300).map((x,i)=>({x, y:best.ys[i]}));
+  return { xCol: best.a, yCol: best.b, r: best.r, points };
+}
+
+function daComputeHistogram(numericCols, rows){
+  if(numericCols.length===0) return null;
+  const col = numericCols[0];
+  const vals = rows.map(r=>parseFloat(r[col.name])).filter(v=>!isNaN(v));
+  if(vals.length<3) return null;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const binCount = 8;
+  const width = (max-min)/binCount || 1;
+  const bins = Array.from({length:binCount}, (_,i)=>({start: min+i*width, end: min+(i+1)*width, count:0}));
+  vals.forEach(v=>{
+    let idx = Math.floor((v-min)/width);
+    if(idx>=binCount) idx = binCount-1;
+    if(idx<0) idx = 0;
+    bins[idx].count++;
+  });
+  return { column: col.name, bins: bins.map(b=>({rangeLabel: daFmtNum(b.start), count: b.count})) };
+}
+
+function daComputeStackedBreakdown(catCols, rows, primaryCol){
+  const secondary = catCols.find(c=>c.name!==primaryCol && c.unique>=2 && c.unique<=5);
+  if(!secondary) return null;
+  const primary = catCols.find(c=>c.name===primaryCol);
+  if(!primary) return null;
+  const primaryCounts = {};
+  rows.forEach(r=>{ const v=String(r[primary.name]); primaryCounts[v]=(primaryCounts[v]||0)+1; });
+  const topCats = Object.entries(primaryCounts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k])=>k);
+  const segValues = [...new Set(rows.map(r=>String(r[secondary.name])))].slice(0,5);
+  const matrix = topCats.map(cat=>segValues.map(seg=>rows.filter(r=>String(r[primary.name])===cat && String(r[secondary.name])===seg).length));
+  return { primaryCol: primary.name, secondaryCol: secondary.name, categories: topCats, segments: segValues, matrix };
+}
+
+function daComputeCategoryBreakdown(catCols, rows, excludeCol){
+  const hints = ['genre','category','type','segment','status','channel','platform','country'];
+  let col = catCols.find(c=>c.name!==excludeCol && hints.some(h=>c.name.toLowerCase().includes(h)) && c.unique>=2 && c.unique<=12);
+  if(!col) col = catCols.filter(c=>c.name!==excludeCol && c.unique>=2 && c.unique<=12).sort((a,b)=>a.unique-b.unique)[0];
+  if(!col) return null;
+  const counts = {};
+  rows.forEach(r=>{ const v = String(r[col.name]); counts[v] = (counts[v]||0)+1; });
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const top = entries.slice(0,5).map(([k,v])=>({label:k, value:v}));
+  const otherSum = entries.slice(5).reduce((a,[,v])=>a+v, 0);
+  if(otherSum>0) top.push({label:'Other', value:otherSum});
+  return { column: col.name, items: top };
+}
+
+const DA_CHART_TYPES = [
+  { id:'bar', label:'Bar', icon:'ti-chart-bar', available: ()=>true,
+    render: ()=> daState.topPerformers && daState.topPerformers.ranked.length>0
+      ? `<p class="da-title">Top ${daEsc(daState.topPerformers.catColumn)} by ${daEsc(daState.topPerformers.numColumn)}</p>` + daSvgBarChart(daState.topPerformers.ranked.map(r=>({label:r[0], value:r[1]})))
+      : `<p class="da-title">Column averages</p>` + daSvgBarChart(daState.processed.numericSummary.slice(0,6).map(n=>({label:n.name, value:n.mean}))) },
+  { id:'line', label:'Line', icon:'ti-chart-line', available: ()=>!!daState.trend,
+    render: ()=> `<p class="da-title">${daEsc(daState.trend.metric)} by ${daEsc(daState.trend.xColumn)} (trend)</p>` + daSvgLineChart(daState.trend.items) },
+  { id:'area', label:'Area', icon:'ti-chart-area-line', available: ()=>!!daState.trend,
+    render: ()=> `<p class="da-title">${daEsc(daState.trend.metric)} by ${daEsc(daState.trend.xColumn)} (area)</p>` + daSvgAreaChart(daState.trend.items) },
+  { id:'pie', label:'Pie', icon:'ti-chart-pie', available: ()=>!!daState.categoryBreakdown,
+    render: ()=> `<p class="da-title">${daEsc(daState.categoryBreakdown.column)} breakdown</p>` + daSvgPieChart(daState.categoryBreakdown.items) },
+  { id:'scatter', label:'Scatter', icon:'ti-chart-dots', available: ()=>!!daState.scatter,
+    render: ()=> `<p class="da-title">${daEsc(daState.scatter.xCol)} vs ${daEsc(daState.scatter.yCol)} (r=${Math.round(daState.scatter.r*100)/100})</p>` + daSvgScatterChart(daState.scatter.points, daState.scatter.xCol, daState.scatter.yCol) },
+  { id:'histogram', label:'Histogram', icon:'ti-chart-histogram', available: ()=>!!daState.histogram,
+    render: ()=> `<p class="da-title">Distribution of ${daEsc(daState.histogram.column)}</p>` + daSvgHistogram(daState.histogram.bins) },
+  { id:'stacked', label:'Stacked', icon:'ti-chart-bar-popular', available: ()=>!!daState.stacked,
+    render: ()=> `<p class="da-title">${daEsc(daState.stacked.primaryCol)} by ${daEsc(daState.stacked.secondaryCol)}</p>` + daSvgStackedBarChart(daState.stacked.categories, daState.stacked.segments, daState.stacked.matrix) }
+];
+
+let daActiveChart = 'bar';
+function daRenderChartSwitcher(tabsId, activeId){
+  const tabsDiv = document.getElementById(tabsId);
+  tabsDiv.innerHTML = '';
+  DA_CHART_TYPES.forEach(ct=>{
+    const ok = ct.available();
+    const btn = document.createElement('button');
+    btn.className = 'da-chart-tab' + (ct.id===daActiveChart ? ' active' : '') + (!ok ? ' disabled' : '');
+    btn.innerHTML = `<i class="ti ${ct.icon}"></i>${ct.label}`;
+    if(ok){ btn.onclick = ()=>{ daActiveChart = ct.id; daRenderChartSwitcher(tabsId, activeId); daPaintActiveChart(activeId); }; }
+    tabsDiv.appendChild(btn);
+  });
+}
+function daPaintActiveChart(activeId){
+  const ct = DA_CHART_TYPES.find(c=>c.id===daActiveChart && c.available()) || DA_CHART_TYPES.find(c=>c.available());
+  daActiveChart = ct.id;
+  document.getElementById(activeId).innerHTML = ct.render();
+}
+
+function daRenderAllChartsForReport(){
+  const map = { bar:['report-chart-bar','report-chart-bar-card'], line:['report-chart-line','report-chart-line-card'], area:['report-chart-area','report-chart-area-card'], pie:['report-chart-pie','report-chart-pie-card'], scatter:['report-chart-scatter','report-chart-scatter-card'], histogram:['report-chart-histogram','report-chart-histogram-card'], stacked:['report-chart-stacked','report-chart-stacked-card'] };
+  DA_CHART_TYPES.forEach(ct=>{
+    const ids = map[ct.id];
+    if(!ids) return;
+    const [contentId, cardId] = ids;
+    const card = document.getElementById(cardId);
+    if(ct.available()){
+      document.getElementById(contentId).innerHTML = ct.render();
+      if(card) card.style.display = 'block';
+    } else if(card){
+      card.style.display = 'none';
+    }
+  });
+}
+function daRenderDashboard(){
+  document.getElementById('dash-title').textContent = daState.objective.label;
+  const kpiDiv = document.getElementById('dash-kpis');
+  kpiDiv.innerHTML = '';
+  daState.result.kpis.forEach(k=>{
+    const d = document.createElement('div');
+    d.className = 'da-stat';
+    d.innerHTML = `<div class="n" style="font-size:18px">${k.value}</div><div class="l">${k.label}</div>`;
+    kpiDiv.appendChild(d);
+  });
+  const insDiv = document.getElementById('dash-insights');
+  insDiv.innerHTML = '';
+  daState.result.insights.forEach(i=>{
+    const li = document.createElement('li');
+    li.textContent = i;
+    insDiv.appendChild(li);
+  });
+  daActiveChart = 'bar';
+  daRenderChartSwitcher('dash-chart-tabs', 'dash-chart-active');
+  daPaintActiveChart('dash-chart-active');
+}
+
+async function daSaveAnalysis(){
+  try {
+    const id = 'a_' + Date.now();
+    const record = { id, filename: daState.filename, objective: daState.objective.label, objectiveId: daState.objective.id, date: new Date().toISOString(), result: daState.result };
+    await window.storage.set('analysis:'+id, JSON.stringify(record), false);
+    let listRes;
+    try { listRes = await window.storage.get('analyses:list', false); } catch(e){ listRes = null; }
+    const list = listRes ? JSON.parse(listRes.value) : [];
+    list.unshift(id);
+    await window.storage.set('analyses:list', JSON.stringify(list.slice(0,20)), false);
+  } catch(e){ console.error('save failed', e); }
+}
+
+async function daLoadRecent(){
+  const recentDiv = document.getElementById('recent-list');
+  const emptyHtml = '<div class="da-empty"><i class="ti ti-database-off"></i>No analyses yet — upload a file to get started.</div>';
+  try {
+    const listRes = await window.storage.get('analyses:list', false);
+    const list = JSON.parse(listRes.value);
+    if(list.length===0){ recentDiv.innerHTML = emptyHtml; document.getElementById('stat-count').textContent='0'; return; }
+    document.getElementById('stat-count').textContent = list.length;
+    const records = [];
+    for(const id of list.slice(0,10)){
+      try { const r = await window.storage.get('analysis:'+id, false); records.push(JSON.parse(r.value)); } catch(e){}
+    }
+    recentDiv.innerHTML = '';
+    records.forEach(r=>{
+      const div = document.createElement('div');
+      div.className = 'da-list-item';
+      const d = new Date(r.date);
+      div.innerHTML = `<div style="display:flex;align-items:center"><div class="da-obj-icon" style="width:30px;height:30px;font-size:14px"><i class="ti ${OBJECTIVE_ICONS[r.objectiveId]||'ti-chart-bar'}"></i></div><div><p style="margin:0;font-weight:600;font-size:14px">${r.filename}</p><p class="da-muted" style="margin:2px 0 0">${r.objective} · ${d.toLocaleDateString()}</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i>`;
+      recentDiv.appendChild(div);
+    });
+    const objCounts = {};
+    records.forEach(r=>{ objCounts[r.objective]=(objCounts[r.objective]||0)+1; });
+    const top = Object.entries(objCounts).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('stat-obj').textContent = top ? top[0] : '–';
+  } catch(e){
+    recentDiv.innerHTML = emptyHtml;
+  }
+}
+
+let daReportChart = null;
+function daPrintReport(){
+  try {
+    window.print();
+  } catch(e){
+    document.getElementById('report-meta').insertAdjacentHTML('afterend', '<p class="da-err">Print isn\'t available in this preview — screenshot the page instead, or open the app outside this chat.</p>');
+  }
+}
+
+function daShowReport(){
+  document.getElementById('report-filename').textContent = daState.filename;
+  document.getElementById('report-meta').textContent = `${daState.objective.label} · ${daState.summary.rowCount} rows · ${new Date().toLocaleDateString()}`;
+  const kpiDiv = document.getElementById('report-kpis');
+  kpiDiv.innerHTML = '';
+  daState.result.kpis.forEach(k=>{
+    const d = document.createElement('div');
+    d.className = 'da-stat';
+    d.innerHTML = `<div class="n" style="font-size:18px">${k.value}</div><div class="l">${k.label}</div>`;
+    kpiDiv.appendChild(d);
+  });
+  const insDiv = document.getElementById('report-insights');
+  insDiv.innerHTML = '';
+  daState.result.insights.forEach(i=>{
+    const li = document.createElement('li');
+    li.textContent = i;
+    insDiv.appendChild(li);
+  });
+  daRenderAllChartsForReport();
+  daShowView('view-report');
+}
+
+function daShowExport(text){
+  document.getElementById('export-panel').style.display = 'block';
+  const box = document.getElementById('export-output');
+  box.value = text;
+  box.focus();
+  box.select();
+}
+function daExportJSON(){
+  daShowExport(JSON.stringify({filename:daState.filename, objective:daState.objective, result:daState.result}, null, 2));
+}
+function daExportCSV(){
+  let csv = 'label,value\n';
+  daState.result.kpis.forEach(k=>{ csv += `"${k.label}","${k.value}"\n`; });
+  daShowExport(csv);
+}
+function daExportText(){
+  let text = `Data analyzer report\n${daState.filename} — ${daState.objective.label}\n\n`;
+  text += 'KPIs:\n';
+  daState.result.kpis.forEach(k=>{ text += `- ${k.label}: ${k.value}\n`; });
+  text += '\nInsights:\n';
+  daState.result.insights.forEach(i=>{ text += `- ${i}\n`; });
+  daShowExport(text);
+}
+
+daLoadRecent();
+</script>
