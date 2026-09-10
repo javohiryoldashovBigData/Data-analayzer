@@ -271,6 +271,12 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <p class="da-muted" style="margin-top:10px" data-i18n="or_paste_hint">Or use paste below if you'd rather not select a file.</p>
   </div>
   <div class="da-card">
+    <p class="da-title" style="margin-bottom:8px"><i class="ti ti-link" style="color:var(--da-accent);margin-right:4px"></i><span data-i18n="load_from_url">Or load from a URL</span></p>
+    <p class="da-muted" style="margin-bottom:8px" data-i18n="url_desc">Paste a direct link to a .csv, .json, .xlsx, .xls, or .pdf file (GitHub links work too)</p>
+    <input id="urlInput" type="url" class="da-input" placeholder="https://example.com/data.csv" data-i18n-placeholder="ph_url">
+    <button class="da-btn da-btn-primary" id="url-fetch-btn" style="margin-top:10px;width:100%;justify-content:center" onclick="daFetchFromUrl()"><i class="ti ti-download"></i><span data-i18n="fetch_data">Fetch data</span></button>
+  </div>
+  <div class="da-card">
     <p class="da-title" style="margin-bottom:8px"><i class="ti ti-clipboard-text" style="color:var(--da-accent);margin-right:4px"></i><span data-i18n="paste_here">Or paste your data here</span></p>
     <p class="da-muted" style="margin-bottom:8px" data-i18n="paste_desc">Paste CSV (with header row) or JSON array of objects, then tap the button below</p>
     <textarea id="pasteInput" rows="10" style="width:100%;font-family:var(--font-mono);font-size:13px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box" placeholder="name,revenue,date&#10;Acme,1200,2024-01-05&#10;Beta,900,2024-01-06"></textarea>
@@ -392,7 +398,7 @@ const OBJECTIVES = [
 let daState = { rows: [], columns: [], filename: '', summary: null, objective: null, result: null, user: null, authMode: 'signin', lang: 'en', theme: 'light' };
 
 /* ================= i18n ================= */
-const DA_LANGS = { en:'English', zh:'中文', ru:'Русский', ar:'العربية' };
+const DA_LANGS = { en:'English', zh:'中文', ru:'Русский', ar:'العربية', es:'Español', fr:'Français', de:'Deutsch' };
 const DA_I18N = {
   en: {
     brand:'Data Analyzer', brand_sub:'Upload → Inspect → Analyze → Export',
@@ -405,7 +411,7 @@ const DA_I18N = {
     your_activity:'Your activity', datasets_analyzed:'Datasets analyzed', most_used_objective:'Most used objective',
     recent_analyses:'Recent analyses', no_analyses:'No analyses yet — upload a file to get started.',
     upload_data:'Upload data', choose_a_file:'Choose a file', file_types:'CSV, Excel (.xlsx/.xls), JSON, or PDF (with a real table in it)',
-    or_paste_hint:"Or use paste below if you'd rather not select a file.",
+    or_paste_hint:"Or use paste below if you'd rather not select a file.", load_from_url:'Or load from a URL', url_desc:'Paste a direct link to a .csv, .json, .xlsx, .xls, or .pdf file (GitHub links work too)', ph_url:'https://example.com/data.csv', fetch_data:'Fetch data',
     paste_here:'Or paste your data here', paste_desc:'Paste CSV (with header row) or JSON array of objects, then tap the button below',
     analyze_this_data:'Analyze this data',
     inspecting_data:'Inspecting data', reading_file:'Reading file…',
@@ -430,7 +436,7 @@ const DA_I18N = {
     your_activity:'你的活动', datasets_analyzed:'已分析的数据集', most_used_objective:'最常用的目标',
     recent_analyses:'最近的分析', no_analyses:'还没有分析记录 — 上传一个文件开始吧。',
     upload_data:'上传数据', choose_a_file:'选择文件', file_types:'CSV、Excel（.xlsx/.xls）、JSON，或包含真实表格的 PDF',
-    or_paste_hint:'如果不想选择文件，也可以在下方粘贴数据。',
+    or_paste_hint:'如果不想选择文件，也可以在下方粘贴数据。', load_from_url:'或从网址加载', url_desc:'粘贴指向 .csv、.json、.xlsx、.xls 或 .pdf 文件的直接链接（也支持 GitHub 链接）', ph_url:'https://example.com/data.csv', fetch_data:'获取数据',
     paste_here:'或在此粘贴数据', paste_desc:'粘贴带表头的 CSV 或 JSON 对象数组，然后点击下方按钮',
     analyze_this_data:'分析这些数据',
     inspecting_data:'正在检查数据', reading_file:'正在读取文件…',
@@ -455,7 +461,7 @@ const DA_I18N = {
     your_activity:'Ваша активность', datasets_analyzed:'Проанализировано наборов данных', most_used_objective:'Часто используемая цель',
     recent_analyses:'Недавние анализы', no_analyses:'Пока нет анализов — загрузите файл, чтобы начать.',
     upload_data:'Загрузка данных', choose_a_file:'Выбрать файл', file_types:'CSV, Excel (.xlsx/.xls), JSON или PDF (с настоящей таблицей)',
-    or_paste_hint:'Или вставьте данные ниже, если не хотите выбирать файл.',
+    or_paste_hint:'Или вставьте данные ниже, если не хотите выбирать файл.', load_from_url:'Или загрузите по ссылке', url_desc:'Вставьте прямую ссылку на файл .csv, .json, .xlsx, .xls или .pdf (ссылки GitHub тоже подходят)', ph_url:'https://example.com/data.csv', fetch_data:'Загрузить данные',
     paste_here:'Или вставьте данные здесь', paste_desc:'Вставьте CSV (с заголовком) или массив объектов JSON, затем нажмите кнопку ниже',
     analyze_this_data:'Проанализировать данные',
     inspecting_data:'Проверка данных', reading_file:'Чтение файла…',
@@ -480,7 +486,7 @@ const DA_I18N = {
     your_activity:'نشاطك', datasets_analyzed:'مجموعات البيانات المحلّلة', most_used_objective:'الهدف الأكثر استخدامًا',
     recent_analyses:'التحليلات الأخيرة', no_analyses:'لا توجد تحليلات بعد — ارفع ملفًا للبدء.',
     upload_data:'رفع البيانات', choose_a_file:'اختر ملفًا', file_types:'CSV أو Excel (.xlsx/.xls) أو JSON أو PDF (يحتوي جدولًا حقيقيًا)',
-    or_paste_hint:'أو الصق بياناتك أدناه إذا كنت تفضل عدم اختيار ملف.',
+    or_paste_hint:'أو الصق بياناتك أدناه إذا كنت تفضل عدم اختيار ملف.', load_from_url:'أو حمّل من رابط', url_desc:'الصق رابطًا مباشرًا لملف .csv أو .json أو .xlsx أو .xls أو .pdf (روابط GitHub مدعومة أيضًا)', ph_url:'https://example.com/data.csv', fetch_data:'جلب البيانات',
     paste_here:'أو الصق بياناتك هنا', paste_desc:'الصق CSV (مع صف عناوين) أو مصفوفة JSON، ثم اضغط الزر أدناه',
     analyze_this_data:'حلّل هذه البيانات',
     inspecting_data:'جارٍ فحص البيانات', reading_file:'جارٍ قراءة الملف…',
@@ -493,6 +499,81 @@ const DA_I18N = {
     footer_tagline:'انحدار وارتباط حقيقي — يعمل بالكامل داخل متصفحك.',
     auth_desc:'سجّل الدخول لحفظ سجل تحليلاتك عبر أجهزتك. يمكنك أيضًا الاستمرار في استخدام التطبيق بدون حساب.',
     ph_email:'البريد الإلكتروني', ph_password:'كلمة المرور', signin:'تسجيل الدخول', signup:'إنشاء حساب', no_account:'ليس لديك حساب؟', have_account:'لديك حساب بالفعل؟', please_wait:'يرجى الانتظار…', err_enter_both:'أدخل البريد الإلكتروني وكلمة المرور.', err_connecting:'لا يزال الاتصال قيد التقدم — حاول مرة أخرى بعد قليل.',
+  },
+  es: {
+    brand:'Analizador de Datos', brand_sub:'Subir → Inspeccionar → Analizar → Exportar',
+    hero_h1:'Convierte una hoja de cálculo en una respuesta.',
+    hero_p:'Sube un archivo CSV, Excel, JSON o PDF. La regresión y correlación real se calcula en tu navegador — sin adivinar, sin esperar a un servidor.',
+    upload_your_data:'Sube tus datos', how_it_works:'Cómo funciona',
+    step1_t:'Subir', step1_d:'Pega tus datos o elige un archivo CSV, Excel, JSON o PDF.',
+    step2_t:'Elige un objetivo', step2_d:'Revisamos tus columnas y sugerimos qué vale la pena analizar.',
+    step3_t:'Obtén tu informe', step3_d:'Gráficos interactivos, estadísticas reales y un resumen imprimible.',
+    your_activity:'Tu actividad', datasets_analyzed:'Conjuntos de datos analizados', most_used_objective:'Objetivo más usado',
+    recent_analyses:'Análisis recientes', no_analyses:'Aún no hay análisis — sube un archivo para empezar.',
+    upload_data:'Subir datos', choose_a_file:'Elegir un archivo', file_types:'CSV, Excel (.xlsx/.xls), JSON, o PDF (con una tabla real)',
+    or_paste_hint:'O pega tus datos abajo si prefieres no seleccionar un archivo.', load_from_url:'O cárgalo desde una URL', url_desc:'Pega un enlace directo a un archivo .csv, .json, .xlsx, .xls o .pdf (los enlaces de GitHub también funcionan)', ph_url:'https://ejemplo.com/datos.csv', fetch_data:'Obtener datos',
+    paste_here:'O pega tus datos aquí', paste_desc:'Pega un CSV (con fila de encabezado) o un array JSON de objetos, luego pulsa el botón',
+    analyze_this_data:'Analizar estos datos',
+    inspecting_data:'Inspeccionando datos', reading_file:'Leyendo archivo…',
+    choose_objective:'Elige un objetivo', suggested_for_data:'Sugerido para estos datos', see_all_objectives:'Ver todos los objetivos',
+    processing:'Procesando', running_analysis:'Ejecutando análisis…',
+    done:'Listo', ai_insights:'Análisis de IA', view_full_report:'Ver informe completo', show_as_json:'Mostrar como JSON', show_as_csv:'Mostrar como CSV',
+    copy_hint:'Toca el cuadro, selecciona todo y copia — las descargas no son compatibles en esta vista previa.',
+    analysis_report:'Informe de análisis', back:'Atrás', insights:'Conclusiones',
+    save_pdf:'Guardar como PDF / Imprimir', print_hint:'Abrirá el diálogo de impresión de tu navegador — elige "Guardar como PDF".',
+    footer_tagline:'Regresión y correlación real — se ejecuta enteramente en tu navegador.',
+    auth_desc:'Inicia sesión para guardar tu historial de análisis en todos tus dispositivos. También puedes seguir usando la app sin una cuenta.',
+    ph_email:'Correo electrónico', ph_password:'Contraseña', signin:'Iniciar sesión', signup:'Registrarse', no_account:'¿No tienes una cuenta?', have_account:'¿Ya tienes una cuenta?', please_wait:'Espera un momento…', err_enter_both:'Ingresa un correo y una contraseña.', err_connecting:'Aún conectando — intenta de nuevo en un momento.',
+  },
+  fr: {
+    brand:'Analyseur de Données', brand_sub:'Importer → Inspecter → Analyser → Exporter',
+    hero_h1:'Transformez un tableur en réponse.',
+    hero_p:'Déposez un fichier CSV, Excel, JSON ou PDF. La régression et la corrélation réelles sont calculées dans votre navigateur — sans deviner, sans attendre un serveur.',
+    upload_your_data:'Importez vos données', how_it_works:'Comment ça marche',
+    step1_t:'Importer', step1_d:'Collez vos données ou choisissez un fichier CSV, Excel, JSON ou PDF.',
+    step2_t:'Choisissez un objectif', step2_d:"Nous examinons vos colonnes et suggérons ce qui vaut la peine d'être analysé.",
+    step3_t:'Obtenez votre rapport', step3_d:'Graphiques interactifs, statistiques réelles et résumé imprimable.',
+    your_activity:'Votre activité', datasets_analyzed:'Jeux de données analysés', most_used_objective:'Objectif le plus utilisé',
+    recent_analyses:'Analyses récentes', no_analyses:"Aucune analyse pour l'instant — importez un fichier pour commencer.",
+    upload_data:'Importer des données', choose_a_file:'Choisir un fichier', file_types:'CSV, Excel (.xlsx/.xls), JSON, ou PDF (avec un vrai tableau)',
+    or_paste_hint:'Ou collez vos données ci-dessous si vous préférez ne pas sélectionner de fichier.', load_from_url:"Ou charger depuis une URL", url_desc:'Collez un lien direct vers un fichier .csv, .json, .xlsx, .xls ou .pdf (les liens GitHub fonctionnent aussi)', ph_url:'https://exemple.com/donnees.csv', fetch_data:'Récupérer les données',
+    paste_here:'Ou collez vos données ici', paste_desc:"Collez un CSV (avec ligne d'en-tête) ou un tableau JSON d'objets, puis appuyez sur le bouton",
+    analyze_this_data:'Analyser ces données',
+    inspecting_data:'Inspection des données', reading_file:'Lecture du fichier…',
+    choose_objective:'Choisissez un objectif', suggested_for_data:'Suggéré pour ces données', see_all_objectives:'Voir tous les objectifs',
+    processing:'Traitement en cours', running_analysis:"Exécution de l'analyse…",
+    done:'Terminé', ai_insights:"Analyses de l'IA", view_full_report:'Voir le rapport complet', show_as_json:'Afficher en JSON', show_as_csv:'Afficher en CSV',
+    copy_hint:"Touchez la zone, sélectionnez tout et copiez — les téléchargements ne sont pas pris en charge dans cet aperçu.",
+    analysis_report:"Rapport d'analyse", back:'Retour', insights:'Analyses',
+    save_pdf:'Enregistrer en PDF / Imprimer', print_hint:'Ouvrira la boîte de dialogue d\'impression de votre navigateur — choisissez "Enregistrer en PDF".',
+    footer_tagline:'Régression et corrélation réelles — s\'exécute entièrement dans votre navigateur.',
+    auth_desc:'Connectez-vous pour sauvegarder votre historique d\'analyses sur tous vos appareils. Vous pouvez aussi continuer à utiliser l\'application sans compte.',
+    ph_email:'E-mail', ph_password:'Mot de passe', signin:'Se connecter', signup:"S'inscrire", no_account:'Pas encore de compte ?', have_account:'Déjà un compte ?', please_wait:'Veuillez patienter…', err_enter_both:'Entrez un e-mail et un mot de passe.', err_connecting:'Connexion en cours — réessayez dans un instant.',
+  },
+  de: {
+    brand:'Datenanalysator', brand_sub:'Hochladen → Prüfen → Analysieren → Exportieren',
+    hero_h1:'Verwandeln Sie eine Tabelle in eine Antwort.',
+    hero_p:'Laden Sie eine CSV-, Excel-, JSON- oder PDF-Datei hoch. Echte Regressions- und Korrelationsberechnungen laufen direkt in Ihrem Browser — kein Raten, kein Warten auf einen Server.',
+    upload_your_data:'Laden Sie Ihre Daten hoch', how_it_works:'So funktioniert es',
+    step1_t:'Hochladen', step1_d:'Fügen Sie Ihre Daten ein oder wählen Sie eine CSV-, Excel-, JSON- oder PDF-Datei.',
+    step2_t:'Ziel auswählen', step2_d:'Wir prüfen Ihre Spalten und schlagen vor, was sich zu analysieren lohnt.',
+    step3_t:'Bericht erhalten', step3_d:'Interaktive Diagramme, echte Statistiken und eine druckbare Zusammenfassung.',
+    your_activity:'Ihre Aktivität', datasets_analyzed:'Analysierte Datensätze', most_used_objective:'Meistgenutztes Ziel',
+    recent_analyses:'Letzte Analysen', no_analyses:'Noch keine Analysen — laden Sie eine Datei hoch, um zu beginnen.',
+    upload_data:'Daten hochladen', choose_a_file:'Datei auswählen', file_types:'CSV, Excel (.xlsx/.xls), JSON oder PDF (mit einer echten Tabelle)',
+    or_paste_hint:'Oder fügen Sie Ihre Daten unten ein, wenn Sie keine Datei auswählen möchten.', load_from_url:'Oder von einer URL laden', url_desc:'Fügen Sie einen direkten Link zu einer .csv-, .json-, .xlsx-, .xls- oder .pdf-Datei ein (GitHub-Links funktionieren ebenfalls)', ph_url:'https://beispiel.com/daten.csv', fetch_data:'Daten abrufen',
+    paste_here:'Oder fügen Sie Ihre Daten hier ein', paste_desc:'Fügen Sie eine CSV (mit Kopfzeile) oder ein JSON-Array von Objekten ein und tippen Sie dann auf die Schaltfläche',
+    analyze_this_data:'Diese Daten analysieren',
+    inspecting_data:'Daten werden geprüft', reading_file:'Datei wird gelesen…',
+    choose_objective:'Ziel auswählen', suggested_for_data:'Vorschlag für diese Daten', see_all_objectives:'Alle Ziele anzeigen',
+    processing:'Verarbeitung', running_analysis:'Analyse läuft…',
+    done:'Fertig', ai_insights:'KI-Erkenntnisse', view_full_report:'Vollständigen Bericht ansehen', show_as_json:'Als JSON anzeigen', show_as_csv:'Als CSV anzeigen',
+    copy_hint:'Tippen Sie auf das Feld, wählen Sie alles aus und kopieren Sie — Downloads werden in dieser Vorschau nicht unterstützt.',
+    analysis_report:'Analysebericht', back:'Zurück', insights:'Erkenntnisse',
+    save_pdf:'Als PDF speichern / Drucken', print_hint:'Öffnet den Druckdialog Ihres Browsers — wählen Sie "Als PDF speichern".',
+    footer_tagline:'Echte Regression &amp; Korrelation — läuft vollständig in Ihrem Browser.',
+    auth_desc:'Melden Sie sich an, um Ihren Analyseverlauf geräteübergreifend zu speichern. Sie können die App auch weiterhin ohne Konto nutzen.',
+    ph_email:'E-Mail', ph_password:'Passwort', signin:'Anmelden', signup:'Registrieren', no_account:'Noch kein Konto?', have_account:'Bereits ein Konto?', please_wait:'Bitte warten…', err_enter_both:'Geben Sie E-Mail und Passwort ein.', err_connecting:'Verbindung wird aufgebaut — versuchen Sie es gleich noch einmal.',
   }
 };
 
@@ -676,7 +757,9 @@ function daValidateRows(rows){
 }
 
 async function daExtractPdfTable(file){
-  const buf = await file.arrayBuffer();
+  return daExtractPdfTableFromBuffer(await file.arrayBuffer());
+}
+async function daExtractPdfTableFromBuffer(buf){
   const pdf = await pdfjsLib.getDocument({data: buf}).promise;
   const allLines = [];
   for(let p=1; p<=pdf.numPages; p++){
@@ -721,6 +804,61 @@ async function daExtractPdfTable(file){
     return obj;
   });
   return rows;
+}
+
+function daNormalizeDataUrl(url){
+  // GitHub "blob" view URLs -> raw.githubusercontent.com
+  const m = url.match(/^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/(.+)$/i);
+  if(m){
+    return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}`.split('?')[0];
+  }
+  return url;
+}
+
+async function daFetchFromUrl(){
+  const input = document.getElementById('urlInput');
+  const rawUrl = input.value.trim();
+  daSetAlert('upload-err', '');
+  if(!rawUrl){ daSetAlert('upload-err', 'Paste a URL first.'); return; }
+  const url = daNormalizeDataUrl(rawUrl);
+  const btn = document.getElementById('url-fetch-btn');
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader-2"></i> Fetching…';
+  btn.disabled = true;
+  try {
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error('Server returned ' + resp.status);
+    const path = url.split('?')[0].toLowerCase();
+    let rows;
+    if(path.endsWith('.csv')){
+      const text = await resp.text();
+      const parsed = Papa.parse(text, { header:true, skipEmptyLines:true, dynamicTyping:true });
+      rows = parsed.data;
+    } else if(path.endsWith('.json')){
+      const text = await resp.text();
+      rows = JSON.parse(text);
+      if(!Array.isArray(rows)) rows = [rows];
+    } else if(path.endsWith('.xlsx') || path.endsWith('.xls')){
+      const buf = await resp.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+    } else if(path.endsWith('.pdf')){
+      const buf = await resp.arrayBuffer();
+      try { rows = await daExtractPdfTableFromBuffer(buf); }
+      catch(e){ throw new Error("We couldn't find a data table in that PDF."); }
+    } else {
+      throw new Error('Unrecognized file type at that URL — use a link ending in .csv, .json, .xlsx, .xls, or .pdf');
+    }
+    const filename = decodeURIComponent(path.split('/').pop() || 'url-data');
+    daProcessRows(rows, filename);
+  } catch(e){
+    daSetAlert('upload-err', e.message.includes('enter real data') || e.message.includes("couldn't find")
+      ? e.message
+      : "Couldn't load that URL: " + e.message + ' — some sites block cross-origin access. GitHub raw links usually work.');
+  }
+  btn.innerHTML = originalHtml;
+  btn.disabled = false;
 }
 
 async function daProcessRows(rows, filename){
