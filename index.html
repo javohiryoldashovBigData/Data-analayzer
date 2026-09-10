@@ -1,3 +1,9 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Data Analyzer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -7,7 +13,7 @@
 <style>
 :root{ --da-accent:#4FB99A; --da-accent-deep:#2E8B72; --da-accent-warm:#E8895C; --da-ink:#12201B; --da-display:'Space Grotesk',var(--font-sans); }
 html{background:linear-gradient(180deg, rgba(79,185,154,0.06), rgba(79,185,154,0) 280px), var(--surface-1); min-height:100vh}
-body{min-height:100vh}
+body{min-height:100vh;margin:0}
 .da-app{font-family:var(--font-sans);max-width:640px;margin:0 auto;padding:18px 16px 48px;box-sizing:border-box}
 input[type="file"]{font-size:13px;color:var(--text-secondary);width:100%}
 input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload-button{
@@ -52,6 +58,13 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 .da-spinner{width:26px;height:26px;border-radius:50%;border:2.5px solid var(--border);border-top-color:var(--da-accent);animation:daspin 0.7s linear infinite}
 @keyframes daspin{to{transform:rotate(360deg)}}
 .da-err{color:var(--text-danger,#c0432b);font-size:13px;margin-top:8px}
+.da-progress-track{width:100%;max-width:220px;height:5px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:2px}
+.da-progress-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg, var(--da-accent), var(--da-accent-deep));transition:width 0.4s ease}
+@keyframes daKpiIn{from{opacity:0;transform:translateY(10px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.da-kpi-in{opacity:0;animation:daKpiIn 0.4s ease forwards}
+@keyframes daCardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.da-card-in{opacity:0;animation:daCardIn 0.45s ease forwards}
+@media (prefers-reduced-motion: reduce){ .da-kpi-in,.da-card-in{animation:none !important;opacity:1 !important} }
 .da-list-item{padding:11px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:opacity 0.15s}
 .da-list-item:hover{opacity:0.7}
 .da-list-item:last-child{border-bottom:none}
@@ -91,6 +104,8 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 .da-how-body .d{font-size:13px;color:var(--text-secondary);line-height:1.45}
 .da-section-title{font-family:var(--da-display);font-size:15px;font-weight:600;margin:0 0 10px;letter-spacing:-0.01em}
 </style>
+</head>
+<body>
 
 <div class="da-app" id="daApp">
 
@@ -178,7 +193,9 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 
 <div class="da-view" id="view-inspect">
   <p class="da-h1">Inspecting data</p>
-  <div class="da-progress"><div class="da-spinner"></div><span id="inspect-status" class="da-muted">Reading file…</span></div>
+  <div class="da-progress"><div class="da-spinner"></div><span id="inspect-status" class="da-muted">Reading file…</span>
+    <div class="da-progress-track"><div class="da-progress-fill" id="inspect-fill"></div></div>
+  </div>
 </div>
 
 <div class="da-view" id="view-objective">
@@ -193,8 +210,11 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 
 <div class="da-view" id="view-processing">
   <p class="da-h1">Processing</p>
-  <div class="da-progress"><div class="da-spinner"></div><span id="processing-status" class="da-muted">Running analysis…</span></div>
+  <div class="da-progress"><div class="da-spinner"></div><span id="processing-status" class="da-muted">Running analysis…</span>
+    <div class="da-progress-track"><div class="da-progress-fill" id="processing-fill"></div></div>
+  </div>
 </div>
+
 
 <div class="da-view" id="view-dashboard">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -202,11 +222,11 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <button class="da-btn" onclick="daGoLanding()">Done</button>
   </div>
   <div class="da-grid2" id="dash-kpis" style="margin-bottom:1rem"></div>
-  <div class="da-card">
+  <div class="da-card da-card-in" style="animation-delay:0.15s">
     <div id="dash-chart-tabs" class="da-chart-tabs"></div>
     <div id="dash-chart-active"></div>
   </div>
-  <div class="da-card">
+  <div class="da-card da-card-in" style="animation-delay:0.28s">
     <p class="da-title">AI insights</p>
     <ul id="dash-insights" style="margin:0;padding-left:18px;font-size:14px;line-height:1.7"></ul>
   </div>
@@ -454,15 +474,22 @@ async function daProcessRows(rows, filename){
   document.getElementById('upload-err').textContent = '';
   daState.filename = filename;
   daShowView('view-inspect');
+  document.getElementById('inspect-status').textContent = 'Reading file…';
+  document.getElementById('inspect-fill').style.width = '10%';
   try {
+    await daSleep(400);
     rows = daValidateRows(rows);
     daState.rows = rows;
     document.getElementById('inspect-status').textContent = 'Detecting columns and quality…';
+    document.getElementById('inspect-fill').style.width = '55%';
+    await daSleep(500);
     const columns = daAnalyzeColumns(rows);
     daState.columns = columns;
     const duplicates = rows.length - new Set(rows.map(r=>JSON.stringify(r))).size;
 
     document.getElementById('inspect-status').textContent = 'Running local analysis…';
+    document.getElementById('inspect-fill').style.width = '90%';
+    await daSleep(450);
     const qualitySummary = daGenerateQualitySummary(columns, duplicates, rows.length);
     const suggestedObjectives = daSuggestObjectives(columns);
     daState.summary = { qualitySummary, suggestedObjectives, duplicates, rowCount: rows.length };
@@ -676,7 +703,9 @@ async function daSelectObjective(id, label){
   document.getElementById('objective-err').textContent = '';
   daShowView('view-processing');
   document.getElementById('processing-status').textContent = 'Computing statistics…';
+  document.getElementById('processing-fill').style.width = '15%';
   try {
+    await daSleep(450);
     const numericCols = daState.columns.filter(c=>c.type==='numeric');
     const catCols = daState.columns.filter(c=>c.type==='categorical');
     const dateCols = daState.columns.filter(c=>c.type==='date');
@@ -693,9 +722,15 @@ async function daSelectObjective(id, label){
     daState.stacked = daState.categoryBreakdown ? daComputeStackedBreakdown(catCols, daState.rows, daState.categoryBreakdown.column) : null;
 
     document.getElementById('processing-status').textContent = 'Running regression and correlation analysis…';
+    document.getElementById('processing-fill').style.width = '60%';
+    await daSleep(500);
     const result = daRunLocalML(id, daState.columns, daState.rows, daState.trend, topPerformers, catCols, numericCols);
     daState.result = result;
     daState.processed = processed;
+
+    document.getElementById('processing-status').textContent = 'Building charts…';
+    document.getElementById('processing-fill').style.width = '95%';
+    await daSleep(400);
     daRenderDashboard();
     await daSaveAnalysis();
     daShowView('view-dashboard');
@@ -706,6 +741,7 @@ async function daSelectObjective(id, label){
 }
 
 function daEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function daSleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
 function daHumanize(name){
   if(name===null || name===undefined) return '';
   const s = String(name).replace(/[_\-]+/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2').trim();
@@ -991,9 +1027,10 @@ function daRenderDashboard(){
   document.getElementById('dash-title').textContent = daState.objective.label;
   const kpiDiv = document.getElementById('dash-kpis');
   kpiDiv.innerHTML = '';
-  daState.result.kpis.forEach(k=>{
+  daState.result.kpis.forEach((k,i)=>{
     const d = document.createElement('div');
-    d.className = 'da-stat';
+    d.className = 'da-stat da-kpi-in';
+    d.style.animationDelay = (i*0.06)+'s';
     d.innerHTML = `<div class="n" style="font-size:18px">${k.value}</div><div class="l">${k.label}</div>`;
     kpiDiv.appendChild(d);
   });
@@ -1108,3 +1145,6 @@ function daExportText(){
 
 daLoadRecent();
 </script>
+
+</body>
+</html>
