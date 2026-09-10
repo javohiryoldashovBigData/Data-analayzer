@@ -1,16 +1,29 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{ --da-accent:#4FB99A; --da-accent-deep:#2E8B72; --da-accent-warm:#E8895C; }
-.da-app{font-family:var(--font-sans);max-width:640px;margin:0 auto}
+:root{ --da-accent:#4FB99A; --da-accent-deep:#2E8B72; --da-accent-warm:#E8895C; --da-ink:#12201B; --da-display:'Space Grotesk',var(--font-sans); }
+html{background:linear-gradient(180deg, rgba(79,185,154,0.06), rgba(79,185,154,0) 280px), var(--surface-1); min-height:100vh}
+body{min-height:100vh}
+.da-app{font-family:var(--font-sans);max-width:640px;margin:0 auto;padding:18px 16px 48px;box-sizing:border-box}
+input[type="file"]{font-size:13px;color:var(--text-secondary);width:100%}
+input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload-button{
+  padding:9px 14px;border-radius:9px;border:0.5px solid var(--border-strong);background:var(--surface-1);
+  color:var(--text-primary);font-size:13px;font-family:var(--font-sans);margin-right:10px;cursor:pointer}
+.da-footer{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;color:var(--text-secondary);font-size:12px;padding:2rem 0 0.5rem;border-top:0.5px solid var(--border);margin-top:2rem}
+.da-footer-brand{display:flex;align-items:center;gap:7px;font-family:var(--da-display);font-weight:600;font-size:13px;color:var(--text-primary)}
+.da-footer-brand .dot{width:6px;height:6px;border-radius:50%;background:var(--da-accent)}
 .da-view{display:none; animation: daFadeIn 0.25s ease}
 .da-view.active{display:block}
 @keyframes daFadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
 .da-header{display:flex;align-items:center;gap:10px;padding:2px 0 1.1rem;border-bottom:0.5px solid var(--border);margin-bottom:1.1rem}
 .da-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg, var(--da-accent), var(--da-accent-deep));display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
-.da-brand{font-weight:600;font-size:15px;letter-spacing:-0.01em}
+.da-brand{font-family:var(--da-display);font-weight:600;font-size:15px;letter-spacing:-0.01em}
 .da-brand-sub{font-size:11px;color:var(--text-secondary);margin-top:-1px}
+.da-header{position:relative}
 .da-steps{display:flex;align-items:center;gap:4px;margin-bottom:1.25rem}
 .da-step{flex:1;height:3px;border-radius:2px;background:var(--border)}
 .da-step.done{background:var(--da-accent)}
@@ -19,11 +32,15 @@
 .da-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;font-size:14px;border-radius:10px;border:0.5px solid var(--border-strong);background:transparent;cursor:pointer;color:var(--text-primary);transition:transform 0.1s, background 0.15s}
 .da-btn:hover{background:var(--surface-1); transform:translateY(-1px)}
 .da-btn:active{transform:translateY(0)}
-.da-btn-primary{background:var(--da-accent);color:#fff;border:none;box-shadow:0 2px 8px -2px rgba(79,185,154,0.5)}
+.da-btn-primary{background:var(--da-accent);color:#fff;border:none;box-shadow:0 2px 8px -2px rgba(79,185,154,0.5);position:relative;overflow:hidden}
 .da-btn-primary:hover{background:var(--da-accent-deep)}
+.da-btn-primary:active{transform:translateY(0) scale(0.98)}
+.da-btn-primary::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,0.35),transparent);transform:skewX(-20deg)}
+.da-btn-primary:hover::after{left:140%;transition:left 0.55s ease}
+.da-btn-primary:not(:hover)::after{transition:left 0s}
 .da-muted{color:var(--text-secondary);font-size:13px}
-.da-title{font-size:16px;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em}
-.da-h1{font-size:21px;font-weight:600;margin:0 0 1rem;letter-spacing:-0.01em}
+.da-title{font-family:var(--da-display);font-size:16px;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em}
+.da-h1{font-family:var(--da-display);font-size:21px;font-weight:600;margin:0 0 1rem;letter-spacing:-0.01em}
 .da-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .da-stat{background:var(--surface-1);border-radius:12px;padding:1rem;border:0.5px solid var(--border)}
 .da-stat .n{font-size:22px;font-weight:600;color:var(--da-accent-deep)}
@@ -43,7 +60,36 @@
 .da-chart-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .da-chart-tab{font-size:12px;padding:6px 10px;border-radius:20px;border:0.5px solid var(--border-strong);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px}
 .da-chart-tab.active{background:var(--da-accent);color:#fff;border-color:var(--da-accent)}
+.da-dropzone{border:1.5px dashed var(--border-strong);border-radius:12px;padding:1.5rem 1rem;text-align:center;transition:border-color 0.15s, background 0.15s}
+.da-dropzone.has-file{border-style:solid;border-color:var(--da-accent)}
+.da-dropzone-icon{width:44px;height:44px;border-radius:50%;background:rgba(79,185,154,0.12);color:var(--da-accent-deep);display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 10px}
+#file-picked-name{font-size:13px;font-weight:600;margin-top:10px;color:var(--da-accent-deep)}
 .da-chart-tab.disabled{opacity:0.35;cursor:not-allowed}
+
+/* ---- hero ---- */
+.da-hero{background:linear-gradient(155deg, var(--da-ink) 0%, #1B3A2E 60%, var(--da-accent-deep) 130%);border-radius:18px;padding:2rem 1.5rem 1.75rem;margin-bottom:1.5rem;position:relative;overflow:hidden;color:#fff}
+.da-hero-eyebrow{font-family:var(--da-display);font-size:12px;color:rgba(255,255,255,0.65);margin:0 0 10px;opacity:0;animation:daHeroUp 0.5s ease 0.05s forwards}
+.da-hero h1{font-family:var(--da-display);font-size:26px;line-height:1.18;font-weight:700;letter-spacing:-0.01em;margin:0 0 10px;opacity:0;animation:daHeroUp 0.5s ease 0.15s forwards}
+.da-hero p{font-size:14px;line-height:1.5;color:rgba(255,255,255,0.82);margin:0 0 20px;max-width:34ch;opacity:0;animation:daHeroUp 0.5s ease 0.25s forwards}
+.da-hero-cta{opacity:0;animation:daHeroUp 0.5s ease 0.35s forwards}
+.da-hero-cta .da-btn-primary{background:#fff;color:var(--da-ink);box-shadow:0 4px 14px -4px rgba(0,0,0,0.35)}
+.da-hero-cta .da-btn-primary:hover{background:#EDEDE8}
+.da-hero-cta .da-btn-primary::after{background:linear-gradient(120deg,transparent,rgba(20,40,30,0.18),transparent)}
+.da-hero-chart{display:flex;align-items:flex-end;gap:5px;height:56px;margin-top:22px}
+.da-hero-chart .bar{flex:1;background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.45));border-radius:3px 3px 1px 1px;height:0;animation:daBarGrow 0.6s cubic-bezier(.22,1.4,.4,1) 0.5s forwards}
+@keyframes daHeroUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes daBarGrow{to{height:var(--h)}}
+@media (prefers-reduced-motion: reduce){
+  .da-hero-eyebrow,.da-hero h1,.da-hero p,.da-hero-cta,.da-hero-chart .bar{animation:none !important;opacity:1 !important;height:var(--h,auto)}
+}
+
+.da-how{display:flex;flex-direction:column;gap:2px;margin-bottom:1.5rem}
+.da-how-step{display:flex;gap:13px;padding:12px 0;border-bottom:0.5px solid var(--border)}
+.da-how-step:last-child{border-bottom:none}
+.da-how-num{font-family:var(--font-mono);font-size:12px;color:var(--da-accent-deep);background:rgba(79,185,154,0.12);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.da-how-body .t{font-size:14px;font-weight:600;margin-bottom:2px}
+.da-how-body .d{font-size:13px;color:var(--text-secondary);line-height:1.45}
+.da-section-title{font-family:var(--da-display);font-size:15px;font-weight:600;margin:0 0 10px;letter-spacing:-0.01em}
 </style>
 
 <div class="da-app" id="daApp">
@@ -61,9 +107,43 @@
 </div>
 
 <div class="da-view active" id="view-landing">
+
+  <div class="da-hero">
+    <p class="da-hero-eyebrow">Data Analyzer</p>
+    <h1>Turn a spreadsheet into an answer.</h1>
+    <p>Drop in a CSV, Excel, JSON, or PDF file. Real regression and correlation math runs in your browser — no guessing, no waiting on a server.</p>
+    <div class="da-hero-cta">
+      <button class="da-btn da-btn-primary" onclick="daGoUpload()"><i class="ti ti-upload"></i>Upload your data</button>
+    </div>
+    <div class="da-hero-chart" aria-hidden="true">
+      <div class="bar" style="--h:38%"></div>
+      <div class="bar" style="--h:62%"></div>
+      <div class="bar" style="--h:47%"></div>
+      <div class="bar" style="--h:88%"></div>
+      <div class="bar" style="--h:70%"></div>
+      <div class="bar" style="--h:100%"></div>
+      <div class="bar" style="--h:58%"></div>
+    </div>
+  </div>
+
+  <p class="da-section-title">How it works</p>
+  <div class="da-how">
+    <div class="da-how-step">
+      <div class="da-how-num">1</div>
+      <div class="da-how-body"><div class="t">Upload</div><div class="d">Paste your data or pick a CSV, Excel, JSON, or PDF file.</div></div>
+    </div>
+    <div class="da-how-step">
+      <div class="da-how-num">2</div>
+      <div class="da-how-body"><div class="t">Pick an objective</div><div class="d">We inspect your columns and suggest what's worth analyzing.</div></div>
+    </div>
+    <div class="da-how-step">
+      <div class="da-how-num">3</div>
+      <div class="da-how-body"><div class="t">Get your report</div><div class="d">Interactive charts, real stats, and a printable summary.</div></div>
+    </div>
+  </div>
+
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-    <p class="da-h1" style="margin:0">Overview</p>
-    <button class="da-btn da-btn-primary" onclick="daGoUpload()"><i class="ti ti-upload"></i>Upload data</button>
+    <p class="da-section-title" style="margin:0">Your activity</p>
   </div>
   <div class="da-grid2" style="margin-bottom:1rem">
     <div class="da-stat"><div class="n" id="stat-count">0</div><div class="l">Datasets analyzed</div></div>
@@ -77,9 +157,14 @@
   <p class="da-h1">Upload data</p>
   <div class="da-card">
     <p class="da-title" style="margin-bottom:8px"><i class="ti ti-file-upload" style="color:var(--da-accent);margin-right:4px"></i>Choose a file</p>
-    <p class="da-muted" style="margin-bottom:8px">CSV, Excel (.xlsx/.xls), or JSON</p>
-    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json">
-    <p class="da-muted" style="margin-top:8px">If tapping this does nothing, use paste below instead — some in-chat previews block the native file picker.</p>
+    <p class="da-muted" style="margin-bottom:12px">CSV, Excel (.xlsx/.xls), JSON, or PDF (with a real table in it)</p>
+    <div class="da-dropzone" id="dropzone">
+      <div class="da-dropzone-icon"><i class="ti ti-cloud-upload"></i></div>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json,.pdf" style="display:none">
+      <button type="button" class="da-btn da-btn-primary" style="justify-content:center" onclick="document.getElementById('fileInput').click()"><i class="ti ti-folder-open"></i>Choose a file</button>
+      <p id="file-picked-name"></p>
+    </div>
+    <p class="da-muted" style="margin-top:10px">Or use paste below if you'd rather not select a file.</p>
   </div>
   <div class="da-card">
     <p class="da-title" style="margin-bottom:8px"><i class="ti ti-clipboard-text" style="color:var(--da-accent);margin-right:4px"></i>Or paste your data here</p>
@@ -162,7 +247,7 @@
   </div>
   <div class="da-no-print" style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:1.25rem">
     <button class="da-btn da-btn-primary" style="width:100%;justify-content:center" onclick="daPrintReport()"><i class="ti ti-printer"></i>Save as PDF / Print</button>
-    <p class="da-muted" style="text-align:center">If the print dialog doesn't open here, open this file outside the chat (locally or once hosted) and try again — or screenshot this page instead.</p>
+    <p class="da-muted" style="text-align:center">Opens your browser's print dialog — choose "Save as PDF" as the destination.</p>
   </div>
 </div>
 
@@ -177,9 +262,14 @@
 }
 </style>
 
+<div class="da-footer">
+  <div class="da-footer-brand"><span class="dot"></span>Data Analyzer</div>
+  <p style="margin:0">Real regression &amp; correlation math — runs entirely in your browser.</p>
+</div>
 </div>
 
 <script>
+if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }
 const OBJECTIVES = [
   {id:'sales_prediction', label:'Sales prediction', needs:'numeric + date columns'},
   {id:'customer_churn', label:'Customer churn', needs:'categorical status column'},
@@ -289,13 +379,83 @@ function daPearsonCorrelation(xs, ys){
   return den===0 ? 0 : num/den;
 }
 
+function daValidateRows(rows){
+  if(!Array.isArray(rows) || rows.length===0){
+    throw new Error("We couldn't find any data in that file. Please enter real data — a table with rows and columns.");
+  }
+  const cleanRows = rows.filter(r=>r && typeof r==='object' && Object.values(r).some(v=>v!==null && v!==''));
+  if(cleanRows.length===0){
+    throw new Error("That file looks empty. Please enter real data — a table with rows and columns.");
+  }
+  const keys = Object.keys(cleanRows[0]).filter(k=>k && k.trim());
+  if(keys.length < 2){
+    throw new Error("This doesn't look like real data — we need at least two columns to analyze. Please check the file and try again.");
+  }
+  if(cleanRows.length < 2){
+    throw new Error("We only found one row of data. Please upload a file with more than one row so there's something to analyze.");
+  }
+  const totalCells = cleanRows.length * keys.length;
+  const filledCells = cleanRows.reduce((sum,r)=>sum + keys.filter(k=>r[k]!==null && r[k]!==undefined && String(r[k]).trim()!=='').length, 0);
+  if(filledCells / totalCells < 0.35){
+    throw new Error("Most of this file appears empty or unreadable. Please enter real data — a table with rows and columns.");
+  }
+  return cleanRows;
+}
+
+async function daExtractPdfTable(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const allLines = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items.filter(it=>it.str && it.str.trim());
+    if(items.length===0) continue;
+    const lineMap = new Map();
+    items.forEach(it=>{
+      const key = Math.round(it.transform[5] / 3) * 3;
+      if(!lineMap.has(key)) lineMap.set(key, []);
+      lineMap.get(key).push(it);
+    });
+    const ys = Array.from(lineMap.keys()).sort((a,b)=>b-a);
+    ys.forEach(y=>{
+      const lineItems = lineMap.get(y).sort((a,b)=>a.transform[4]-b.transform[4]);
+      const cells = [];
+      let current = lineItems[0].str;
+      let lastX = lineItems[0].transform[4] + (lineItems[0].width || 0);
+      for(let i=1;i<lineItems.length;i++){
+        const it = lineItems[i];
+        const gap = it.transform[4] - lastX;
+        if(gap > 8){ cells.push(current.trim()); current = it.str; }
+        else { current += it.str; }
+        lastX = it.transform[4] + (it.width || 0);
+      }
+      cells.push(current.trim());
+      if(cells.some(c=>c)) allLines.push(cells);
+    });
+  }
+  if(allLines.length < 2) throw new Error('NO_TABLE');
+  const counts = {};
+  allLines.forEach(l=>{ counts[l.length] = (counts[l.length]||0)+1; });
+  const [bestCount, bestVotes] = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  const colCount = parseInt(bestCount, 10);
+  if(colCount < 2 || bestVotes < 2) throw new Error('NO_TABLE');
+  const tableLines = allLines.filter(l=>l.length===colCount);
+  const header = tableLines[0].map((h,i)=> (h && h.trim()) || ('column_'+(i+1)) );
+  const rows = tableLines.slice(1).map(line=>{
+    const obj = {};
+    header.forEach((h,i)=>{ obj[h] = (line[i]!==undefined && line[i]!=='') ? line[i] : null; });
+    return obj;
+  });
+  return rows;
+}
+
 async function daProcessRows(rows, filename){
   document.getElementById('upload-err').textContent = '';
   daState.filename = filename;
   daShowView('view-inspect');
   try {
-    rows = rows.filter(r=>Object.values(r).some(v=>v!==null && v!==''));
-    if(rows.length===0) throw new Error('No data rows found');
+    rows = daValidateRows(rows);
     daState.rows = rows;
     document.getElementById('inspect-status').textContent = 'Detecting columns and quality…';
     const columns = daAnalyzeColumns(rows);
@@ -332,7 +492,7 @@ function daHandlePaste(){
       rows = daParseCSVText(raw);
     }
   } catch(err){
-    document.getElementById('upload-err').textContent = 'Could not read data: ' + err.message;
+    document.getElementById('upload-err').textContent = "We couldn't read that as data. Please enter real data — CSV with a header row, or a JSON array of objects.";
     return;
   }
   daProcessRows(rows, 'pasted-data');
@@ -342,6 +502,8 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
   document.getElementById('upload-err').textContent = '';
+  document.getElementById('dropzone').classList.add('has-file');
+  document.getElementById('file-picked-name').innerHTML = `<i class="ti ti-file-check" style="margin-right:4px"></i>${file.name}`;
   try {
     let rows = [];
     if(file.name.endsWith('.csv')){
@@ -356,12 +518,21 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
       const text = await file.text();
       rows = JSON.parse(text);
       if(!Array.isArray(rows)) rows = [rows];
+    } else if(file.name.endsWith('.pdf')){
+      document.getElementById('upload-err').textContent = 'Reading PDF…';
+      try {
+        rows = await daExtractPdfTable(file);
+      } catch(e){
+        throw new Error("We couldn't find a data table in this PDF. Please enter real data — try exporting it as CSV/Excel, or paste the table below.");
+      }
     } else {
-      throw new Error('Unsupported file type — use CSV, Excel, or JSON');
+      throw new Error('Unsupported file type — use CSV, Excel, JSON, or PDF');
     }
     daProcessRows(rows, file.name);
   } catch(err){
-    document.getElementById('upload-err').textContent = 'Could not read file: ' + err.message + ' — try pasting the data instead.';
+    document.getElementById('dropzone').classList.remove('has-file');
+    document.getElementById('file-picked-name').textContent = '';
+    document.getElementById('upload-err').textContent = (err.message.includes('enter real data') ? err.message : 'Could not read file: ' + err.message + ' — please enter real data, or try pasting it instead.');
   }
 });
 
@@ -399,12 +570,19 @@ function daShowAllObjectives(){
   el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
+function daIsIdLikeColumn(col){
+  const n = col.name.toLowerCase();
+  if(/(^|_)id$/.test(n) || n==='uuid' || n==='guid') return true;
+  return false;
+}
+
 function daComputeTopPerformers(catCols, numericCols, rows){
-  if(catCols.length===0 || numericCols.length===0) return null;
+  const usableCatCols = catCols.filter(c=>!daIsIdLikeColumn(c));
+  if(usableCatCols.length===0 || numericCols.length===0) return null;
   const nameHints = ['artist','track','name','product','customer','category','channel'];
-  let catCol = catCols.find(c=>nameHints.some(h=>c.name.toLowerCase().includes(h)));
+  let catCol = usableCatCols.find(c=>nameHints.some(h=>c.name.toLowerCase().includes(h)));
   if(!catCol){
-    catCol = catCols.filter(c=>c.unique>=2 && c.unique<=rows.length*0.7).sort((a,b)=>b.unique-a.unique)[0] || catCols[0];
+    catCol = usableCatCols.filter(c=>c.unique>=2 && c.unique<=rows.length*0.7).sort((a,b)=>b.unique-a.unique)[0] || usableCatCols[0];
   }
   const metricHints = ['stream','count','revenue','sales','amount','total','views','popularity','price'];
   let numCol = numericCols.find(c=>metricHints.some(h=>c.name.toLowerCase().includes(h)));
@@ -469,6 +647,7 @@ function daRunLocalML(objective, columns, rows, trend, topPerformers, catCols, n
         const n = Math.min(xs.length, ys.length);
         if(n<3) continue;
         const r = daPearsonCorrelation(xs.slice(0,n), ys.slice(0,n));
+        if(Math.abs(r) > 0.995) continue; // trivial/derived pair — not an insight
         if(Math.abs(r) > Math.abs(best.r)) best = {a:numericCols[i].name, b:numericCols[j].name, r};
       }
     }
@@ -690,6 +869,7 @@ function daComputeScatter(numericCols, rows){
       });
       if(xs.length<3) continue;
       const r = daPearsonCorrelation(xs, ys);
+      if(Math.abs(r) > 0.995) continue; // trivial/derived pair (e.g. same value in different units) — not an insight
       if(Math.abs(r) > Math.abs(best.r)) best = {a:numericCols[i].name, b:numericCols[j].name, r, xs, ys};
     }
   }
@@ -717,7 +897,7 @@ function daComputeHistogram(numericCols, rows){
 }
 
 function daComputeStackedBreakdown(catCols, rows, primaryCol){
-  const secondary = catCols.find(c=>c.name!==primaryCol && c.unique>=2 && c.unique<=5);
+  const secondary = catCols.find(c=>c.name!==primaryCol && !daIsIdLikeColumn(c) && c.unique>=2 && c.unique<=5);
   if(!secondary) return null;
   const primary = catCols.find(c=>c.name===primaryCol);
   if(!primary) return null;
@@ -730,9 +910,10 @@ function daComputeStackedBreakdown(catCols, rows, primaryCol){
 }
 
 function daComputeCategoryBreakdown(catCols, rows, excludeCol){
+  const usable = catCols.filter(c=>!daIsIdLikeColumn(c));
   const hints = ['genre','category','type','segment','status','channel','platform','country'];
-  let col = catCols.find(c=>c.name!==excludeCol && hints.some(h=>c.name.toLowerCase().includes(h)) && c.unique>=2 && c.unique<=12);
-  if(!col) col = catCols.filter(c=>c.name!==excludeCol && c.unique>=2 && c.unique<=12).sort((a,b)=>a.unique-b.unique)[0];
+  let col = usable.find(c=>c.name!==excludeCol && hints.some(h=>c.name.toLowerCase().includes(h)) && c.unique>=2 && c.unique<=12);
+  if(!col) col = usable.filter(c=>c.name!==excludeCol && c.unique>=2 && c.unique<=12).sort((a,b)=>a.unique-b.unique)[0];
   if(!col) return null;
   const counts = {};
   rows.forEach(r=>{ const v = String(r[col.name]); counts[v] = (counts[v]||0)+1; });
