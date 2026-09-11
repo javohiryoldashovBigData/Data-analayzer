@@ -7,10 +7,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDDl82Dyn6ixDIC0rwbkJykJ8toeab6lkI",
@@ -26,7 +27,7 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  window.daFirebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, collection, query, orderBy, limit, getDocs };
+  window.daFirebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs };
 
   onAuthStateChanged(auth, (user)=>{
     if(window.daOnAuthChange) window.daOnAuthChange(user);
@@ -80,8 +81,8 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 .da-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;font-size:14px;border-radius:10px;border:0.5px solid var(--border-strong);background:transparent;cursor:pointer;color:var(--text-primary);transition:transform 0.1s, background 0.15s}
 .da-btn:hover{background:var(--surface-1); transform:translateY(-1px)}
 .da-btn:active{transform:translateY(0)}
-.da-btn-primary{background:var(--da-accent);color:#fff;border:none;box-shadow:0 2px 8px -2px rgba(79,185,154,0.5);position:relative;overflow:hidden}
-.da-btn-primary:hover{background:var(--da-accent-deep)}
+.da-btn-primary{background:linear-gradient(135deg, var(--da-accent), var(--da-accent-deep));color:#fff;border:none;box-shadow:0 3px 12px -3px rgba(79,185,154,0.55);position:relative;overflow:hidden}
+.da-btn-primary:hover{box-shadow:0 5px 16px -3px rgba(79,185,154,0.65)}
 .da-btn-primary:active{transform:translateY(0) scale(0.98)}
 .da-btn-primary::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,0.35),transparent);transform:skewX(-20deg)}
 .da-btn-primary:hover::after{left:140%;transition:left 0.55s ease}
@@ -91,6 +92,9 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 .da-h1{font-family:var(--da-display);font-size:21px;font-weight:600;margin:0 0 1rem;letter-spacing:-0.01em}
 .da-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .da-stat{background:var(--surface-1);border-radius:12px;padding:1rem;border:0.5px solid var(--border)}
+.da-stat-rich{position:relative;overflow:hidden;padding-bottom:0.75rem}
+.da-stat-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:8px}
+.da-stat-spark{display:block;width:100%;height:20px;margin-top:8px;opacity:0.6}
 .da-stat .n{font-size:22px;font-weight:600;color:var(--da-accent-deep)}
 .da-stat .l{font-size:12px;color:var(--text-secondary);margin-top:2px}
 .da-obj{background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color 0.15s, transform 0.1s}
@@ -123,28 +127,68 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 
 /* ---- hero ---- */
 .da-hero{background:linear-gradient(155deg, var(--da-ink) 0%, #1B3A2E 60%, var(--da-accent-deep) 130%);border-radius:18px;padding:2rem 1.5rem 1.75rem;margin-bottom:1.5rem;position:relative;overflow:hidden;color:#fff}
+.da-hero-orb{position:absolute;border-radius:50%;filter:blur(28px);opacity:0.55;pointer-events:none}
+.da-hero-orb-1{width:180px;height:180px;background:radial-gradient(circle, var(--da-accent), transparent 70%);top:-60px;right:-40px;animation:daOrbFloat1 13s ease-in-out infinite}
+.da-hero-orb-2{width:150px;height:150px;background:radial-gradient(circle, var(--da-accent-warm), transparent 70%);bottom:-50px;left:-30px;animation:daOrbFloat2 16s ease-in-out infinite}
+.da-hero-orb-3{width:110px;height:110px;background:radial-gradient(circle, #6FD3B8, transparent 70%);top:40%;right:20%;animation:daOrbFloat3 10s ease-in-out infinite}
+@keyframes daOrbFloat1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-18px,22px) scale(1.12)}}
+@keyframes daOrbFloat2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-16px) scale(1.08)}}
+@keyframes daOrbFloat3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-14px,-18px) scale(0.9)}}
+@media (prefers-reduced-motion: reduce){ .da-hero-orb{animation:none !important} }
 .da-hero-eyebrow{font-family:var(--da-display);font-size:12px;color:rgba(255,255,255,0.65);margin:0 0 10px;opacity:0;animation:daHeroUp 0.5s ease 0.05s forwards}
 .da-hero h1{font-family:var(--da-display);font-size:26px;line-height:1.18;font-weight:700;letter-spacing:-0.01em;margin:0 0 10px;opacity:0;animation:daHeroUp 0.5s ease 0.15s forwards}
 .da-hero p{font-size:14px;line-height:1.5;color:rgba(255,255,255,0.82);margin:0 0 20px;max-width:34ch;opacity:0;animation:daHeroUp 0.5s ease 0.25s forwards}
-.da-hero-cta{opacity:0;animation:daHeroUp 0.5s ease 0.35s forwards}
+.da-hero-cta{opacity:0;animation:daHeroUp 0.5s ease 0.35s forwards;display:flex;flex-direction:column;align-items:flex-start}
+.da-hero-cta .da-btn{justify-content:center;width:100%;box-sizing:border-box}
 .da-hero-cta .da-btn-primary{background:#fff;color:var(--da-ink);box-shadow:0 4px 14px -4px rgba(0,0,0,0.35)}
 .da-hero-cta .da-btn-primary:hover{background:#EDEDE8}
 .da-hero-cta .da-btn-primary::after{background:linear-gradient(120deg,transparent,rgba(20,40,30,0.18),transparent)}
 .da-hero-chart{display:flex;align-items:flex-end;gap:5px;height:56px;margin-top:22px}
 .da-hero-chart .bar{flex:1;background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.45));border-radius:3px 3px 1px 1px;height:0;animation:daBarGrow 0.6s cubic-bezier(.22,1.4,.4,1) 0.5s forwards}
+.da-hero-texture{position:absolute;inset:0;pointer-events:none;opacity:0.5;background-image:radial-gradient(rgba(255,255,255,0.14) 1px, transparent 1px);background-size:18px 18px;-webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,0.9), transparent 75%);mask-image:linear-gradient(180deg, rgba(0,0,0,0.9), transparent 75%)}
 @keyframes daHeroUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes daBarGrow{to{height:var(--h)}}
 @media (prefers-reduced-motion: reduce){
   .da-hero-eyebrow,.da-hero h1,.da-hero p,.da-hero-cta,.da-hero-chart .bar{animation:none !important;opacity:1 !important;height:var(--h,auto)}
 }
 
-.da-how{display:flex;flex-direction:column;gap:2px;margin-bottom:1.5rem}
-.da-how-step{display:flex;gap:13px;padding:12px 0;border-bottom:0.5px solid var(--border)}
+.da-how{display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem}
+.da-how-step{display:flex;gap:13px;padding:14px;border-radius:12px;background:var(--surface-2);border:0.5px solid var(--border);transition:transform 0.15s, box-shadow 0.15s, border-color 0.15s}
+.da-how-step:hover{transform:translateY(-2px);box-shadow:0 6px 18px -8px rgba(0,0,0,0.12);border-color:var(--border-strong)}
+.da-how-num{font-size:17px;background:linear-gradient(135deg, var(--da-accent), var(--da-accent-deep));color:#fff;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 10px -3px rgba(79,185,154,0.45)}
 .da-how-step:last-child{border-bottom:none}
-.da-how-num{font-family:var(--font-mono);font-size:12px;color:var(--da-accent-deep);background:rgba(79,185,154,0.12);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .da-how-body .t{font-size:14px;font-weight:600;margin-bottom:2px}
 .da-how-body .d{font-size:13px;color:var(--text-secondary);line-height:1.45}
 .da-section-title{font-family:var(--da-display);font-size:15px;font-weight:600;margin:0 0 10px;letter-spacing:-0.01em}
+
+/* ---- showcase / badges / testimonials ---- */
+.da-premium-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.da-premium-card{position:relative;overflow:hidden;background:var(--surface-2);border:0.5px solid var(--border);border-radius:14px;padding:18px 8px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;transition:transform 0.15s, box-shadow 0.15s, border-color 0.15s}
+.da-premium-card:hover{transform:translateY(-3px);box-shadow:0 8px 20px -8px rgba(0,0,0,0.15);border-color:var(--border-strong)}
+.da-premium-card i{font-size:21px;color:var(--da-accent-deep);z-index:1}
+.da-premium-card span{font-size:12px;font-weight:600;color:var(--text-primary);z-index:1;line-height:1.2}
+.da-premium-card .corner{position:absolute;width:50px;height:50px;border-radius:50%;filter:blur(3px);opacity:0.3;pointer-events:none;bottom:-20px;right:-20px}
+.da-premium-card .corner-1{background:var(--da-accent)}
+.da-premium-card .corner-2{background:var(--da-accent-warm)}
+.da-fmt-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;z-index:1}
+.da-fmt-icon i{color:inherit}
+.da-premium-card small{font-size:10px;color:var(--text-secondary);z-index:1;line-height:1.2;margin-top:-4px}
+.da-testimonial{padding:4px 0}
+.da-testimonial-stars{color:#E8A23C;font-size:14px;margin-bottom:6px}
+.da-testimonial-quote{font-size:14px;line-height:1.5;color:var(--text-primary);margin:0 0 8px;font-style:italic}
+.da-testimonial-author{font-size:12px;color:var(--text-secondary);font-weight:600}
+.da-testimonial + .da-testimonial{margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)}
+.da-rating-summary{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.da-rating-summary .num{font-family:var(--da-display);font-size:22px;font-weight:700;color:var(--text-primary)}
+.da-rating-summary .stars{color:#E8A23C;font-size:15px}
+.da-upload-icon-badge{width:34px;height:34px;border-radius:50%;background:rgba(79,185,154,0.14);color:var(--da-accent-deep);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+
+/* ---- stat strip ---- */
+.da-stat-strip{display:flex;justify-content:space-between;gap:6px;margin:-0.5rem 0 1.75rem;padding:0 2px}
+.da-stat-strip-item{flex:1;text-align:center}
+.da-stat-strip-item .n{font-family:var(--da-display);font-size:20px;font-weight:700;color:var(--da-accent-deep);letter-spacing:-0.01em}
+.da-stat-strip-item .l{font-size:10.5px;color:var(--text-secondary);margin-top:1px;line-height:1.25}
+@media (max-width:360px){ .da-stat-strip-item .l{font-size:9.5px} }
 
 /* ---- auth ---- */
 .da-signin-btn{font-size:13px;font-weight:600;color:var(--da-accent-deep);background:transparent;border:0.5px solid var(--border-strong);border-radius:20px;padding:7px 13px;cursor:pointer;display:flex;align-items:center;gap:5px}
@@ -203,6 +247,24 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
+<div id="admin-modal" class="da-modal-overlay" style="display:none">
+  <div class="da-modal" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <p class="da-title" style="margin:0">Site content admin</p>
+      <button class="da-btn" style="padding:6px 10px" onclick="daCloseAdmin()"><i class="ti ti-x"></i></button>
+    </div>
+    <p class="da-muted" style="margin-bottom:14px">Edit what visitors see in the ratings/testimonials section. Changes are public and visible to everyone immediately after saving.</p>
+    <label class="da-muted" style="font-size:12px;font-weight:600">Overall rating (0–5, blank to hide)</label>
+    <input id="admin-rating" type="number" min="0" max="5" step="0.1" class="da-input" style="margin-top:4px" placeholder="e.g. 4.8">
+    <label class="da-muted" style="font-size:12px;font-weight:600;margin-top:14px;display:block">Number of reviews (optional)</label>
+    <input id="admin-rating-count" type="number" min="0" class="da-input" style="margin-top:4px" placeholder="e.g. 12">
+    <div id="admin-testimonials"></div>
+    <button class="da-btn" style="margin-top:10px;width:100%;justify-content:center" onclick="daAddAdminTestimonialField()"><i class="ti ti-plus"></i>Add testimonial</button>
+    <div id="admin-err" class="da-err"></div>
+    <button class="da-btn da-btn-primary" style="width:100%;justify-content:center;margin-top:16px" onclick="daSaveSiteContent()"><i class="ti ti-device-floppy"></i>Save changes</button>
+  </div>
+</div>
+
 <div class="da-steps" id="da-steps">
   <div class="da-step" data-step="1"></div>
   <div class="da-step" data-step="2"></div>
@@ -213,11 +275,15 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 <div class="da-view active" id="view-landing">
 
   <div class="da-hero">
+    <div class="da-hero-orb da-hero-orb-1" aria-hidden="true"></div>
+    <div class="da-hero-orb da-hero-orb-2" aria-hidden="true"></div>
+    <div class="da-hero-orb da-hero-orb-3" aria-hidden="true"></div>
     <p class="da-hero-eyebrow" data-i18n="brand">Data Analyzer</p>
     <h1 data-i18n="hero_h1">Turn a spreadsheet into an answer.</h1>
     <p data-i18n="hero_p">Drop in a CSV, Excel, JSON, or PDF file. Real regression and correlation math runs in your browser — no guessing, no waiting on a server.</p>
     <div class="da-hero-cta">
       <button class="da-btn da-btn-primary" onclick="daGoUpload()"><i class="ti ti-upload"></i><span data-i18n="upload_your_data">Upload your data</span></button>
+      <button class="da-btn" style="margin-top:8px;background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.3);color:#fff" onclick="daLoadSample()"><i class="ti ti-flask"></i><span data-i18n="try_sample">Try a sample dataset</span></button>
     </div>
     <div class="da-hero-chart" aria-hidden="true">
       <div class="bar" style="--h:38%"></div>
@@ -228,39 +294,87 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
       <div class="bar" style="--h:100%"></div>
       <div class="bar" style="--h:58%"></div>
     </div>
+    <div class="da-hero-texture" aria-hidden="true"></div>
+  </div>
+
+  <div class="da-stat-strip">
+    <div class="da-stat-strip-item"><div class="n">7</div><div class="l" data-i18n="stat_chart_types">chart types</div></div>
+    <div class="da-stat-strip-item"><div class="n">6</div><div class="l" data-i18n="stat_formats">file formats</div></div>
+    <div class="da-stat-strip-item"><div class="n">100%</div><div class="l" data-i18n="stat_browser">runs in-browser</div></div>
+    <div class="da-stat-strip-item"><div class="n">7</div><div class="l" data-i18n="stat_languages">languages</div></div>
   </div>
 
   <p class="da-section-title" data-i18n="how_it_works">How it works</p>
   <div class="da-how">
     <div class="da-how-step">
-      <div class="da-how-num">1</div>
+      <div class="da-how-num"><i class="ti ti-cloud-upload"></i></div>
       <div class="da-how-body"><div class="t" data-i18n="step1_t">Upload</div><div class="d" data-i18n="step1_d">Paste your data or pick a CSV, Excel, JSON, or PDF file.</div></div>
     </div>
     <div class="da-how-step">
-      <div class="da-how-num">2</div>
+      <div class="da-how-num"><i class="ti ti-target-arrow"></i></div>
       <div class="da-how-body"><div class="t" data-i18n="step2_t">Pick an objective</div><div class="d" data-i18n="step2_d">We inspect your columns and suggest what's worth analyzing.</div></div>
     </div>
     <div class="da-how-step">
-      <div class="da-how-num">3</div>
+      <div class="da-how-num"><i class="ti ti-report-analytics"></i></div>
       <div class="da-how-body"><div class="t" data-i18n="step3_t">Get your report</div><div class="d" data-i18n="step3_d">Interactive charts, real stats, and a printable summary.</div></div>
     </div>
+  </div>
+
+  <p class="da-section-title" data-i18n="what_you_get">What you get</p>
+  <div class="da-premium-grid">
+    <div class="da-premium-card"><i class="ti ti-chart-bar"></i><span data-i18n="chip_bar">Bar</span><div class="corner corner-1"></div></div>
+    <div class="da-premium-card"><i class="ti ti-chart-line"></i><span data-i18n="chip_line">Line</span><div class="corner corner-2"></div></div>
+    <div class="da-premium-card"><i class="ti ti-chart-area-line"></i><span data-i18n="chip_area">Area</span><div class="corner corner-1"></div></div>
+    <div class="da-premium-card"><i class="ti ti-chart-pie"></i><span data-i18n="chip_pie">Pie</span><div class="corner corner-2"></div></div>
+    <div class="da-premium-card"><i class="ti ti-chart-dots"></i><span data-i18n="chip_scatter">Scatter</span><div class="corner corner-1"></div></div>
+    <div class="da-premium-card"><i class="ti ti-chart-histogram"></i><span data-i18n="chip_histogram">Histogram</span><div class="corner corner-2"></div></div>
+  </div>
+  <p class="da-muted" style="margin:2px 0 1.5rem" data-i18n="what_you_get_desc">Every analysis picks the chart types that fit your data — all computed with real math, not a template.</p>
+
+  <p class="da-section-title" data-i18n="works_with">Works with</p>
+  <div class="da-premium-grid">
+    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#E4F5EC;color:#1E9E5A"><i class="ti ti-file-type-csv"></i></div><span>CSV</span><small data-i18n="fmt_csv_sub">Comma-separated</small><div class="corner corner-1"></div></div>
+    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#E5F3E6;color:#1D7A34"><i class="ti ti-file-spreadsheet"></i></div><span>Excel</span><small>.xlsx, .xls</small><div class="corner corner-2"></div></div>
+    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#F0EBFB;color:#6E3FC7"><i class="ti ti-braces"></i></div><span>JSON</span><small>.json</small><div class="corner corner-1"></div></div>
+    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#FBEAE8;color:#D64437"><i class="ti ti-file-type-pdf"></i></div><span>PDF</span><small>.pdf</small><div class="corner corner-2"></div></div>
+    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#FDECE1;color:#D8611F"><i class="ti ti-presentation"></i></div><span>PowerPoint</span><small>.pptx, .ppt</small><div class="corner corner-1"></div></div>
+    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#EDEDED;color:#181818"><i class="ti ti-brand-github"></i></div><span>GitHub</span><small data-i18n="fmt_github_sub">Direct links</small><div class="corner corner-2"></div></div>
+  </div>
+
+  <p class="da-section-title" data-i18n="what_people_say">What people say</p>
+  <div class="da-card" id="testimonial-card">
+    <div class="da-empty"><i class="ti ti-message-star"></i><span data-i18n="no_reviews_yet">No reviews yet — be the first to share your experience.</span></div>
   </div>
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
     <p class="da-section-title" style="margin:0" data-i18n="your_activity">Your activity</p>
   </div>
   <div class="da-grid2" style="margin-bottom:1rem">
-    <div class="da-stat"><div class="n" id="stat-count">0</div><div class="l" data-i18n="datasets_analyzed">Datasets analyzed</div></div>
-    <div class="da-stat"><div class="n" id="stat-obj" style="font-size:15px">–</div><div class="l" data-i18n="most_used_objective">Most used objective</div></div>
+    <div class="da-stat da-stat-rich">
+      <div class="da-stat-icon" style="background:rgba(79,185,154,0.14);color:var(--da-accent-deep)"><i class="ti ti-database"></i></div>
+      <div class="n" id="stat-count">0</div>
+      <div class="l" data-i18n="datasets_analyzed">Datasets analyzed</div>
+      <svg class="da-stat-spark" viewBox="0 0 100 24" preserveAspectRatio="none"><path d="M0,20 L15,16 L30,18 L45,10 L60,13 L75,5 L100,2" fill="none" stroke="var(--da-accent)" stroke-width="2"/></svg>
+    </div>
+    <div class="da-stat da-stat-rich">
+      <div class="da-stat-icon" style="background:rgba(232,137,92,0.16);color:var(--da-accent-warm)"><i class="ti ti-target-arrow"></i></div>
+      <div class="n" id="stat-obj" style="font-size:15px">–</div>
+      <div class="l" data-i18n="most_used_objective">Most used objective</div>
+      <svg class="da-stat-spark" viewBox="0 0 100 24" preserveAspectRatio="none"><path d="M0,10 L15,14 L30,8 L45,15 L60,9 L75,17 L100,6" fill="none" stroke="var(--da-accent-warm)" stroke-width="2"/></svg>
+    </div>
   </div>
   <p class="da-title" data-i18n="recent_analyses">Recent analyses</p>
   <div id="recent-list"><div class="da-empty"><i class="ti ti-database-off"></i><span data-i18n="no_analyses">No analyses yet — upload a file to get started.</span></div></div>
 </div>
 
+
 <div class="da-view" id="view-upload">
   <p class="da-h1" data-i18n="upload_data">Upload data</p>
-  <div class="da-card">
-    <p class="da-title" style="margin-bottom:8px"><i class="ti ti-file-upload" style="color:var(--da-accent);margin-right:4px"></i><span data-i18n="choose_a_file">Choose a file</span></p>
+  <div class="da-card da-card-in" style="animation-delay:0.05s">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="da-upload-icon-badge"><i class="ti ti-file-upload"></i></div>
+      <p class="da-title" style="margin:0"><span data-i18n="choose_a_file">Choose a file</span></p>
+    </div>
     <p class="da-muted" style="margin-bottom:12px" data-i18n="file_types">CSV, Excel (.xlsx/.xls), JSON, or PDF (with a real table in it)</p>
     <div class="da-dropzone" id="dropzone">
       <div class="da-dropzone-icon"><i class="ti ti-cloud-upload"></i></div>
@@ -270,14 +384,20 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     </div>
     <p class="da-muted" style="margin-top:10px" data-i18n="or_paste_hint">Or use paste below if you'd rather not select a file.</p>
   </div>
-  <div class="da-card">
-    <p class="da-title" style="margin-bottom:8px"><i class="ti ti-link" style="color:var(--da-accent);margin-right:4px"></i><span data-i18n="load_from_url">Or load from a URL</span></p>
+  <div class="da-card da-card-in" style="animation-delay:0.15s">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="da-upload-icon-badge" style="background:rgba(232,137,92,0.14);color:var(--da-accent-warm)"><i class="ti ti-link"></i></div>
+      <p class="da-title" style="margin:0"><span data-i18n="load_from_url">Or load from a URL</span></p>
+    </div>
     <p class="da-muted" style="margin-bottom:8px" data-i18n="url_desc">Paste a direct link to a .csv, .json, .xlsx, .xls, or .pdf file (GitHub links work too)</p>
     <input id="urlInput" type="url" class="da-input" placeholder="https://example.com/data.csv" data-i18n-placeholder="ph_url">
     <button class="da-btn da-btn-primary" id="url-fetch-btn" style="margin-top:10px;width:100%;justify-content:center" onclick="daFetchFromUrl()"><i class="ti ti-download"></i><span data-i18n="fetch_data">Fetch data</span></button>
   </div>
-  <div class="da-card">
-    <p class="da-title" style="margin-bottom:8px"><i class="ti ti-clipboard-text" style="color:var(--da-accent);margin-right:4px"></i><span data-i18n="paste_here">Or paste your data here</span></p>
+  <div class="da-card da-card-in" style="animation-delay:0.25s">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="da-upload-icon-badge" style="background:rgba(46,139,114,0.14);color:var(--da-accent-deep)"><i class="ti ti-clipboard-text"></i></div>
+      <p class="da-title" style="margin:0"><span data-i18n="paste_here">Or paste your data here</span></p>
+    </div>
     <p class="da-muted" style="margin-bottom:8px" data-i18n="paste_desc">Paste CSV (with header row) or JSON array of objects, then tap the button below</p>
     <textarea id="pasteInput" rows="10" style="width:100%;font-family:var(--font-mono);font-size:13px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box" placeholder="name,revenue,date&#10;Acme,1200,2024-01-05&#10;Beta,900,2024-01-06"></textarea>
     <button class="da-btn da-btn-primary" style="margin-top:10px;width:100%;justify-content:center" onclick="daHandlePaste()"><i class="ti ti-sparkles"></i><span data-i18n="analyze_this_data">Analyze this data</span></button>
@@ -329,6 +449,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <button class="da-btn da-btn-primary" onclick="daShowReport()" data-i18n="view_full_report">View full report</button>
     <button class="da-btn" onclick="daExportJSON()" data-i18n="show_as_json">Show as JSON</button>
     <button class="da-btn" onclick="daExportCSV()" data-i18n="show_as_csv">Show as CSV</button>
+    <button class="da-btn da-btn-primary" id="pptx-export-btn" onclick="daExportPPTX()" style="background:var(--da-accent-warm);border-color:var(--da-accent-warm)"><i class="ti ti-presentation"></i><span data-i18n="download_pptx">Download as PowerPoint</span></button>
   </div>
   <div id="export-panel" style="display:none;margin-top:12px">
     <textarea id="export-output" readonly rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box"></textarea>
@@ -396,6 +517,11 @@ const OBJECTIVES = [
 ];
 
 let daState = { rows: [], columns: [], filename: '', summary: null, objective: null, result: null, user: null, authMode: 'signin', lang: 'en', theme: 'light' };
+const DA_ADMIN_UID = 'REPLACE_WITH_YOUR_FIREBASE_UID';
+
+const DA_SAMPLE_DATA = [{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"North America","units_sold":48,"revenue":1666.67,"customer_rating":4.1,"order_date":"2025-07-02"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"North America","units_sold":23,"revenue":1264.59,"customer_rating":4.1,"order_date":"2025-10-09"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":49,"revenue":6453.41,"customer_rating":4.3,"order_date":"2025-06-20"},{"product_name":"Resistance Bands Set","category":"Fitness","region":"North America","units_sold":56,"revenue":2962.3,"customer_rating":3.6,"order_date":"2025-06-19"},{"product_name":"Yoga Mat Premium","category":"Fitness","region":"North America","units_sold":56,"revenue":1580.98,"customer_rating":4.4,"order_date":"2025-11-27"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Europe","units_sold":28,"revenue":749.3,"customer_rating":4.0,"order_date":"2025-12-08"},{"product_name":"Mechanical Keyboard","category":"Electronics","region":"Latin America","units_sold":63,"revenue":5084.91,"customer_rating":3.5,"order_date":"2025-04-27"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Asia Pacific","units_sold":46,"revenue":3872.57,"customer_rating":4.8,"order_date":"2025-11-15"},{"product_name":"4K Webcam","category":"Electronics","region":"Asia Pacific","units_sold":19,"revenue":804.48,"customer_rating":4.0,"order_date":"2025-03-17"},{"product_name":"LED Desk Lamp","category":"Home","region":"North America","units_sold":19,"revenue":303.01,"customer_rating":3.9,"order_date":"2025-10-15"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Asia Pacific","units_sold":20,"revenue":171.94,"customer_rating":4.1,"order_date":"2025-11-11"},{"product_name":"Bluetooth Speaker Mini","category":"Electronics","region":"Asia Pacific","units_sold":24,"revenue":2149.5,"customer_rating":4.2,"order_date":"2025-02-28"},{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"Asia Pacific","units_sold":94,"revenue":1934.77,"customer_rating":3.9,"order_date":"2025-01-20"},{"product_name":"Foam Roller","category":"Fitness","region":"Latin America","units_sold":87,"revenue":7336.53,"customer_rating":4.6,"order_date":"2025-02-03"},{"product_name":"Cookbook Deluxe","category":"Books","region":"Latin America","units_sold":54,"revenue":1215.78,"customer_rating":4.1,"order_date":"2025-09-28"},{"product_name":"Matte Lipstick","category":"Beauty","region":"Latin America","units_sold":9,"revenue":296.14,"customer_rating":4.6,"order_date":"2025-06-15"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Latin America","units_sold":41,"revenue":1048.8,"customer_rating":4.4,"order_date":"2025-11-02"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"North America","units_sold":42,"revenue":3308.37,"customer_rating":4.5,"order_date":"2025-10-19"},{"product_name":"LED Desk Lamp","category":"Home","region":"Europe","units_sold":15,"revenue":268.52,"customer_rating":4.5,"order_date":"2025-12-02"},{"product_name":"Bestseller Novel Set","category":"Books","region":"North America","units_sold":26,"revenue":317.59,"customer_rating":4.1,"order_date":"2025-03-09"},{"product_name":"Throw Blanket Soft","category":"Home","region":"Europe","units_sold":22,"revenue":1100.38,"customer_rating":3.7,"order_date":"2025-01-03"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"Europe","units_sold":64,"revenue":3104.56,"customer_rating":4.2,"order_date":"2025-08-10"},{"product_name":"Scented Candle Set","category":"Home","region":"Latin America","units_sold":39,"revenue":2276.54,"customer_rating":4.0,"order_date":"2025-10-16"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Europe","units_sold":56,"revenue":2927.11,"customer_rating":3.8,"order_date":"2025-10-08"},{"product_name":"Organic Face Serum","category":"Beauty","region":"North America","units_sold":51,"revenue":1345.81,"customer_rating":5.0,"order_date":"2025-04-09"},{"product_name":"Ceramic Coffee Mug","category":"Home","region":"Europe","units_sold":1,"revenue":24.44,"customer_rating":4.7,"order_date":"2025-02-03"},{"product_name":"Air Plant Terrarium","category":"Home","region":"Europe","units_sold":34,"revenue":889.05,"customer_rating":4.7,"order_date":"2025-09-23"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"North America","units_sold":35,"revenue":1902.89,"customer_rating":5,"order_date":"2025-12-18"},{"product_name":"4K Webcam","category":"Electronics","region":"Asia Pacific","units_sold":20,"revenue":1301.62,"customer_rating":4.2,"order_date":"2025-01-03"},{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"Latin America","units_sold":54,"revenue":599.51,"customer_rating":4.7,"order_date":"2025-12-14"},{"product_name":"Air Plant Terrarium","category":"Home","region":"North America","units_sold":18,"revenue":790.79,"customer_rating":4.7,"order_date":"2025-07-05"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Asia Pacific","units_sold":24,"revenue":1880.26,"customer_rating":3.5,"order_date":"2025-06-25"},{"product_name":"Air Plant Terrarium","category":"Home","region":"Latin America","units_sold":44,"revenue":2470.15,"customer_rating":3.9,"order_date":"2025-07-01"},{"product_name":"Mechanical Keyboard","category":"Electronics","region":"Asia Pacific","units_sold":60,"revenue":8710.91,"customer_rating":4.9,"order_date":"2025-07-28"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Latin America","units_sold":40,"revenue":2223.58,"customer_rating":4.3,"order_date":"2025-04-13"},{"product_name":"Foam Roller","category":"Fitness","region":"Asia Pacific","units_sold":70,"revenue":6114.58,"customer_rating":4.1,"order_date":"2025-01-04"},{"product_name":"Resistance Bands Set","category":"Fitness","region":"Europe","units_sold":46,"revenue":4079.47,"customer_rating":3.7,"order_date":"2025-09-04"},{"product_name":"Ceramic Coffee Mug","category":"Home","region":"Europe","units_sold":32,"revenue":258.81,"customer_rating":3.4,"order_date":"2025-11-07"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Latin America","units_sold":36,"revenue":2273.0,"customer_rating":3.8,"order_date":"2025-05-22"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":16,"revenue":233.9,"customer_rating":3.2,"order_date":"2025-10-19"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Latin America","units_sold":24,"revenue":240.78,"customer_rating":3.7,"order_date":"2025-08-22"},{"product_name":"Yoga Mat Premium","category":"Fitness","region":"Latin America","units_sold":22,"revenue":1909.3,"customer_rating":3.6,"order_date":"2025-02-27"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"Asia Pacific","units_sold":45,"revenue":1166.87,"customer_rating":4.0,"order_date":"2025-07-21"},{"product_name":"Organic Face Serum","category":"Beauty","region":"Europe","units_sold":78,"revenue":916.91,"customer_rating":3.6,"order_date":"2025-02-25"},{"product_name":"Scented Candle Set","category":"Home","region":"Europe","units_sold":55,"revenue":1921.36,"customer_rating":3.7,"order_date":"2025-08-22"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Asia Pacific","units_sold":55,"revenue":2192.19,"customer_rating":3.6,"order_date":"2025-03-24"},{"product_name":"LED Desk Lamp","category":"Home","region":"Latin America","units_sold":25,"revenue":1028.96,"customer_rating":3.9,"order_date":"2025-02-23"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Europe","units_sold":26,"revenue":925.0,"customer_rating":3.5,"order_date":"2025-02-14"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":6,"revenue":112.53,"customer_rating":3.8,"order_date":"2025-10-13"},{"product_name":"LED Desk Lamp","category":"Home","region":"North America","units_sold":1,"revenue":28.28,"customer_rating":4.0,"order_date":"2025-10-08"},{"product_name":"LED Desk Lamp","category":"Home","region":"Europe","units_sold":32,"revenue":903.06,"customer_rating":3.3,"order_date":"2025-03-20"},{"product_name":"Air Plant Terrarium","category":"Home","region":"North America","units_sold":50,"revenue":2123.8,"customer_rating":4.0,"order_date":"2025-05-13"},{"product_name":"Foam Roller","category":"Fitness","region":"Europe","units_sold":1,"revenue":37.0,"customer_rating":4.6,"order_date":"2025-08-01"},{"product_name":"Cookbook Deluxe","category":"Books","region":"North America","units_sold":41,"revenue":915.88,"customer_rating":3.0,"order_date":"2025-04-27"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":39,"revenue":2268.52,"customer_rating":4.7,"order_date":"2025-10-20"},{"product_name":"Cookbook Deluxe","category":"Books","region":"North America","units_sold":1,"revenue":28.44,"customer_rating":3.7,"order_date":"2025-07-13"},{"product_name":"Kids Puzzle Book","category":"Books","region":"Europe","units_sold":59,"revenue":1474.68,"customer_rating":3.7,"order_date":"2025-02-26"},{"product_name":"Organic Face Serum","category":"Beauty","region":"North America","units_sold":67,"revenue":1724.08,"customer_rating":3.4,"order_date":"2025-02-14"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Latin America","units_sold":51,"revenue":2286.79,"customer_rating":3.6,"order_date":"2025-08-15"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":40,"revenue":2264.01,"customer_rating":3.6,"order_date":"2025-11-13"},{"product_name":"Foam Roller","category":"Fitness","region":"North America","units_sold":33,"revenue":1188.04,"customer_rating":4.9,"order_date":"2025-05-18"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":22,"revenue":741.36,"customer_rating":3.7,"order_date":"2025-01-03"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Europe","units_sold":1,"revenue":29.46,"customer_rating":5,"order_date":"2025-09-11"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Latin America","units_sold":1,"revenue":30.11,"customer_rating":4.0,"order_date":"2025-03-07"},{"product_name":"Yoga Mat Premium","category":"Fitness","region":"Latin America","units_sold":50,"revenue":2858.35,"customer_rating":3.8,"order_date":"2025-06-06"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"North America","units_sold":73,"revenue":1469.24,"customer_rating":4.0,"order_date":"2025-08-04"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Asia Pacific","units_sold":1,"revenue":95.1,"customer_rating":4.3,"order_date":"2025-07-16"},{"product_name":"USB-C Fast Charger","category":"Electronics","region":"North America","units_sold":15,"revenue":664.14,"customer_rating":4.0,"order_date":"2025-10-26"},{"product_name":"Matte Lipstick","category":"Beauty","region":"Europe","units_sold":10,"revenue":175.97,"customer_rating":4.5,"order_date":"2025-01-20"},{"product_name":"Cookbook Deluxe","category":"Books","region":"North America","units_sold":44,"revenue":504.03,"customer_rating":4.4,"order_date":"2025-01-14"},{"product_name":"Throw Blanket Soft","category":"Home","region":"Latin America","units_sold":18,"revenue":805.71,"customer_rating":3.2,"order_date":"2025-11-19"},{"product_name":"Bestseller Novel Set","category":"Books","region":"Europe","units_sold":53,"revenue":1387.85,"customer_rating":4.3,"order_date":"2025-05-20"},{"product_name":"Cookbook Deluxe","category":"Books","region":"Asia Pacific","units_sold":14,"revenue":195.85,"customer_rating":4.1,"order_date":"2025-10-02"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":35,"revenue":696.64,"customer_rating":4.1,"order_date":"2025-11-27"},{"product_name":"Resistance Bands Set","category":"Fitness","region":"North America","units_sold":66,"revenue":1585.01,"customer_rating":4.2,"order_date":"2025-08-03"},{"product_name":"LED Desk Lamp","category":"Home","region":"Asia Pacific","units_sold":3,"revenue":40.32,"customer_rating":4.2,"order_date":"2025-07-27"},{"product_name":"Air Plant Terrarium","category":"Home","region":"North America","units_sold":1,"revenue":24.81,"customer_rating":4.1,"order_date":"2025-11-28"},{"product_name":"Air Plant Terrarium","category":"Home","region":"Latin America","units_sold":41,"revenue":1099.31,"customer_rating":3.9,"order_date":"2025-09-05"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Latin America","units_sold":34,"revenue":1658.42,"customer_rating":3.8,"order_date":"2025-01-18"},{"product_name":"Scented Candle Set","category":"Home","region":"North America","units_sold":72,"revenue":1000.8,"customer_rating":5,"order_date":"2025-05-17"},{"product_name":"Kids Puzzle Book","category":"Books","region":"Asia Pacific","units_sold":52,"revenue":581.47,"customer_rating":4.8,"order_date":"2025-12-05"},{"product_name":"USB-C Fast Charger","category":"Electronics","region":"Asia Pacific","units_sold":80,"revenue":11490.24,"customer_rating":4.2,"order_date":"2025-10-19"},{"product_name":"Bestseller Novel Set","category":"Books","region":"Latin America","units_sold":1,"revenue":24.78,"customer_rating":5,"order_date":"2025-04-23"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"Latin America","units_sold":49,"revenue":3530.13,"customer_rating":3.7,"order_date":"2025-11-26"},{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"Europe","units_sold":58,"revenue":1682.99,"customer_rating":3.8,"order_date":"2025-09-15"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":19,"revenue":1626.34,"customer_rating":4.9,"order_date":"2025-11-03"},{"product_name":"Foam Roller","category":"Fitness","region":"Latin America","units_sold":26,"revenue":1563.74,"customer_rating":4.0,"order_date":"2025-11-10"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"North America","units_sold":21,"revenue":375.38,"customer_rating":3.2,"order_date":"2025-01-11"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Asia Pacific","units_sold":46,"revenue":3558.29,"customer_rating":4.5,"order_date":"2025-10-28"},{"product_name":"Ceramic Coffee Mug","category":"Home","region":"Europe","units_sold":13,"revenue":260.96,"customer_rating":3.3,"order_date":"2025-08-10"}];
+function daLoadSample(){ daProcessRows(JSON.parse(JSON.stringify(DA_SAMPLE_DATA)), 'sample-ecommerce-sales.json'); }
+
 
 /* ================= i18n ================= */
 const DA_LANGS = { en:'English', zh:'中文', ru:'Русский', ar:'العربية', es:'Español', fr:'Français', de:'Deutsch' };
@@ -404,11 +530,11 @@ const DA_I18N = {
     brand:'Data Analyzer', brand_sub:'Upload → Inspect → Analyze → Export',
     hero_h1:'Turn a spreadsheet into an answer.',
     hero_p:'Drop in a CSV, Excel, JSON, or PDF file. Real regression and correlation math runs in your browser — no guessing, no waiting on a server.',
-    upload_your_data:'Upload your data', how_it_works:'How it works',
+    upload_your_data:'Upload your data', try_sample:'Try a sample dataset', stat_chart_types:'chart types', stat_formats:'file formats', stat_browser:'runs in-browser', stat_languages:'languages', how_it_works:'How it works',
     step1_t:'Upload', step1_d:'Paste your data or pick a CSV, Excel, JSON, or PDF file.',
     step2_t:'Pick an objective', step2_d:"We inspect your columns and suggest what's worth analyzing.",
     step3_t:'Get your report', step3_d:'Interactive charts, real stats, and a printable summary.',
-    your_activity:'Your activity', datasets_analyzed:'Datasets analyzed', most_used_objective:'Most used objective',
+    what_you_get:'What you get', what_you_get_desc:'Every analysis picks the chart types that fit your data — all computed with real math, not a template.', chip_bar:'Bar', chip_line:'Line', chip_area:'Area', chip_pie:'Pie', chip_scatter:'Scatter', chip_histogram:'Histogram', chip_stacked:'Stacked', works_with:'Works with', fmt_csv_sub:'Comma-separated', fmt_github_sub:'Direct links', what_people_say:'What people say', no_reviews_yet:'No reviews yet — be the first to share your experience.', your_activity:'Your activity', datasets_analyzed:'Datasets analyzed', most_used_objective:'Most used objective',
     recent_analyses:'Recent analyses', no_analyses:'No analyses yet — upload a file to get started.',
     upload_data:'Upload data', choose_a_file:'Choose a file', file_types:'CSV, Excel (.xlsx/.xls), JSON, or PDF (with a real table in it)',
     or_paste_hint:"Or use paste below if you'd rather not select a file.", load_from_url:'Or load from a URL', url_desc:'Paste a direct link to a .csv, .json, .xlsx, .xls, or .pdf file (GitHub links work too)', ph_url:'https://example.com/data.csv', fetch_data:'Fetch data',
@@ -417,7 +543,7 @@ const DA_I18N = {
     inspecting_data:'Inspecting data', reading_file:'Reading file…',
     choose_objective:'Choose objective', suggested_for_data:'Suggested for this data', see_all_objectives:'See all objectives',
     processing:'Processing', running_analysis:'Running analysis…',
-    done:'Done', ai_insights:'AI insights', view_full_report:'View full report', show_as_json:'Show as JSON', show_as_csv:'Show as CSV',
+    done:'Done', download_pptx:'Download as PowerPoint', building_pptx:'Building PowerPoint…', key_metrics:'Key metrics', top:'Top', by:'by', breakdown:'breakdown', ai_insights:'AI insights', view_full_report:'View full report', show_as_json:'Show as JSON', show_as_csv:'Show as CSV',
     copy_hint:"Tap the box, select all, and copy — downloads aren't supported in this preview.",
     analysis_report:'Analysis report', back:'Back', insights:'Insights',
     save_pdf:'Save as PDF / Print', print_hint:'Opens your browser\'s print dialog — choose "Save as PDF" as the destination.',
@@ -429,11 +555,11 @@ const DA_I18N = {
     brand:'数据分析器', brand_sub:'上传 → 检查 → 分析 → 导出',
     hero_h1:'把表格变成答案。',
     hero_p:'上传 CSV、Excel、JSON 或 PDF 文件。真实的回归与相关性计算在你的浏览器中运行 — 无需猜测，无需等待服务器。',
-    upload_your_data:'上传你的数据', how_it_works:'使用方法',
+    upload_your_data:'上传你的数据', try_sample:'试用示例数据', stat_chart_types:'图表类型', stat_formats:'文件格式', stat_browser:'浏览器运行', stat_languages:'种语言', how_it_works:'使用方法',
     step1_t:'上传', step1_d:'粘贴数据，或选择 CSV、Excel、JSON 或 PDF 文件。',
     step2_t:'选择分析目标', step2_d:'我们会检查你的列，并建议值得分析的内容。',
     step3_t:'获取报告', step3_d:'交互式图表、真实统计数据和可打印摘要。',
-    your_activity:'你的活动', datasets_analyzed:'已分析的数据集', most_used_objective:'最常用的目标',
+    what_you_get:'你能得到什么', what_you_get_desc:'每次分析都会根据你的数据自动挑选合适的图表类型 — 全部用真实数学计算，而非模板。', chip_bar:'柱状图', chip_line:'折线图', chip_area:'面积图', chip_pie:'饼图', chip_scatter:'散点图', chip_histogram:'直方图', chip_stacked:'堆叠图', works_with:'支持', fmt_csv_sub:'逗号分隔', fmt_github_sub:'直接链接', what_people_say:'用户怎么说', no_reviews_yet:'暂无评价 — 快来分享你的体验吧。', your_activity:'你的活动', datasets_analyzed:'已分析的数据集', most_used_objective:'最常用的目标',
     recent_analyses:'最近的分析', no_analyses:'还没有分析记录 — 上传一个文件开始吧。',
     upload_data:'上传数据', choose_a_file:'选择文件', file_types:'CSV、Excel（.xlsx/.xls）、JSON，或包含真实表格的 PDF',
     or_paste_hint:'如果不想选择文件，也可以在下方粘贴数据。', load_from_url:'或从网址加载', url_desc:'粘贴指向 .csv、.json、.xlsx、.xls 或 .pdf 文件的直接链接（也支持 GitHub 链接）', ph_url:'https://example.com/data.csv', fetch_data:'获取数据',
@@ -442,7 +568,7 @@ const DA_I18N = {
     inspecting_data:'正在检查数据', reading_file:'正在读取文件…',
     choose_objective:'选择分析目标', suggested_for_data:'针对此数据的建议', see_all_objectives:'查看所有目标',
     processing:'处理中', running_analysis:'正在运行分析…',
-    done:'完成', ai_insights:'AI 洞察', view_full_report:'查看完整报告', show_as_json:'显示为 JSON', show_as_csv:'显示为 CSV',
+    done:'完成', download_pptx:'下载为 PowerPoint', building_pptx:'正在生成 PowerPoint…', key_metrics:'关键指标', top:'最高', by:'按', breakdown:'分布', ai_insights:'AI 洞察', view_full_report:'查看完整报告', show_as_json:'显示为 JSON', show_as_csv:'显示为 CSV',
     copy_hint:'点击文本框，全选并复制 — 此预览不支持直接下载。',
     analysis_report:'分析报告', back:'返回', insights:'洞察',
     save_pdf:'保存为 PDF / 打印', print_hint:'将打开浏览器的打印对话框 — 选择"另存为 PDF"。',
@@ -454,11 +580,11 @@ const DA_I18N = {
     brand:'Анализатор данных', brand_sub:'Загрузка → Проверка → Анализ → Экспорт',
     hero_h1:'Превратите таблицу в ответ.',
     hero_p:'Загрузите файл CSV, Excel, JSON или PDF. Настоящая регрессия и корреляция считаются прямо в браузере — без догадок и без ожидания сервера.',
-    upload_your_data:'Загрузить данные', how_it_works:'Как это работает',
+    upload_your_data:'Загрузить данные', try_sample:'Попробовать пример данных', stat_chart_types:'типов графиков', stat_formats:'форматов файлов', stat_browser:'работает в браузере', stat_languages:'языков', how_it_works:'Как это работает',
     step1_t:'Загрузка', step1_d:'Вставьте данные или выберите файл CSV, Excel, JSON или PDF.',
     step2_t:'Выберите цель', step2_d:'Мы проверим ваши столбцы и предложим, что стоит проанализировать.',
     step3_t:'Получите отчёт', step3_d:'Интерактивные графики, реальная статистика и отчёт для печати.',
-    your_activity:'Ваша активность', datasets_analyzed:'Проанализировано наборов данных', most_used_objective:'Часто используемая цель',
+    what_you_get:'Что вы получаете', what_you_get_desc:'Каждый анализ подбирает подходящие типы графиков для ваших данных — всё считается по-настоящему, а не по шаблону.', chip_bar:'Столбчатая', chip_line:'Линейная', chip_area:'Areas', chip_pie:'Круговая', chip_scatter:'Точечная', chip_histogram:'Гистограмма', chip_stacked:'С накоплением', works_with:'Совместимо с', fmt_csv_sub:'С разделителями-запятыми', fmt_github_sub:'Прямые ссылки', what_people_say:'Отзывы', no_reviews_yet:'Пока нет отзывов — поделитесь своим первым.', your_activity:'Ваша активность', datasets_analyzed:'Проанализировано наборов данных', most_used_objective:'Часто используемая цель',
     recent_analyses:'Недавние анализы', no_analyses:'Пока нет анализов — загрузите файл, чтобы начать.',
     upload_data:'Загрузка данных', choose_a_file:'Выбрать файл', file_types:'CSV, Excel (.xlsx/.xls), JSON или PDF (с настоящей таблицей)',
     or_paste_hint:'Или вставьте данные ниже, если не хотите выбирать файл.', load_from_url:'Или загрузите по ссылке', url_desc:'Вставьте прямую ссылку на файл .csv, .json, .xlsx, .xls или .pdf (ссылки GitHub тоже подходят)', ph_url:'https://example.com/data.csv', fetch_data:'Загрузить данные',
@@ -467,7 +593,7 @@ const DA_I18N = {
     inspecting_data:'Проверка данных', reading_file:'Чтение файла…',
     choose_objective:'Выберите цель', suggested_for_data:'Рекомендации для этих данных', see_all_objectives:'Показать все цели',
     processing:'Обработка', running_analysis:'Выполняется анализ…',
-    done:'Готово', ai_insights:'AI-инсайты', view_full_report:'Открыть полный отчёт', show_as_json:'Показать как JSON', show_as_csv:'Показать как CSV',
+    done:'Готово', download_pptx:'Скачать как PowerPoint', building_pptx:'Создание PowerPoint…', key_metrics:'Ключевые показатели', top:'Топ', by:'по', breakdown:'разбивка', ai_insights:'AI-инсайты', view_full_report:'Открыть полный отчёт', show_as_json:'Показать как JSON', show_as_csv:'Показать как CSV',
     copy_hint:'Нажмите на поле, выделите всё и скопируйте — загрузка файлов недоступна в этом превью.',
     analysis_report:'Отчёт по анализу', back:'Назад', insights:'Инсайты',
     save_pdf:'Сохранить как PDF / Печать', print_hint:'Откроется диалог печати браузера — выберите "Сохранить как PDF".',
@@ -479,11 +605,11 @@ const DA_I18N = {
     brand:'محلل البيانات', brand_sub:'رفع ← فحص ← تحليل ← تصدير',
     hero_h1:'حوّل جدول البيانات إلى إجابة.',
     hero_p:'ارفع ملف CSV أو Excel أو JSON أو PDF. الانحدار والارتباط الحقيقي يُحسب داخل متصفحك مباشرة — بلا تخمين وبلا انتظار خادم.',
-    upload_your_data:'ارفع بياناتك', how_it_works:'كيف يعمل',
+    upload_your_data:'ارفع بياناتك', try_sample:'جرّب بيانات نموذجية', stat_chart_types:'أنواع رسوم بيانية', stat_formats:'صيغ ملفات', stat_browser:'يعمل في المتصفح', stat_languages:'لغات', how_it_works:'كيف يعمل',
     step1_t:'الرفع', step1_d:'الصق بياناتك أو اختر ملف CSV أو Excel أو JSON أو PDF.',
     step2_t:'اختر الهدف', step2_d:'سنفحص أعمدتك ونقترح ما يستحق التحليل.',
     step3_t:'احصل على تقريرك', step3_d:'رسوم بيانية تفاعلية وإحصاءات حقيقية وملخص قابل للطباعة.',
-    your_activity:'نشاطك', datasets_analyzed:'مجموعات البيانات المحلّلة', most_used_objective:'الهدف الأكثر استخدامًا',
+    what_you_get:'ما الذي تحصل عليه', what_you_get_desc:'كل تحليل يختار أنواع الرسوم البيانية المناسبة لبياناتك — كلها محسوبة بحسابات حقيقية، لا بقالب جاهز.', chip_bar:'أعمدة', chip_line:'خطي', chip_area:'مساحي', chip_pie:'دائري', chip_scatter:'مبعثر', chip_histogram:'مدرج تكراري', chip_stacked:'متراكم', works_with:'يعمل مع', fmt_csv_sub:'مفصول بفواصل', fmt_github_sub:'روابط مباشرة', what_people_say:'ماذا يقول الناس', no_reviews_yet:'لا توجد تقييمات بعد — كن أول من يشارك تجربته.', your_activity:'نشاطك', datasets_analyzed:'مجموعات البيانات المحلّلة', most_used_objective:'الهدف الأكثر استخدامًا',
     recent_analyses:'التحليلات الأخيرة', no_analyses:'لا توجد تحليلات بعد — ارفع ملفًا للبدء.',
     upload_data:'رفع البيانات', choose_a_file:'اختر ملفًا', file_types:'CSV أو Excel (.xlsx/.xls) أو JSON أو PDF (يحتوي جدولًا حقيقيًا)',
     or_paste_hint:'أو الصق بياناتك أدناه إذا كنت تفضل عدم اختيار ملف.', load_from_url:'أو حمّل من رابط', url_desc:'الصق رابطًا مباشرًا لملف .csv أو .json أو .xlsx أو .xls أو .pdf (روابط GitHub مدعومة أيضًا)', ph_url:'https://example.com/data.csv', fetch_data:'جلب البيانات',
@@ -492,7 +618,7 @@ const DA_I18N = {
     inspecting_data:'جارٍ فحص البيانات', reading_file:'جارٍ قراءة الملف…',
     choose_objective:'اختر الهدف', suggested_for_data:'مقترح لهذه البيانات', see_all_objectives:'عرض جميع الأهداف',
     processing:'جارٍ المعالجة', running_analysis:'جارٍ تشغيل التحليل…',
-    done:'تم', ai_insights:'رؤى الذكاء الاصطناعي', view_full_report:'عرض التقرير الكامل', show_as_json:'عرض كـ JSON', show_as_csv:'عرض كـ CSV',
+    done:'تم', download_pptx:'تنزيل كـ PowerPoint', building_pptx:'جارٍ إنشاء PowerPoint…', key_metrics:'المقاييس الرئيسية', top:'أعلى', by:'حسب', breakdown:'توزيع', ai_insights:'رؤى الذكاء الاصطناعي', view_full_report:'عرض التقرير الكامل', show_as_json:'عرض كـ JSON', show_as_csv:'عرض كـ CSV',
     copy_hint:'اضغط على المربع، ثم حدد الكل وانسخ — التنزيل غير مدعوم في هذه المعاينة.',
     analysis_report:'تقرير التحليل', back:'رجوع', insights:'رؤى',
     save_pdf:'حفظ كـ PDF / طباعة', print_hint:'سيفتح مربع حوار الطباعة في متصفحك — اختر "حفظ كـ PDF".',
@@ -504,11 +630,11 @@ const DA_I18N = {
     brand:'Analizador de Datos', brand_sub:'Subir → Inspeccionar → Analizar → Exportar',
     hero_h1:'Convierte una hoja de cálculo en una respuesta.',
     hero_p:'Sube un archivo CSV, Excel, JSON o PDF. La regresión y correlación real se calcula en tu navegador — sin adivinar, sin esperar a un servidor.',
-    upload_your_data:'Sube tus datos', how_it_works:'Cómo funciona',
+    upload_your_data:'Sube tus datos', try_sample:'Prueba un conjunto de datos de muestra', stat_chart_types:'tipos de gráfico', stat_formats:'formatos de archivo', stat_browser:'funciona en el navegador', stat_languages:'idiomas', how_it_works:'Cómo funciona',
     step1_t:'Subir', step1_d:'Pega tus datos o elige un archivo CSV, Excel, JSON o PDF.',
     step2_t:'Elige un objetivo', step2_d:'Revisamos tus columnas y sugerimos qué vale la pena analizar.',
     step3_t:'Obtén tu informe', step3_d:'Gráficos interactivos, estadísticas reales y un resumen imprimible.',
-    your_activity:'Tu actividad', datasets_analyzed:'Conjuntos de datos analizados', most_used_objective:'Objetivo más usado',
+    what_you_get:'Lo que obtienes', what_you_get_desc:'Cada análisis elige los tipos de gráfico que mejor se ajustan a tus datos — todo calculado con matemáticas reales, no con una plantilla.', chip_bar:'Barras', chip_line:'Líneas', chip_area:'Área', chip_pie:'Circular', chip_scatter:'Dispersión', chip_histogram:'Histograma', chip_stacked:'Apilado', works_with:'Compatible con', fmt_csv_sub:'Separado por comas', fmt_github_sub:'Enlaces directos', what_people_say:'Lo que dice la gente', no_reviews_yet:'Aún no hay reseñas — sé el primero en compartir tu experiencia.', your_activity:'Tu actividad', datasets_analyzed:'Conjuntos de datos analizados', most_used_objective:'Objetivo más usado',
     recent_analyses:'Análisis recientes', no_analyses:'Aún no hay análisis — sube un archivo para empezar.',
     upload_data:'Subir datos', choose_a_file:'Elegir un archivo', file_types:'CSV, Excel (.xlsx/.xls), JSON, o PDF (con una tabla real)',
     or_paste_hint:'O pega tus datos abajo si prefieres no seleccionar un archivo.', load_from_url:'O cárgalo desde una URL', url_desc:'Pega un enlace directo a un archivo .csv, .json, .xlsx, .xls o .pdf (los enlaces de GitHub también funcionan)', ph_url:'https://ejemplo.com/datos.csv', fetch_data:'Obtener datos',
@@ -517,7 +643,7 @@ const DA_I18N = {
     inspecting_data:'Inspeccionando datos', reading_file:'Leyendo archivo…',
     choose_objective:'Elige un objetivo', suggested_for_data:'Sugerido para estos datos', see_all_objectives:'Ver todos los objetivos',
     processing:'Procesando', running_analysis:'Ejecutando análisis…',
-    done:'Listo', ai_insights:'Análisis de IA', view_full_report:'Ver informe completo', show_as_json:'Mostrar como JSON', show_as_csv:'Mostrar como CSV',
+    done:'Listo', download_pptx:'Descargar como PowerPoint', building_pptx:'Generando PowerPoint…', key_metrics:'Métricas clave', top:'Top', by:'por', breakdown:'desglose', ai_insights:'Análisis de IA', view_full_report:'Ver informe completo', show_as_json:'Mostrar como JSON', show_as_csv:'Mostrar como CSV',
     copy_hint:'Toca el cuadro, selecciona todo y copia — las descargas no son compatibles en esta vista previa.',
     analysis_report:'Informe de análisis', back:'Atrás', insights:'Conclusiones',
     save_pdf:'Guardar como PDF / Imprimir', print_hint:'Abrirá el diálogo de impresión de tu navegador — elige "Guardar como PDF".',
@@ -529,11 +655,11 @@ const DA_I18N = {
     brand:'Analyseur de Données', brand_sub:'Importer → Inspecter → Analyser → Exporter',
     hero_h1:'Transformez un tableur en réponse.',
     hero_p:'Déposez un fichier CSV, Excel, JSON ou PDF. La régression et la corrélation réelles sont calculées dans votre navigateur — sans deviner, sans attendre un serveur.',
-    upload_your_data:'Importez vos données', how_it_works:'Comment ça marche',
+    upload_your_data:'Importez vos données', try_sample:"Essayer un jeu de données d'exemple", stat_chart_types:'types de graphiques', stat_formats:'formats de fichiers', stat_browser:'fonctionne dans le navigateur', stat_languages:'langues', how_it_works:'Comment ça marche',
     step1_t:'Importer', step1_d:'Collez vos données ou choisissez un fichier CSV, Excel, JSON ou PDF.',
     step2_t:'Choisissez un objectif', step2_d:"Nous examinons vos colonnes et suggérons ce qui vaut la peine d'être analysé.",
     step3_t:'Obtenez votre rapport', step3_d:'Graphiques interactifs, statistiques réelles et résumé imprimable.',
-    your_activity:'Votre activité', datasets_analyzed:'Jeux de données analysés', most_used_objective:'Objectif le plus utilisé',
+    what_you_get:'Ce que vous obtenez', what_you_get_desc:'Chaque analyse choisit les types de graphiques adaptés à vos données — tout est calculé avec de vraies mathématiques, pas un modèle.', chip_bar:'Barres', chip_line:'Lignes', chip_area:'Aire', chip_pie:'Camembert', chip_scatter:'Nuage de points', chip_histogram:'Histogramme', chip_stacked:'Empilé', works_with:'Compatible avec', fmt_csv_sub:'Séparé par virgules', fmt_github_sub:'Liens directs', what_people_say:'Ce que les gens disent', no_reviews_yet:"Pas encore d'avis — soyez le premier à partager votre expérience.", your_activity:'Votre activité', datasets_analyzed:'Jeux de données analysés', most_used_objective:'Objectif le plus utilisé',
     recent_analyses:'Analyses récentes', no_analyses:"Aucune analyse pour l'instant — importez un fichier pour commencer.",
     upload_data:'Importer des données', choose_a_file:'Choisir un fichier', file_types:'CSV, Excel (.xlsx/.xls), JSON, ou PDF (avec un vrai tableau)',
     or_paste_hint:'Ou collez vos données ci-dessous si vous préférez ne pas sélectionner de fichier.', load_from_url:"Ou charger depuis une URL", url_desc:'Collez un lien direct vers un fichier .csv, .json, .xlsx, .xls ou .pdf (les liens GitHub fonctionnent aussi)', ph_url:'https://exemple.com/donnees.csv', fetch_data:'Récupérer les données',
@@ -542,7 +668,7 @@ const DA_I18N = {
     inspecting_data:'Inspection des données', reading_file:'Lecture du fichier…',
     choose_objective:'Choisissez un objectif', suggested_for_data:'Suggéré pour ces données', see_all_objectives:'Voir tous les objectifs',
     processing:'Traitement en cours', running_analysis:"Exécution de l'analyse…",
-    done:'Terminé', ai_insights:"Analyses de l'IA", view_full_report:'Voir le rapport complet', show_as_json:'Afficher en JSON', show_as_csv:'Afficher en CSV',
+    done:'Terminé', download_pptx:'Télécharger en PowerPoint', building_pptx:'Création du PowerPoint…', key_metrics:'Indicateurs clés', top:'Top', by:'par', breakdown:'répartition', ai_insights:"Analyses de l'IA", view_full_report:'Voir le rapport complet', show_as_json:'Afficher en JSON', show_as_csv:'Afficher en CSV',
     copy_hint:"Touchez la zone, sélectionnez tout et copiez — les téléchargements ne sont pas pris en charge dans cet aperçu.",
     analysis_report:"Rapport d'analyse", back:'Retour', insights:'Analyses',
     save_pdf:'Enregistrer en PDF / Imprimer', print_hint:'Ouvrira la boîte de dialogue d\'impression de votre navigateur — choisissez "Enregistrer en PDF".',
@@ -554,11 +680,11 @@ const DA_I18N = {
     brand:'Datenanalysator', brand_sub:'Hochladen → Prüfen → Analysieren → Exportieren',
     hero_h1:'Verwandeln Sie eine Tabelle in eine Antwort.',
     hero_p:'Laden Sie eine CSV-, Excel-, JSON- oder PDF-Datei hoch. Echte Regressions- und Korrelationsberechnungen laufen direkt in Ihrem Browser — kein Raten, kein Warten auf einen Server.',
-    upload_your_data:'Laden Sie Ihre Daten hoch', how_it_works:'So funktioniert es',
+    upload_your_data:'Laden Sie Ihre Daten hoch', try_sample:'Beispieldaten ausprobieren', stat_chart_types:'Diagrammtypen', stat_formats:'Dateiformate', stat_browser:'läuft im Browser', stat_languages:'Sprachen', how_it_works:'So funktioniert es',
     step1_t:'Hochladen', step1_d:'Fügen Sie Ihre Daten ein oder wählen Sie eine CSV-, Excel-, JSON- oder PDF-Datei.',
     step2_t:'Ziel auswählen', step2_d:'Wir prüfen Ihre Spalten und schlagen vor, was sich zu analysieren lohnt.',
     step3_t:'Bericht erhalten', step3_d:'Interaktive Diagramme, echte Statistiken und eine druckbare Zusammenfassung.',
-    your_activity:'Ihre Aktivität', datasets_analyzed:'Analysierte Datensätze', most_used_objective:'Meistgenutztes Ziel',
+    what_you_get:'Das bekommen Sie', what_you_get_desc:'Jede Analyse wählt die passenden Diagrammtypen für Ihre Daten — alles mit echter Mathematik berechnet, nicht mit einer Vorlage.', chip_bar:'Balken', chip_line:'Linie', chip_area:'Fläche', chip_pie:'Kreis', chip_scatter:'Streuung', chip_histogram:'Histogramm', chip_stacked:'Gestapelt', works_with:'Kompatibel mit', fmt_csv_sub:'Komma-getrennt', fmt_github_sub:'Direkte Links', what_people_say:'Das sagen Nutzer', no_reviews_yet:'Noch keine Bewertungen — teilen Sie als Erste(r) Ihre Erfahrung.', your_activity:'Ihre Aktivität', datasets_analyzed:'Analysierte Datensätze', most_used_objective:'Meistgenutztes Ziel',
     recent_analyses:'Letzte Analysen', no_analyses:'Noch keine Analysen — laden Sie eine Datei hoch, um zu beginnen.',
     upload_data:'Daten hochladen', choose_a_file:'Datei auswählen', file_types:'CSV, Excel (.xlsx/.xls), JSON oder PDF (mit einer echten Tabelle)',
     or_paste_hint:'Oder fügen Sie Ihre Daten unten ein, wenn Sie keine Datei auswählen möchten.', load_from_url:'Oder von einer URL laden', url_desc:'Fügen Sie einen direkten Link zu einer .csv-, .json-, .xlsx-, .xls- oder .pdf-Datei ein (GitHub-Links funktionieren ebenfalls)', ph_url:'https://beispiel.com/daten.csv', fetch_data:'Daten abrufen',
@@ -567,7 +693,7 @@ const DA_I18N = {
     inspecting_data:'Daten werden geprüft', reading_file:'Datei wird gelesen…',
     choose_objective:'Ziel auswählen', suggested_for_data:'Vorschlag für diese Daten', see_all_objectives:'Alle Ziele anzeigen',
     processing:'Verarbeitung', running_analysis:'Analyse läuft…',
-    done:'Fertig', ai_insights:'KI-Erkenntnisse', view_full_report:'Vollständigen Bericht ansehen', show_as_json:'Als JSON anzeigen', show_as_csv:'Als CSV anzeigen',
+    done:'Fertig', download_pptx:'Als PowerPoint herunterladen', building_pptx:'PowerPoint wird erstellt…', key_metrics:'Wichtige Kennzahlen', top:'Top', by:'nach', breakdown:'Verteilung', ai_insights:'KI-Erkenntnisse', view_full_report:'Vollständigen Bericht ansehen', show_as_json:'Als JSON anzeigen', show_as_csv:'Als CSV anzeigen',
     copy_hint:'Tippen Sie auf das Feld, wählen Sie alles aus und kopieren Sie — Downloads werden in dieser Vorschau nicht unterstützt.',
     analysis_report:'Analysebericht', back:'Zurück', insights:'Erkenntnisse',
     save_pdf:'Als PDF speichern / Drucken', print_hint:'Öffnet den Druckdialog Ihres Browsers — wählen Sie "Als PDF speichern".',
@@ -871,12 +997,25 @@ async function daProcessRows(rows, filename){
     await daSleep(400);
     rows = daValidateRows(rows);
     daState.rows = rows;
-    document.getElementById('inspect-status').textContent = 'Detecting columns and quality…';
+    const isLarge = rows.length > 20000;
+    document.getElementById('inspect-status').textContent = isLarge
+      ? `Detecting columns and quality… (${rows.length.toLocaleString()} rows — this may take a moment)`
+      : 'Detecting columns and quality…';
     document.getElementById('inspect-fill').style.width = '55%';
     await daSleep(500);
     const columns = daAnalyzeColumns(rows);
     daState.columns = columns;
-    const duplicates = rows.length - new Set(rows.map(r=>JSON.stringify(r))).size;
+    // Duplicate detection is O(n) with a JSON.stringify per row — cheap for normal files,
+    // but for very large datasets we sample instead of scanning every row so the UI stays responsive.
+    let duplicates;
+    if(rows.length > 20000){
+      const step = Math.ceil(rows.length / 5000);
+      const sample = rows.filter((_,i)=> i % step === 0);
+      const dupInSample = sample.length - new Set(sample.map(r=>JSON.stringify(r))).size;
+      duplicates = Math.round((dupInSample / sample.length) * rows.length);
+    } else {
+      duplicates = rows.length - new Set(rows.map(r=>JSON.stringify(r))).size;
+    }
 
     document.getElementById('inspect-status').textContent = 'Running local analysis…';
     document.getElementById('inspect-fill').style.width = '90%';
@@ -921,7 +1060,8 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
   if(!file) return;
   daSetAlert('upload-err', '');
   document.getElementById('dropzone').classList.add('has-file');
-  document.getElementById('file-picked-name').innerHTML = `<i class="ti ti-file-check" style="margin-right:4px"></i>${file.name}`;
+  const sizeNote = file.size > 8*1024*1024 ? ` <span class="da-muted" style="font-weight:400">(${(file.size/1024/1024).toFixed(1)} MB — large file, this may take a moment)</span>` : '';
+  document.getElementById('file-picked-name').innerHTML = `<i class="ti ti-file-check" style="margin-right:4px"></i>${file.name}${sizeNote}`;
   try {
     let rows = [];
     if(file.name.endsWith('.csv')){
@@ -1031,11 +1171,18 @@ function daRunLocalML(objective, columns, rows, trend, topPerformers, catCols, n
     const nextVal = reg.slope*xs.length + reg.intercept;
     const lastLabel = trend.items[trend.items.length-1].label;
     const direction = reg.slope>0 ? 'upward' : (reg.slope<0 ? 'downward' : 'flat');
+    const r2pct = Math.round(reg.r2*100);
     kpis.push({label:`${daHumanize(trend.metric)} trend`, value: `${direction} (${daFmtNum(reg.slope)}/period)`});
-    kpis.push({label:'Model fit (R²)', value: `${Math.round(reg.r2*100)}%`});
+    kpis.push({label:'Model fit (R²)', value: `${r2pct}%`});
     kpis.push({label:`Projected next period`, value: daFmtNum(nextVal)});
-    insights.push(`Linear regression on ${daHumanize(trend.metric)} by ${daHumanize(trend.xColumn)} shows a ${direction} trend of ${daFmtNum(reg.slope)} per period, with R² = ${Math.round(reg.r2*100)}% (higher R² means the trend line fits the data more reliably).`);
-    insights.push(`Extrapolating the fitted line one period past ${lastLabel}, the projected ${daHumanize(trend.metric)} value is ${daFmtNum(nextVal)}.`);
+    const dirWord = direction==='upward' ? 'up' : (direction==='downward' ? 'down' : 'flat');
+    const fitPhrase = r2pct>70
+      ? `That's a pretty consistent pattern — it explains ${r2pct}% of the movement, so it's a fair bet this continues.`
+      : r2pct>40
+        ? `The pattern is moderate — it accounts for ${r2pct}% of the movement, so expect some ups and downs along the way.`
+        : `The fit is loose though — it only explains ${r2pct}% of the movement, so treat this as a rough signal rather than a sure thing.`;
+    insights.push(`${daHumanize(trend.metric)} has been trending ${dirWord} over time, moving by about ${daFmtNum(reg.slope)} per period. ${fitPhrase}`);
+    insights.push(`If that pace holds, expect ${daHumanize(trend.metric)} to land around ${daFmtNum(nextVal)} next period.`);
   }
 
   if(objective==='customer_churn'){
@@ -1046,14 +1193,14 @@ function daRunLocalML(objective, columns, rows, trend, topPerformers, catCols, n
       rows.forEach(r=>{ const v = String(r[statusCol.name]).toLowerCase(); if(churnWords.some(w=>v===w||v.includes(w))) churnCount++; });
       const rate = Math.round((churnCount/rows.length)*1000)/10;
       kpis.push({label:'Churn rate', value: rate+'%'});
-      insights.push(`Based on the "${daHumanize(statusCol.name)}" column, ${rate}% of rows match churn/inactive-type values — a direct, rule-based churn rate rather than an estimate.`);
+      insights.push(`${rate}% of rows are marked as churned or inactive in the "${daHumanize(statusCol.name)}" column — that's a direct count straight from your data, not an estimate.`);
     } else if(topPerformers){
       const vals = topPerformers.ranked.map(r=>r[1]).sort((a,b)=>a-b);
       const q1 = vals[Math.floor(vals.length*0.25)] ?? vals[0];
       const atRisk = topPerformers.ranked.filter(r=>r[1]<=q1).length;
       const pct = Math.round((atRisk/topPerformers.ranked.length)*1000)/10;
       kpis.push({label:'At-risk share (bottom 25%)', value: pct+'%'});
-      insights.push(`No explicit churn/status column was found, so risk was approximated: entities in the bottom 25% of ${daHumanize(topPerformers.numColumn)} (${pct}% of ${daHumanize(topPerformers.catColumn)} values) are flagged as at-risk.`);
+      insights.push(`There wasn't a churn column to work with, so we used a stand-in: whoever sits in the bottom 25% by ${daHumanize(topPerformers.numColumn)} gets flagged "at risk." That's ${pct}% of ${daHumanize(topPerformers.catColumn)} entries — a starting point for investigation, not a certainty.`);
     }
   }
 
@@ -1072,20 +1219,21 @@ function daRunLocalML(objective, columns, rows, trend, topPerformers, catCols, n
     }
     if(best.a){
       kpis.push({label:'Strongest correlation', value: `${daHumanize(best.a)} ↔ ${daHumanize(best.b)} (r=${Math.round(best.r*100)/100})`});
-      const strength = Math.abs(best.r)>0.7 ? 'strong' : (Math.abs(best.r)>0.4 ? 'moderate' : 'weak');
-      insights.push(`${daHumanize(best.a)} and ${daHumanize(best.b)} have a ${strength} ${best.r>0?'positive':'negative'} correlation (Pearson r = ${Math.round(best.r*100)/100}), computed directly from the data.`);
+      const strength = Math.abs(best.r)>0.7 ? 'closely' : (Math.abs(best.r)>0.4 ? 'somewhat' : 'only loosely');
+      const moveTogether = best.r>0 ? 'the other tends to rise too' : 'the other tends to fall';
+      insights.push(`${daHumanize(best.a)} and ${daHumanize(best.b)} move ${strength} together — when one goes up, ${moveTogether} (r = ${Math.round(best.r*100)/100}).`);
     }
   }
 
   if(topPerformers){
     const top = topPerformers.ranked[0];
     kpis.push({label:`Top ${daHumanize(topPerformers.catColumn)}`, value: `${top[0]} (${daFmtNum(top[1])})`});
-    insights.push(`${top[0]} leads on ${daHumanize(topPerformers.numColumn)} with a total of ${daFmtNum(top[1])}, computed by summing ${daHumanize(topPerformers.numColumn)} grouped by ${daHumanize(topPerformers.catColumn)}.`);
+    insights.push(`${top[0]} is the clear leader on ${daHumanize(topPerformers.numColumn)}, totaling ${daFmtNum(top[1])} — ahead of every other ${daHumanize(topPerformers.catColumn)} in the data.`);
   }
 
   if(kpis.length===0){
     kpis.push({label:'Rows analyzed', value: rows.length});
-    insights.push('Not enough numeric/categorical structure was found to run regression or correlation — try a dataset with clearer numeric and category columns.');
+    insights.push("This data didn't have enough numeric or category structure to run a solid regression or correlation — a dataset with clearer number and category columns would give richer results.");
   }
   return { kpis: kpis.slice(0,4), insights: insights.slice(0,5), chartTitle };
 }
@@ -1452,7 +1600,18 @@ function daRenderDashboard(){
 async function daSaveAnalysis(){
   try {
     const id = 'a_' + Date.now();
-    const record = { id, filename: daState.filename, objective: daState.objective.label, objectiveId: daState.objective.id, date: new Date().toISOString(), result: daState.result };
+    const record = {
+      id, filename: daState.filename, objective: daState.objective.label, objectiveId: daState.objective.id, date: new Date().toISOString(),
+      result: daState.result,
+      chartData: {
+        topPerformers: daState.topPerformers || null,
+        trend: daState.trend || null,
+        categoryBreakdown: daState.categoryBreakdown || null,
+        scatter: daState.scatter || null,
+        histogram: daState.histogram || null,
+        stacked: daState.stacked || null
+      }
+    };
     if(daState.user){
       const fb = window.daFirebase;
       await fb.setDoc(fb.doc(fb.db, 'users', daState.user.uid, 'analyses', id), record);
@@ -1487,9 +1646,12 @@ async function daLoadRecent(){
     if(records.length===0){ recentDiv.innerHTML = emptyHtml; document.getElementById('stat-count').textContent='0'; document.getElementById('stat-obj').textContent='–'; return; }
     document.getElementById('stat-count').textContent = records.length;
     recentDiv.innerHTML = '';
-    records.forEach(r=>{
+    daState.recentRecords = records;
+    records.forEach((r,i)=>{
       const div = document.createElement('div');
       div.className = 'da-list-item';
+      div.style.cursor = 'pointer';
+      div.setAttribute('onclick', `daOpenSavedAnalysis(${i})`);
       const d = new Date(r.date);
       div.innerHTML = `<div style="display:flex;align-items:center"><div class="da-obj-icon" style="width:30px;height:30px;font-size:14px"><i class="ti ${OBJECTIVE_ICONS[r.objectiveId]||'ti-chart-bar'}"></i></div><div><p style="margin:0;font-weight:600;font-size:14px">${r.filename}</p><p class="da-muted" style="margin:2px 0 0">${r.objective} · ${d.toLocaleDateString()}</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i>`;
       recentDiv.appendChild(div);
@@ -1503,20 +1665,136 @@ async function daLoadRecent(){
   }
 }
 
+function daOpenSavedAnalysis(idx){
+  const r = daState.recentRecords && daState.recentRecords[idx];
+  if(!r) return;
+  daState.filename = r.filename;
+  daState.objective = { id: r.objectiveId, label: r.objective };
+  daState.result = r.result;
+  const cd = r.chartData || {};
+  daState.topPerformers = cd.topPerformers || null;
+  daState.trend = cd.trend || null;
+  daState.categoryBreakdown = cd.categoryBreakdown || null;
+  daState.scatter = cd.scatter || null;
+  daState.histogram = cd.histogram || null;
+  daState.stacked = cd.stacked || null;
+  daRenderDashboard();
+  daShowView('view-dashboard');
+}
+
+/* ================= site content (ratings / testimonials) ================= */
+async function daLoadSiteContent(){
+  const card = document.getElementById('testimonial-card');
+  try {
+    const fb = window.daFirebase;
+    if(!fb){ return; }
+    const snap = await fb.getDoc(fb.doc(fb.db, 'site_content', 'public'));
+    if(!snap.exists()){ return; }
+    const data = snap.data();
+    daRenderTestimonialCard(data);
+  } catch(e){ /* keep default empty state */ }
+}
+
+function daRenderTestimonialCard(data){
+  const card = document.getElementById('testimonial-card');
+  const testimonials = (data.testimonials || []).filter(t=>t && t.quote);
+  let html = '';
+  if(data.rating){
+    const full = Math.round(data.rating);
+    html += `<div class="da-rating-summary"><span class="num">${Number(data.rating).toFixed(1)}</span><span class="stars">${'★'.repeat(full)}${'☆'.repeat(5-full)}</span>${data.ratingCount ? `<span class="da-muted">(${data.ratingCount} reviews)</span>` : ''}</div>`;
+  }
+  if(testimonials.length===0){
+    html += '<div class="da-empty"><i class="ti ti-message-star"></i><span>No reviews yet — be the first to share your experience.</span></div>';
+  } else {
+    testimonials.forEach(t=>{
+      const stars = Math.round(t.rating || 5);
+      html += `<div class="da-testimonial"><div class="da-testimonial-stars">${'★'.repeat(stars)}${'☆'.repeat(5-stars)}</div><p class="da-testimonial-quote">"${daEsc(t.quote)}"</p><p class="da-testimonial-author">${daEsc(t.name || 'Anonymous')}${t.role ? ' · '+daEsc(t.role) : ''}</p></div>`;
+    });
+  }
+  card.innerHTML = html;
+}
+
+function daOpenAdmin(){
+  document.getElementById('admin-err').textContent = '';
+  document.getElementById('admin-testimonials').innerHTML = '';
+  document.getElementById('admin-modal').style.display = 'flex';
+  (async ()=>{
+    try {
+      const fb = window.daFirebase;
+      const snap = await fb.getDoc(fb.doc(fb.db, 'site_content', 'public'));
+      const data = snap.exists() ? snap.data() : {};
+      document.getElementById('admin-rating').value = data.rating || '';
+      document.getElementById('admin-rating-count').value = data.ratingCount || '';
+      (data.testimonials || []).forEach(t=>daAddAdminTestimonialField(t.quote, t.name, t.role, t.rating));
+      if(!data.testimonials || data.testimonials.length===0) daAddAdminTestimonialField();
+    } catch(e){
+      daAddAdminTestimonialField();
+    }
+  })();
+}
+function daCloseAdmin(){ document.getElementById('admin-modal').style.display = 'none'; }
+
+function daAddAdminTestimonialField(quote, name, role, rating){
+  const wrap = document.createElement('div');
+  wrap.className = 'admin-testimonial-field';
+  wrap.style.cssText = 'border:0.5px solid var(--border);border-radius:10px;padding:10px;margin-top:12px;position:relative';
+  wrap.innerHTML = `
+    <button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-secondary);cursor:pointer"><i class="ti ti-trash"></i></button>
+    <label class="da-muted" style="font-size:11px;font-weight:600">Quote</label>
+    <textarea class="da-input admin-t-quote" rows="2" style="margin-top:3px">${quote ? daEsc(quote) : ''}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input class="da-input admin-t-name" placeholder="Name" style="flex:1" value="${name ? daEsc(name) : ''}">
+      <input class="da-input admin-t-role" placeholder="Role/company (optional)" style="flex:1" value="${role ? daEsc(role) : ''}">
+    </div>
+    <label class="da-muted" style="font-size:11px;font-weight:600;margin-top:8px;display:block">Rating (1–5)</label>
+    <input type="number" min="1" max="5" class="da-input admin-t-rating" style="margin-top:3px;width:80px" value="${rating || 5}">
+  `;
+  document.getElementById('admin-testimonials').appendChild(wrap);
+}
+
+async function daSaveSiteContent(){
+  const fb = window.daFirebase;
+  if(!daState.user || daState.user.uid !== DA_ADMIN_UID){
+    document.getElementById('admin-err').textContent = 'Not authorized.';
+    return;
+  }
+  const rating = parseFloat(document.getElementById('admin-rating').value) || null;
+  const ratingCount = parseInt(document.getElementById('admin-rating-count').value) || null;
+  const testimonials = Array.from(document.querySelectorAll('.admin-testimonial-field')).map(el=>({
+    quote: el.querySelector('.admin-t-quote').value.trim(),
+    name: el.querySelector('.admin-t-name').value.trim(),
+    role: el.querySelector('.admin-t-role').value.trim(),
+    rating: parseInt(el.querySelector('.admin-t-rating').value) || 5
+  })).filter(t=>t.quote);
+  try {
+    await fb.setDoc(fb.doc(fb.db, 'site_content', 'public'), { rating, ratingCount, testimonials, updatedAt: new Date().toISOString() });
+    daCloseAdmin();
+    daRenderTestimonialCard({ rating, ratingCount, testimonials });
+  } catch(e){
+    document.getElementById('admin-err').textContent = 'Save failed: ' + e.message;
+  }
+}
+
 function daRenderAuthHeader(){
   const area = document.getElementById('auth-header-area');
+  let html = '';
+  if(daState.user && daState.user.uid === DA_ADMIN_UID){
+    html += `<button class="da-icon-btn" onclick="daOpenAdmin()" title="Admin"><i class="ti ti-settings"></i></button>`;
+  }
   if(daState.user){
     const label = (daState.user.email||'?').charAt(0).toUpperCase();
-    area.innerHTML = `<div class="da-user-chip" onclick="daSignOut()" title="Sign out"><div class="da-user-avatar">${label}</div></div>`;
+    html += `<div class="da-user-chip" onclick="daSignOut()" title="Sign out"><div class="da-user-avatar">${label}</div></div>`;
   } else {
-    area.innerHTML = `<button class="da-signin-btn" onclick="daOpenAuthModal('signin')"><i class="ti ti-user-circle"></i>Sign in</button>`;
+    html += `<button class="da-signin-btn" onclick="daOpenAuthModal('signin')"><i class="ti ti-user-circle"></i>Sign in</button>`;
   }
+  area.innerHTML = html;
 }
 
 window.daOnAuthChange = function(user){
   daState.user = user;
   daRenderAuthHeader();
   daLoadRecent();
+  daLoadSiteContent();
 };
 
 function daOpenAuthModal(mode){
@@ -1629,8 +1907,78 @@ function daExportText(){
   daShowExport(text);
 }
 
+async function daExportPPTX(){
+  const btn = document.getElementById('pptx-export-btn');
+  const original = btn ? btn.innerHTML : null;
+  if(typeof PptxGenJS === 'undefined'){
+    daSetAlert('upload-err', "PowerPoint export couldn't load its library — check your connection and try again in a moment.");
+    return;
+  }
+  if(btn){ btn.innerHTML = '<i class="ti ti-loader-2"></i> ' + daT('building_pptx'); btn.disabled = true; }
+  try {
+    const pres = new PptxGenJS();
+    pres.defineLayout({ name:'DA_LAYOUT', width:10, height:5.63 });
+    pres.layout = 'DA_LAYOUT';
+    const ACCENT = '4FB99A', ACCENT_DEEP = '2E8B72', INK = '12201B', WARM = 'E8895C';
+
+    // Title slide
+    let s1 = pres.addSlide();
+    s1.background = { color: INK };
+    s1.addText('Data Analyzer', { x:0.6, y:1.7, w:8.8, h:0.6, fontSize:14, color:ACCENT, fontFace:'Arial', bold:true, charSpacing:2 });
+    s1.addText(daState.objective.label, { x:0.6, y:2.15, w:8.8, h:1.0, fontSize:32, color:'FFFFFF', fontFace:'Arial', bold:true });
+    s1.addText(daState.filename, { x:0.6, y:3.05, w:8.8, h:0.4, fontSize:14, color:'CFE9E0', fontFace:'Arial' });
+    s1.addText(new Date().toLocaleDateString(), { x:0.6, y:3.4, w:8.8, h:0.4, fontSize:11, color:'8FB8AC', fontFace:'Arial' });
+
+    // KPI slide
+    let s2 = pres.addSlide();
+    s2.addText(daT('key_metrics'), { x:0.5, y:0.35, w:9, h:0.5, fontSize:22, bold:true, color:INK, fontFace:'Arial' });
+    const kpis = daState.result.kpis.slice(0,6);
+    const cols = 2;
+    kpis.forEach((k,i)=>{
+      const col = i % cols, row = Math.floor(i/cols);
+      const x = 0.5 + col*4.6, y = 1.15 + row*1.3;
+      s2.addShape('roundRect', { x, y, w:4.3, h:1.05, fill:{color:'F7F6F2'}, line:{color:'E7E4DC', width:1}, rectRadius:0.08 });
+      s2.addText(String(k.value), { x:x+0.2, y:y+0.1, w:3.9, h:0.5, fontSize:18, bold:true, color:ACCENT_DEEP, fontFace:'Arial' });
+      s2.addText(String(k.label), { x:x+0.2, y:y+0.6, w:3.9, h:0.35, fontSize:11, color:'68746E', fontFace:'Arial' });
+    });
+
+    // Chart slides using pptx native charts
+    if(daState.topPerformers && daState.topPerformers.ranked.length>0){
+      const top = daState.topPerformers.ranked.slice(0,8);
+      let sc = pres.addSlide();
+      sc.addText(`${daT('top')} ${daHumanize(daState.topPerformers.catColumn)} ${daT('by')} ${daHumanize(daState.topPerformers.numColumn)}`, { x:0.5, y:0.3, w:9, h:0.5, fontSize:18, bold:true, color:INK, fontFace:'Arial' });
+      sc.addChart(pres.ChartType.bar, [{ name: daHumanize(daState.topPerformers.numColumn), labels: top.map(r=>String(r[0])), values: top.map(r=>r[1]) }],
+        { x:0.5, y:1.0, w:9, h:4.3, barColor:ACCENT, showLegend:false, showValue:true, catAxisLabelColor:'444444', valAxisLabelColor:'444444' });
+    }
+    if(daState.trend && daState.trend.items && daState.trend.items.length>0){
+      let sl = pres.addSlide();
+      sl.addText(`${daHumanize(daState.trend.metric)} ${daT('by')} ${daHumanize(daState.trend.xColumn)}`, { x:0.5, y:0.3, w:9, h:0.5, fontSize:18, bold:true, color:INK, fontFace:'Arial' });
+      sl.addChart(pres.ChartType.line, [{ name: daHumanize(daState.trend.metric), labels: daState.trend.items.map(it=>String(it.label)), values: daState.trend.items.map(it=>it.value) }],
+        { x:0.5, y:1.0, w:9, h:4.3, lineColor:ACCENT_DEEP, lineSize:2.5, showLegend:false, catAxisLabelColor:'444444', valAxisLabelColor:'444444' });
+    }
+    if(daState.categoryBreakdown && daState.categoryBreakdown.items && daState.categoryBreakdown.items.length>0){
+      let sp = pres.addSlide();
+      sp.addText(`${daHumanize(daState.categoryBreakdown.column)} ${daT('breakdown')}`, { x:0.5, y:0.3, w:9, h:0.5, fontSize:18, bold:true, color:INK, fontFace:'Arial' });
+      sp.addChart(pres.ChartType.pie, [{ name: daHumanize(daState.categoryBreakdown.column), labels: daState.categoryBreakdown.items.map(it=>String(it.label)), values: daState.categoryBreakdown.items.map(it=>it.value) }],
+        { x:1.6, y:0.95, w:6.8, h:4.3, chartColors:[ACCENT, ACCENT_DEEP, WARM, 'A9C9BE', 'D8A98A', '7FA99A'], showLegend:true, legendPos:'r', showValue:false });
+    }
+
+    // Insights slide
+    let si = pres.addSlide();
+    si.addText(daT('ai_insights'), { x:0.5, y:0.35, w:9, h:0.5, fontSize:22, bold:true, color:INK, fontFace:'Arial' });
+    const insightText = daState.result.insights.slice(0,6).map(t=>({ text:t, options:{ bullet:{code:'25CF', color:ACCENT}, breakLine:true, paraSpaceAfter:14, fontSize:13, color:'333333', fontFace:'Arial' } }));
+    si.addText(insightText, { x:0.5, y:1.1, w:9, h:4.2 });
+
+    await pres.writeFile({ fileName: (daState.filename.replace(/\.[^.]+$/,'') || 'analysis') + '.pptx' });
+  } catch(e){
+    daSetAlert('upload-err', 'PowerPoint export failed: ' + e.message);
+  }
+  if(btn){ btn.innerHTML = original; btn.disabled = false; }
+}
+
 daRenderAuthHeader();
 daLoadRecent();
+daLoadSiteContent();
 (function daInit(){
   let savedLang = 'en';
   try { savedLang = localStorage.getItem('da_lang') || (navigator.language||'en').slice(0,2); } catch(e){}
