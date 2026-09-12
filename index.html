@@ -230,7 +230,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
-<div id="auth-modal" class="da-modal-overlay" style="display:none">
+<div id="auth-modal" class="da-modal-overlay" style="display:none" onclick="if(event.target===this) daCloseAuthModal()">
   <div class="da-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <p class="da-title" style="margin:0" id="auth-modal-title">Sign in</p>
@@ -247,7 +247,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
-<div id="admin-modal" class="da-modal-overlay" style="display:none">
+<div id="admin-modal" class="da-modal-overlay" style="display:none" onclick="if(event.target===this) daCloseAdmin()">
   <div class="da-modal" style="max-height:85vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <p class="da-title" style="margin:0">Site content admin</p>
@@ -265,7 +265,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
-<div id="preview-modal" class="da-modal-overlay" style="display:none">
+<div id="preview-modal" class="da-modal-overlay" style="display:none" onclick="if(event.target===this) daClosePreview()">
   <div class="da-modal" style="max-height:85vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <p class="da-title" style="margin:0" id="preview-modal-title">Preview</p>
