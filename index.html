@@ -11,7 +11,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDDl82Dyn6ixDIC0rwbkJykJ8toeab6lkI",
@@ -27,7 +27,7 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  window.daFirebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs };
+  window.daFirebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs };
 
   onAuthStateChanged(auth, (user)=>{
     if(window.daOnAuthChange) window.daOnAuthChange(user);
@@ -402,7 +402,98 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <textarea id="pasteInput" rows="10" style="width:100%;font-family:var(--font-mono);font-size:13px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box" placeholder="name,revenue,date&#10;Acme,1200,2024-01-05&#10;Beta,900,2024-01-06"></textarea>
     <button class="da-btn da-btn-primary" style="margin-top:10px;width:100%;justify-content:center" onclick="daHandlePaste()"><i class="ti ti-sparkles"></i><span data-i18n="analyze_this_data">Analyze this data</span></button>
   </div>
+  <div class="da-card da-card-in" style="animation-delay:0.35s">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="da-upload-icon-badge" style="background:rgba(79,185,154,0.14);color:var(--da-accent-deep)"><i class="ti ti-database-plus"></i></div>
+      <p class="da-title" style="margin:0" data-i18n="collect_title">Don't have data yet?</p>
+    </div>
+    <p class="da-muted" style="margin-bottom:12px" data-i18n="collect_desc">Use the data collector to gather it from others with a shareable form, or type it in yourself.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="da-btn da-btn-primary" onclick="daGoCollectHub()"><i class="ti ti-link"></i><span data-i18n="collect_form_btn">Build a shareable form</span></button>
+      <button class="da-btn" onclick="daGoManualEntry()"><i class="ti ti-table"></i><span data-i18n="collect_manual_btn">Enter data manually</span></button>
+    </div>
+  </div>
   <div id="upload-err" class="da-err"></div>
+</div>
+
+
+<div class="da-view" id="view-collect-hub">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" data-i18n="collector_hub_title">Data collector</p>
+    <button class="da-btn" onclick="daShowView('view-upload')" data-i18n="back">Back</button>
+  </div>
+  <div class="da-card da-card-in" style="animation-delay:0.05s">
+    <p class="da-title" data-i18n="collector_hub_build_title">Build a shareable form</p>
+    <p class="da-muted" style="margin-bottom:12px" data-i18n="collector_hub_build_desc">Define the fields you need, share the link, and every submission becomes a row you can analyze.</p>
+    <button class="da-btn da-btn-primary" onclick="daGoCollectorBuilder()"><i class="ti ti-plus"></i><span data-i18n="collector_new_btn">New form</span></button>
+  </div>
+  <div id="collect-hub-signedout" class="da-card" style="display:none">
+    <p class="da-muted" style="margin-bottom:10px" data-i18n="collector_signin_hint">Sign in to create and manage shareable forms and see who has responded.</p>
+    <button class="da-btn da-btn-primary" onclick="daOpenAuthModal('signin')" data-i18n="signin">Sign in</button>
+  </div>
+  <p class="da-title" data-i18n="collector_your_forms">Your forms</p>
+  <div id="collect-hub-list"></div>
+</div>
+
+<div class="da-view" id="view-collect-build">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" data-i18n="collector_build_title">Build your form</p>
+    <button class="da-btn" onclick="daShowView('view-collect-hub')" data-i18n="back">Back</button>
+  </div>
+  <div class="da-card">
+    <label class="da-muted" style="font-size:12px;font-weight:600" data-i18n="collector_form_name">Form name</label>
+    <input id="collector-title-input" type="text" class="da-input" style="margin-top:4px" placeholder="e.g. Customer feedback" oninput="daState.collectorBuilder.title=this.value">
+    <p class="da-title" style="margin-top:16px" data-i18n="collector_fields">Fields</p>
+    <div id="collector-fields-list"></div>
+    <button class="da-btn" style="margin-top:8px;width:100%;justify-content:center" onclick="daAddCollectorField()"><i class="ti ti-plus"></i><span data-i18n="collector_add_field">Add field</span></button>
+    <div id="collect-build-err" class="da-err"></div>
+    <button class="da-btn da-btn-primary" id="collect-build-save-btn" style="width:100%;justify-content:center;margin-top:14px" onclick="daSaveCollectorForm()"><i class="ti ti-device-floppy"></i><span data-i18n="collector_save_btn">Save &amp; get link</span></button>
+  </div>
+</div>
+
+<div class="da-view" id="view-collect-detail">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" id="collect-detail-title" data-i18n="collector_detail_title">Your form</p>
+    <button class="da-btn" onclick="daGoCollectHub()" data-i18n="back">Back</button>
+  </div>
+  <div class="da-card">
+    <p class="da-title" data-i18n="collector_share_link">Shareable link</p>
+    <p class="da-muted" style="margin-bottom:8px" data-i18n="collector_share_desc">Anyone with this link can submit a response — no account needed.</p>
+    <div style="display:flex;gap:8px">
+      <input id="collect-detail-link" type="text" class="da-input" readonly onclick="this.select()">
+      <button class="da-btn" onclick="daCopyCollectorLink()"><i class="ti ti-copy"></i></button>
+    </div>
+  </div>
+  <div class="da-card">
+    <p class="da-title" data-i18n="collector_responses">Responses</p>
+    <p class="da-muted" id="collect-detail-count">–</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="da-btn da-btn-primary" id="collect-detail-analyze-btn" onclick="daAnalyzeCollectorResponses()"><i class="ti ti-sparkles"></i><span data-i18n="collector_analyze_btn">Analyze responses</span></button>
+      <button class="da-btn" onclick="daDeleteCollector()" style="color:var(--text-danger)"><i class="ti ti-trash"></i><span data-i18n="collector_delete_btn">Delete form</span></button>
+    </div>
+    <div id="collect-detail-err" class="da-err"></div>
+  </div>
+</div>
+
+<div class="da-view" id="view-manual-entry">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" data-i18n="manual_entry_title">Enter data manually</p>
+    <button class="da-btn" onclick="daShowView('view-upload')" data-i18n="back">Back</button>
+  </div>
+  <p class="da-muted" style="margin-bottom:12px" data-i18n="manual_entry_desc">Name your columns and type in your rows, like a small spreadsheet.</p>
+  <div class="da-card" style="overflow-x:auto">
+    <div id="manual-entry-grid"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="da-btn" onclick="daManualAddColumn()"><i class="ti ti-plus"></i><span data-i18n="manual_add_column">Add column</span></button>
+      <button class="da-btn" onclick="daManualAddRow()"><i class="ti ti-plus"></i><span data-i18n="manual_add_row">Add row</span></button>
+    </div>
+  </div>
+  <div id="manual-entry-err" class="da-err"></div>
+  <button class="da-btn da-btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="daAnalyzeManualGrid()"><i class="ti ti-sparkles"></i><span data-i18n="analyze_this_data">Analyze this data</span></button>
+</div>
+
+<div class="da-view" id="view-collect-submit">
+  <div id="collect-submit-body"></div>
 </div>
 
 
@@ -516,8 +607,22 @@ const OBJECTIVES = [
   {id:'custom_analysis', label:'Custom analysis', needs:'any data'}
 ];
 
-let daState = { rows: [], columns: [], filename: '', summary: null, objective: null, result: null, user: null, authMode: 'signin', lang: 'en', theme: 'light' };
+let daState = { rows: [], columns: [], filename: '', summary: null, objective: null, result: null, user: null, authMode: 'signin', lang: 'en', theme: 'light', collectorBuilder: null, myCollectors: [], activeCollector: null, publicCollector: null, manualGrid: null };
 const DA_ADMIN_UID = 'REPLACE_WITH_YOUR_FIREBASE_UID';
+const DA_FIELD_TYPES = [ {id:'text', label:'Text'}, {id:'number', label:'Number'}, {id:'date', label:'Date'}, {id:'choice', label:'Choice (pick one)'} ];
+/* Firestore security rules required for the data collector feature:
+   match /collectors/{collectorId} {
+     allow get: if true;
+     allow list: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+     allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+     allow update, delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+     match /submissions/{submissionId} {
+       allow create: if true;
+       allow read, delete: if request.auth != null &&
+         request.auth.uid == get(/databases/$(database)/documents/collectors/$(collectorId)).data.ownerUid;
+     }
+   }
+*/
 
 const DA_SAMPLE_DATA = [{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"North America","units_sold":48,"revenue":1666.67,"customer_rating":4.1,"order_date":"2025-07-02"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"North America","units_sold":23,"revenue":1264.59,"customer_rating":4.1,"order_date":"2025-10-09"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":49,"revenue":6453.41,"customer_rating":4.3,"order_date":"2025-06-20"},{"product_name":"Resistance Bands Set","category":"Fitness","region":"North America","units_sold":56,"revenue":2962.3,"customer_rating":3.6,"order_date":"2025-06-19"},{"product_name":"Yoga Mat Premium","category":"Fitness","region":"North America","units_sold":56,"revenue":1580.98,"customer_rating":4.4,"order_date":"2025-11-27"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Europe","units_sold":28,"revenue":749.3,"customer_rating":4.0,"order_date":"2025-12-08"},{"product_name":"Mechanical Keyboard","category":"Electronics","region":"Latin America","units_sold":63,"revenue":5084.91,"customer_rating":3.5,"order_date":"2025-04-27"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Asia Pacific","units_sold":46,"revenue":3872.57,"customer_rating":4.8,"order_date":"2025-11-15"},{"product_name":"4K Webcam","category":"Electronics","region":"Asia Pacific","units_sold":19,"revenue":804.48,"customer_rating":4.0,"order_date":"2025-03-17"},{"product_name":"LED Desk Lamp","category":"Home","region":"North America","units_sold":19,"revenue":303.01,"customer_rating":3.9,"order_date":"2025-10-15"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Asia Pacific","units_sold":20,"revenue":171.94,"customer_rating":4.1,"order_date":"2025-11-11"},{"product_name":"Bluetooth Speaker Mini","category":"Electronics","region":"Asia Pacific","units_sold":24,"revenue":2149.5,"customer_rating":4.2,"order_date":"2025-02-28"},{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"Asia Pacific","units_sold":94,"revenue":1934.77,"customer_rating":3.9,"order_date":"2025-01-20"},{"product_name":"Foam Roller","category":"Fitness","region":"Latin America","units_sold":87,"revenue":7336.53,"customer_rating":4.6,"order_date":"2025-02-03"},{"product_name":"Cookbook Deluxe","category":"Books","region":"Latin America","units_sold":54,"revenue":1215.78,"customer_rating":4.1,"order_date":"2025-09-28"},{"product_name":"Matte Lipstick","category":"Beauty","region":"Latin America","units_sold":9,"revenue":296.14,"customer_rating":4.6,"order_date":"2025-06-15"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Latin America","units_sold":41,"revenue":1048.8,"customer_rating":4.4,"order_date":"2025-11-02"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"North America","units_sold":42,"revenue":3308.37,"customer_rating":4.5,"order_date":"2025-10-19"},{"product_name":"LED Desk Lamp","category":"Home","region":"Europe","units_sold":15,"revenue":268.52,"customer_rating":4.5,"order_date":"2025-12-02"},{"product_name":"Bestseller Novel Set","category":"Books","region":"North America","units_sold":26,"revenue":317.59,"customer_rating":4.1,"order_date":"2025-03-09"},{"product_name":"Throw Blanket Soft","category":"Home","region":"Europe","units_sold":22,"revenue":1100.38,"customer_rating":3.7,"order_date":"2025-01-03"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"Europe","units_sold":64,"revenue":3104.56,"customer_rating":4.2,"order_date":"2025-08-10"},{"product_name":"Scented Candle Set","category":"Home","region":"Latin America","units_sold":39,"revenue":2276.54,"customer_rating":4.0,"order_date":"2025-10-16"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Europe","units_sold":56,"revenue":2927.11,"customer_rating":3.8,"order_date":"2025-10-08"},{"product_name":"Organic Face Serum","category":"Beauty","region":"North America","units_sold":51,"revenue":1345.81,"customer_rating":5.0,"order_date":"2025-04-09"},{"product_name":"Ceramic Coffee Mug","category":"Home","region":"Europe","units_sold":1,"revenue":24.44,"customer_rating":4.7,"order_date":"2025-02-03"},{"product_name":"Air Plant Terrarium","category":"Home","region":"Europe","units_sold":34,"revenue":889.05,"customer_rating":4.7,"order_date":"2025-09-23"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"North America","units_sold":35,"revenue":1902.89,"customer_rating":5,"order_date":"2025-12-18"},{"product_name":"4K Webcam","category":"Electronics","region":"Asia Pacific","units_sold":20,"revenue":1301.62,"customer_rating":4.2,"order_date":"2025-01-03"},{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"Latin America","units_sold":54,"revenue":599.51,"customer_rating":4.7,"order_date":"2025-12-14"},{"product_name":"Air Plant Terrarium","category":"Home","region":"North America","units_sold":18,"revenue":790.79,"customer_rating":4.7,"order_date":"2025-07-05"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Asia Pacific","units_sold":24,"revenue":1880.26,"customer_rating":3.5,"order_date":"2025-06-25"},{"product_name":"Air Plant Terrarium","category":"Home","region":"Latin America","units_sold":44,"revenue":2470.15,"customer_rating":3.9,"order_date":"2025-07-01"},{"product_name":"Mechanical Keyboard","category":"Electronics","region":"Asia Pacific","units_sold":60,"revenue":8710.91,"customer_rating":4.9,"order_date":"2025-07-28"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Latin America","units_sold":40,"revenue":2223.58,"customer_rating":4.3,"order_date":"2025-04-13"},{"product_name":"Foam Roller","category":"Fitness","region":"Asia Pacific","units_sold":70,"revenue":6114.58,"customer_rating":4.1,"order_date":"2025-01-04"},{"product_name":"Resistance Bands Set","category":"Fitness","region":"Europe","units_sold":46,"revenue":4079.47,"customer_rating":3.7,"order_date":"2025-09-04"},{"product_name":"Ceramic Coffee Mug","category":"Home","region":"Europe","units_sold":32,"revenue":258.81,"customer_rating":3.4,"order_date":"2025-11-07"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Latin America","units_sold":36,"revenue":2273.0,"customer_rating":3.8,"order_date":"2025-05-22"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":16,"revenue":233.9,"customer_rating":3.2,"order_date":"2025-10-19"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Latin America","units_sold":24,"revenue":240.78,"customer_rating":3.7,"order_date":"2025-08-22"},{"product_name":"Yoga Mat Premium","category":"Fitness","region":"Latin America","units_sold":22,"revenue":1909.3,"customer_rating":3.6,"order_date":"2025-02-27"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"Asia Pacific","units_sold":45,"revenue":1166.87,"customer_rating":4.0,"order_date":"2025-07-21"},{"product_name":"Organic Face Serum","category":"Beauty","region":"Europe","units_sold":78,"revenue":916.91,"customer_rating":3.6,"order_date":"2025-02-25"},{"product_name":"Scented Candle Set","category":"Home","region":"Europe","units_sold":55,"revenue":1921.36,"customer_rating":3.7,"order_date":"2025-08-22"},{"product_name":"Bamboo Cutting Board","category":"Home","region":"Asia Pacific","units_sold":55,"revenue":2192.19,"customer_rating":3.6,"order_date":"2025-03-24"},{"product_name":"LED Desk Lamp","category":"Home","region":"Latin America","units_sold":25,"revenue":1028.96,"customer_rating":3.9,"order_date":"2025-02-23"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Europe","units_sold":26,"revenue":925.0,"customer_rating":3.5,"order_date":"2025-02-14"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":6,"revenue":112.53,"customer_rating":3.8,"order_date":"2025-10-13"},{"product_name":"LED Desk Lamp","category":"Home","region":"North America","units_sold":1,"revenue":28.28,"customer_rating":4.0,"order_date":"2025-10-08"},{"product_name":"LED Desk Lamp","category":"Home","region":"Europe","units_sold":32,"revenue":903.06,"customer_rating":3.3,"order_date":"2025-03-20"},{"product_name":"Air Plant Terrarium","category":"Home","region":"North America","units_sold":50,"revenue":2123.8,"customer_rating":4.0,"order_date":"2025-05-13"},{"product_name":"Foam Roller","category":"Fitness","region":"Europe","units_sold":1,"revenue":37.0,"customer_rating":4.6,"order_date":"2025-08-01"},{"product_name":"Cookbook Deluxe","category":"Books","region":"North America","units_sold":41,"revenue":915.88,"customer_rating":3.0,"order_date":"2025-04-27"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":39,"revenue":2268.52,"customer_rating":4.7,"order_date":"2025-10-20"},{"product_name":"Cookbook Deluxe","category":"Books","region":"North America","units_sold":1,"revenue":28.44,"customer_rating":3.7,"order_date":"2025-07-13"},{"product_name":"Kids Puzzle Book","category":"Books","region":"Europe","units_sold":59,"revenue":1474.68,"customer_rating":3.7,"order_date":"2025-02-26"},{"product_name":"Organic Face Serum","category":"Beauty","region":"North America","units_sold":67,"revenue":1724.08,"customer_rating":3.4,"order_date":"2025-02-14"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Latin America","units_sold":51,"revenue":2286.79,"customer_rating":3.6,"order_date":"2025-08-15"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":40,"revenue":2264.01,"customer_rating":3.6,"order_date":"2025-11-13"},{"product_name":"Foam Roller","category":"Fitness","region":"North America","units_sold":33,"revenue":1188.04,"customer_rating":4.9,"order_date":"2025-05-18"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":22,"revenue":741.36,"customer_rating":3.7,"order_date":"2025-01-03"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Europe","units_sold":1,"revenue":29.46,"customer_rating":5,"order_date":"2025-09-11"},{"product_name":"Water Bottle Insulated","category":"Fitness","region":"Latin America","units_sold":1,"revenue":30.11,"customer_rating":4.0,"order_date":"2025-03-07"},{"product_name":"Yoga Mat Premium","category":"Fitness","region":"Latin America","units_sold":50,"revenue":2858.35,"customer_rating":3.8,"order_date":"2025-06-06"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"North America","units_sold":73,"revenue":1469.24,"customer_rating":4.0,"order_date":"2025-08-04"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Asia Pacific","units_sold":1,"revenue":95.1,"customer_rating":4.3,"order_date":"2025-07-16"},{"product_name":"USB-C Fast Charger","category":"Electronics","region":"North America","units_sold":15,"revenue":664.14,"customer_rating":4.0,"order_date":"2025-10-26"},{"product_name":"Matte Lipstick","category":"Beauty","region":"Europe","units_sold":10,"revenue":175.97,"customer_rating":4.5,"order_date":"2025-01-20"},{"product_name":"Cookbook Deluxe","category":"Books","region":"North America","units_sold":44,"revenue":504.03,"customer_rating":4.4,"order_date":"2025-01-14"},{"product_name":"Throw Blanket Soft","category":"Home","region":"Latin America","units_sold":18,"revenue":805.71,"customer_rating":3.2,"order_date":"2025-11-19"},{"product_name":"Bestseller Novel Set","category":"Books","region":"Europe","units_sold":53,"revenue":1387.85,"customer_rating":4.3,"order_date":"2025-05-20"},{"product_name":"Cookbook Deluxe","category":"Books","region":"Asia Pacific","units_sold":14,"revenue":195.85,"customer_rating":4.1,"order_date":"2025-10-02"},{"product_name":"Scented Candle Set","category":"Home","region":"Asia Pacific","units_sold":35,"revenue":696.64,"customer_rating":4.1,"order_date":"2025-11-27"},{"product_name":"Resistance Bands Set","category":"Fitness","region":"North America","units_sold":66,"revenue":1585.01,"customer_rating":4.2,"order_date":"2025-08-03"},{"product_name":"LED Desk Lamp","category":"Home","region":"Asia Pacific","units_sold":3,"revenue":40.32,"customer_rating":4.2,"order_date":"2025-07-27"},{"product_name":"Air Plant Terrarium","category":"Home","region":"North America","units_sold":1,"revenue":24.81,"customer_rating":4.1,"order_date":"2025-11-28"},{"product_name":"Air Plant Terrarium","category":"Home","region":"Latin America","units_sold":41,"revenue":1099.31,"customer_rating":3.9,"order_date":"2025-09-05"},{"product_name":"Running Shoes Elite","category":"Fitness","region":"Latin America","units_sold":34,"revenue":1658.42,"customer_rating":3.8,"order_date":"2025-01-18"},{"product_name":"Scented Candle Set","category":"Home","region":"North America","units_sold":72,"revenue":1000.8,"customer_rating":5,"order_date":"2025-05-17"},{"product_name":"Kids Puzzle Book","category":"Books","region":"Asia Pacific","units_sold":52,"revenue":581.47,"customer_rating":4.8,"order_date":"2025-12-05"},{"product_name":"USB-C Fast Charger","category":"Electronics","region":"Asia Pacific","units_sold":80,"revenue":11490.24,"customer_rating":4.2,"order_date":"2025-10-19"},{"product_name":"Bestseller Novel Set","category":"Books","region":"Latin America","units_sold":1,"revenue":24.78,"customer_rating":5,"order_date":"2025-04-23"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"Latin America","units_sold":49,"revenue":3530.13,"customer_rating":3.7,"order_date":"2025-11-26"},{"product_name":"Hair Dryer Ionic","category":"Beauty","region":"Europe","units_sold":58,"revenue":1682.99,"customer_rating":3.8,"order_date":"2025-09-15"},{"product_name":"Wireless Earbuds Pro","category":"Electronics","region":"Europe","units_sold":19,"revenue":1626.34,"customer_rating":4.9,"order_date":"2025-11-03"},{"product_name":"Foam Roller","category":"Fitness","region":"Latin America","units_sold":26,"revenue":1563.74,"customer_rating":4.0,"order_date":"2025-11-10"},{"product_name":"Adjustable Dumbbells","category":"Fitness","region":"North America","units_sold":21,"revenue":375.38,"customer_rating":3.2,"order_date":"2025-01-11"},{"product_name":"Smart Watch Series 5","category":"Electronics","region":"Asia Pacific","units_sold":46,"revenue":3558.29,"customer_rating":4.5,"order_date":"2025-10-28"},{"product_name":"Ceramic Coffee Mug","category":"Home","region":"Europe","units_sold":13,"revenue":260.96,"customer_rating":3.3,"order_date":"2025-08-10"}];
 function daLoadSample(){ daProcessRows(JSON.parse(JSON.stringify(DA_SAMPLE_DATA)), 'sample-ecommerce-sales.json'); }
@@ -550,6 +655,11 @@ const DA_I18N = {
     footer_tagline:'Real regression &amp; correlation math — runs entirely in your browser.',
     auth_desc:'Sign in to save your analysis history across devices. You can keep using the app without an account too.',
     ph_email:'Email', ph_password:'Password', signin:'Sign in', signup:'Sign up', no_account:"Don't have an account?", have_account:'Already have an account?', please_wait:'Please wait…', err_enter_both:'Enter an email and password.', err_connecting:'Still connecting — try again in a moment.',
+    collect_title:"Don't have data yet?", collect_desc:'Use the data collector to gather it from others with a shareable form, or type it in yourself.', collect_form_btn:'Build a shareable form', collect_manual_btn:'Enter data manually',
+    collector_hub_title:'Data collector', collector_hub_build_title:'Build a shareable form', collector_hub_build_desc:'Define the fields you need, share the link, and every submission becomes a row you can analyze.', collector_new_btn:'New form', collector_signin_hint:'Sign in to create and manage shareable forms and see who has responded.', collector_your_forms:'Your forms',
+    collector_build_title:'Build your form', collector_form_name:'Form name', collector_fields:'Fields', collector_add_field:'Add field', collector_save_btn:'Save & get link',
+    collector_detail_title:'Your form', collector_share_link:'Shareable link', collector_share_desc:'Anyone with this link can submit a response — no account needed.', collector_responses:'Responses', collector_analyze_btn:'Analyze responses', collector_delete_btn:'Delete form',
+    manual_entry_title:'Enter data manually', manual_entry_desc:'Name your columns and type in your rows, like a small spreadsheet.', manual_add_column:'Add column', manual_add_row:'Add row',
   },
   zh: {
     brand:'数据分析器', brand_sub:'上传 → 检查 → 分析 → 导出',
@@ -762,7 +872,7 @@ function daShowSuccessBurst(){
 }
 
 
-const DA_STEP_MAP = { 'view-landing':0, 'view-upload':1, 'view-inspect':1, 'view-objective':2, 'view-processing':3, 'view-dashboard':4, 'view-report':4 };
+const DA_STEP_MAP = { 'view-landing':0, 'view-upload':1, 'view-inspect':1, 'view-objective':2, 'view-processing':3, 'view-dashboard':4, 'view-report':4, 'view-collect-hub':1, 'view-collect-build':1, 'view-collect-detail':1, 'view-manual-entry':1 };
 function daShowView(id){
   document.querySelectorAll('.da-view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -1682,6 +1792,316 @@ function daOpenSavedAnalysis(idx){
   daShowView('view-dashboard');
 }
 
+/* ================= data collector ================= */
+function daGoCollectHub(){ daShowView('view-collect-hub'); daRenderCollectHub(); }
+
+async function daRenderCollectHub(){
+  const listEl = document.getElementById('collect-hub-list');
+  const signedOutEl = document.getElementById('collect-hub-signedout');
+  if(!daState.user){
+    signedOutEl.style.display = 'block';
+    listEl.innerHTML = '';
+    return;
+  }
+  signedOutEl.style.display = 'none';
+  listEl.innerHTML = '<p class="da-muted">Loading…</p>';
+  try {
+    const fb = window.daFirebase;
+    const q = fb.query(fb.collection(fb.db, 'collectors'), fb.where('ownerUid','==',daState.user.uid), fb.orderBy('createdAt','desc'), fb.limit(20));
+    const snap = await fb.getDocs(q);
+    const items = [];
+    snap.forEach(d=>items.push({ id: d.id, ...d.data() }));
+    daState.myCollectors = items;
+    if(items.length===0){
+      listEl.innerHTML = '<div class="da-empty"><i class="ti ti-forms"></i><span>No forms yet — build one above.</span></div>';
+      return;
+    }
+    listEl.innerHTML = items.map((c,i)=>
+      `<div class="da-obj" onclick="daOpenCollectorDetail(${i})"><div style="display:flex;align-items:center"><div class="da-obj-icon"><i class="ti ti-clipboard-list"></i></div><div><p style="margin:0;font-weight:600">${daEsc(c.title)}</p><p class="da-muted" style="margin:2px 0 0">${(c.fields||[]).length} fields</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i></div>`
+    ).join('');
+  } catch(e){
+    listEl.innerHTML = `<div class="da-alert"><i class="ti ti-alert-circle"></i><span>Could not load your forms: ${daEsc(e.message)}</span></div>`;
+  }
+}
+
+function daGoCollectorBuilder(){
+  if(!daState.user){ daOpenAuthModal('signin'); return; }
+  daState.collectorBuilder = { title: '', fields: [ {label:'', type:'text', options:''}, {label:'', type:'text', options:''} ] };
+  document.getElementById('collect-build-err').textContent = '';
+  daShowView('view-collect-build');
+  document.getElementById('collector-title-input').value = '';
+  daRenderCollectorFields();
+}
+
+function daRenderCollectorFields(){
+  const wrap = document.getElementById('collector-fields-list');
+  const b = daState.collectorBuilder;
+  wrap.innerHTML = b.fields.map((f,i)=>`
+    <div style="border:0.5px solid var(--border);border-radius:10px;padding:10px;margin-top:10px;position:relative">
+      <button type="button" onclick="daRemoveCollectorField(${i})" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-secondary);cursor:pointer"><i class="ti ti-trash"></i></button>
+      <label class="da-muted" style="font-size:11px;font-weight:600">Field name</label>
+      <input class="da-input" style="margin-top:3px" value="${daEsc(f.label)}" placeholder="e.g. Full name" oninput="daState.collectorBuilder.fields[${i}].label=this.value">
+      <label class="da-muted" style="font-size:11px;font-weight:600;margin-top:8px;display:block">Type</label>
+      <select class="da-input" style="margin-top:3px" onchange="daState.collectorBuilder.fields[${i}].type=this.value; daRenderCollectorFields()">
+        ${DA_FIELD_TYPES.map(t=>`<option value="${t.id}" ${f.type===t.id?'selected':''}>${t.label}</option>`).join('')}
+      </select>
+      ${f.type==='choice' ? `<label class="da-muted" style="font-size:11px;font-weight:600;margin-top:8px;display:block">Options (comma-separated)</label>
+      <input class="da-input" style="margin-top:3px" value="${daEsc(f.options||'')}" placeholder="e.g. Yes, No, Maybe" oninput="daState.collectorBuilder.fields[${i}].options=this.value">` : ''}
+    </div>
+  `).join('');
+}
+
+function daAddCollectorField(){
+  daState.collectorBuilder.fields.push({label:'', type:'text', options:''});
+  daRenderCollectorFields();
+}
+function daRemoveCollectorField(i){
+  if(daState.collectorBuilder.fields.length<=1) return;
+  daState.collectorBuilder.fields.splice(i,1);
+  daRenderCollectorFields();
+}
+
+async function daSaveCollectorForm(){
+  const errEl = document.getElementById('collect-build-err');
+  errEl.textContent = '';
+  if(!daState.user){ daOpenAuthModal('signin'); return; }
+  const b = daState.collectorBuilder;
+  const title = (b.title||'').trim();
+  const fields = (b.fields||[]).map(f=>{
+    const field = { label: (f.label||'').trim(), type: f.type || 'text' };
+    if(field.type==='choice') field.options = (f.options||'').split(',').map(s=>s.trim()).filter(Boolean);
+    return field;
+  }).filter(f=>f.label);
+  if(!title){ errEl.textContent = 'Give your form a name.'; return; }
+  if(fields.length===0){ errEl.textContent = 'Add at least one field with a name.'; return; }
+  if(fields.some(f=>f.type==='choice' && f.options.length<2)){ errEl.textContent = 'Choice fields need at least two comma-separated options.'; return; }
+  const btn = document.getElementById('collect-build-save-btn');
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader-2"></i> Saving…';
+  btn.disabled = true;
+  try {
+    const fb = window.daFirebase;
+    const record = { ownerUid: daState.user.uid, title, fields, createdAt: new Date().toISOString() };
+    const ref = await fb.addDoc(fb.collection(fb.db, 'collectors'), record);
+    daState.activeCollector = { id: ref.id, ...record };
+    daShowView('view-collect-detail');
+    daRenderCollectorDetail();
+  } catch(e){
+    errEl.textContent = 'Could not save: ' + e.message;
+  }
+  btn.innerHTML = original;
+  btn.disabled = false;
+}
+
+function daOpenCollectorDetail(i){
+  const c = daState.myCollectors[i];
+  if(!c) return;
+  daState.activeCollector = c;
+  daShowView('view-collect-detail');
+  daRenderCollectorDetail();
+}
+
+async function daRenderCollectorDetail(){
+  const c = daState.activeCollector;
+  document.getElementById('collect-detail-title').textContent = c.title;
+  document.getElementById('collect-detail-link').value = `${location.origin}${location.pathname}?c=${c.id}`;
+  document.getElementById('collect-detail-count').textContent = 'Loading responses…';
+  document.getElementById('collect-detail-err').textContent = '';
+  document.getElementById('collect-detail-analyze-btn').disabled = true;
+  try {
+    const fb = window.daFirebase;
+    const snap = await fb.getDocs(fb.collection(fb.db, 'collectors', c.id, 'submissions'));
+    daState.activeCollector.submissionCount = snap.size;
+    document.getElementById('collect-detail-count').textContent = snap.size === 0
+      ? 'No responses yet — share the link to start collecting.'
+      : `${snap.size} response${snap.size===1?'':'s'} collected.`;
+    document.getElementById('collect-detail-analyze-btn').disabled = snap.size === 0;
+  } catch(e){
+    document.getElementById('collect-detail-count').textContent = 'Could not load responses: ' + e.message;
+  }
+}
+
+function daCopyCollectorLink(){
+  const input = document.getElementById('collect-detail-link');
+  input.select();
+  try {
+    navigator.clipboard.writeText(input.value);
+    daShowSuccessBurst();
+  } catch(e){ /* selection above still lets the user copy manually */ }
+}
+
+async function daAnalyzeCollectorResponses(){
+  const c = daState.activeCollector;
+  const errEl = document.getElementById('collect-detail-err');
+  errEl.textContent = '';
+  try {
+    const fb = window.daFirebase;
+    const snap = await fb.getDocs(fb.collection(fb.db, 'collectors', c.id, 'submissions'));
+    const rows = [];
+    snap.forEach(d=>rows.push(d.data()));
+    daProcessRows(rows, c.title);
+  } catch(e){
+    errEl.textContent = 'Could not load responses: ' + e.message;
+  }
+}
+
+async function daDeleteCollector(){
+  const c = daState.activeCollector;
+  if(!c) return;
+  if(!confirm(`Delete "${c.title}" and all its responses? This can't be undone.`)) return;
+  const errEl = document.getElementById('collect-detail-err');
+  try {
+    const fb = window.daFirebase;
+    const snap = await fb.getDocs(fb.collection(fb.db, 'collectors', c.id, 'submissions'));
+    for(const d of snap.docs){ await fb.deleteDoc(d.ref); }
+    await fb.deleteDoc(fb.doc(fb.db, 'collectors', c.id));
+    daGoCollectHub();
+  } catch(e){
+    errEl.textContent = 'Could not delete: ' + e.message;
+  }
+}
+
+/* ---- public submission form (opened via ?c=<id>) ---- */
+async function daLoadPublicCollector(id){
+  daShowView('view-collect-submit');
+  const body = document.getElementById('collect-submit-body');
+  body.innerHTML = '<div class="da-progress"><div class="da-spinner"></div><span class="da-muted">Loading form…</span></div>';
+  try {
+    const fb = window.daFirebase;
+    const snap = await fb.getDoc(fb.doc(fb.db, 'collectors', id));
+    if(!snap.exists()) throw new Error("This form couldn't be found. It may have been deleted.");
+    daState.publicCollector = { id, ...snap.data() };
+    daRenderPublicCollectorForm();
+  } catch(e){
+    body.innerHTML = `<div class="da-card"><div class="da-alert"><i class="ti ti-alert-circle"></i><span>${daEsc(e.message)}</span></div></div>`;
+  }
+}
+
+function daRenderPublicCollectorForm(){
+  const c = daState.publicCollector;
+  const body = document.getElementById('collect-submit-body');
+  const fieldsHtml = c.fields.map((f,i)=>{
+    if(f.type==='choice'){
+      return `<label class="da-muted" style="font-size:12px;font-weight:600;display:block;margin-top:12px">${daEsc(f.label)}</label>
+        <select id="pf-${i}" class="da-input" style="margin-top:4px">${f.options.map(o=>`<option value="${daEsc(o)}">${daEsc(o)}</option>`).join('')}</select>`;
+    }
+    const type = f.type==='number' ? 'number' : f.type==='date' ? 'date' : 'text';
+    return `<label class="da-muted" style="font-size:12px;font-weight:600;display:block;margin-top:12px">${daEsc(f.label)}</label>
+      <input id="pf-${i}" type="${type}" class="da-input" style="margin-top:4px">`;
+  }).join('');
+  body.innerHTML = `
+    <div class="da-card da-card-in">
+      <p class="da-h1" style="margin-bottom:4px">${daEsc(c.title)}</p>
+      <p class="da-muted" style="margin-bottom:4px">Fill this in and submit — no account needed.</p>
+      ${fieldsHtml}
+      <div id="collect-submit-err" class="da-err"></div>
+      <button class="da-btn da-btn-primary" id="collect-submit-btn" style="width:100%;justify-content:center;margin-top:16px" onclick="daSubmitCollectorEntry()"><i class="ti ti-send"></i>Submit</button>
+    </div>`;
+}
+
+async function daSubmitCollectorEntry(){
+  const c = daState.publicCollector;
+  if(!c) return;
+  const values = {};
+  let missing = false;
+  c.fields.forEach((f,i)=>{
+    const el = document.getElementById(`pf-${i}`);
+    const v = el.value.trim();
+    if(!v) missing = true;
+    values[f.label] = (f.type==='number' && v!=='') ? parseFloat(v) : v;
+  });
+  const errEl = document.getElementById('collect-submit-err');
+  if(missing){ errEl.textContent = 'Please fill in every field.'; return; }
+  errEl.textContent = '';
+  const btn = document.getElementById('collect-submit-btn');
+  btn.disabled = true;
+  try {
+    const fb = window.daFirebase;
+    await fb.addDoc(fb.collection(fb.db, 'collectors', c.id, 'submissions'), { ...values, submittedAt: new Date().toISOString() });
+    document.getElementById('collect-submit-body').innerHTML = `<div class="da-card"><div class="da-empty"><i class="ti ti-circle-check"></i><span>Thanks! Your response has been recorded.</span></div></div>`;
+  } catch(e){
+    errEl.textContent = 'Could not submit: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+/* ---- manual entry grid ---- */
+function daGoManualEntry(){
+  daState.manualGrid = { columns: ['Column 1','Column 2','Column 3'], rows: [['','',''],['','',''],['','','']] };
+  document.getElementById('manual-entry-err').textContent = '';
+  daShowView('view-manual-entry');
+  daRenderManualGrid();
+}
+
+function daRenderManualGrid(){
+  const g = daState.manualGrid;
+  const wrap = document.getElementById('manual-entry-grid');
+  let html = '<table style="border-collapse:collapse;width:100%;min-width:480px"><thead><tr>';
+  g.columns.forEach((col,c)=>{
+    html += `<th style="padding:4px;text-align:left"><div style="display:flex;gap:4px;align-items:center">
+      <input class="da-input" style="font-size:12px;font-weight:600;padding:6px 8px" value="${daEsc(col)}" oninput="daState.manualGrid.columns[${c}]=this.value">
+      <button type="button" onclick="daManualRemoveColumn(${c})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;flex-shrink:0"><i class="ti ti-x"></i></button>
+    </div></th>`;
+  });
+  html += '<th></th></tr></thead><tbody>';
+  g.rows.forEach((row,r)=>{
+    html += '<tr>';
+    row.forEach((val,c)=>{
+      html += `<td style="padding:4px"><input class="da-input" style="padding:6px 8px" value="${daEsc(val)}" oninput="daState.manualGrid.rows[${r}][${c}]=this.value"></td>`;
+    });
+    html += `<td style="padding:4px"><button type="button" onclick="daManualRemoveRow(${r})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer"><i class="ti ti-trash"></i></button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function daManualAddColumn(){
+  const g = daState.manualGrid;
+  g.columns.push('Column ' + (g.columns.length+1));
+  g.rows.forEach(r=>r.push(''));
+  daRenderManualGrid();
+}
+function daManualRemoveColumn(c){
+  const g = daState.manualGrid;
+  if(g.columns.length<=1) return;
+  g.columns.splice(c,1);
+  g.rows.forEach(r=>r.splice(c,1));
+  daRenderManualGrid();
+}
+function daManualAddRow(){
+  const g = daState.manualGrid;
+  g.rows.push(new Array(g.columns.length).fill(''));
+  daRenderManualGrid();
+}
+function daManualRemoveRow(r){
+  const g = daState.manualGrid;
+  if(g.rows.length<=1) return;
+  g.rows.splice(r,1);
+  daRenderManualGrid();
+}
+
+function daAnalyzeManualGrid(){
+  const g = daState.manualGrid;
+  const errEl = document.getElementById('manual-entry-err');
+  const cols = g.columns.map(c=>c.trim());
+  if(cols.some(c=>!c)){ errEl.textContent = 'Every column needs a name.'; return; }
+  if(new Set(cols).size !== cols.length){ errEl.textContent = 'Column names must be unique.'; return; }
+  const rows = g.rows
+    .filter(r=>r.some(v=>String(v).trim()!==''))
+    .map(r=>{
+      const obj = {};
+      cols.forEach((c,i)=>{
+        const raw = (r[i]===undefined || r[i]===null) ? '' : String(r[i]).trim();
+        if(raw===''){ obj[c] = null; return; }
+        const num = Number(raw);
+        obj[c] = isNaN(num) ? raw : num;
+      });
+      return obj;
+    });
+  errEl.textContent = '';
+  daProcessRows(rows, 'manual-entry');
+}
+
 /* ================= site content (ratings / testimonials) ================= */
 async function daLoadSiteContent(){
   const card = document.getElementById('testimonial-card');
@@ -1989,6 +2409,8 @@ daLoadSiteContent();
     savedTheme = localStorage.getItem('da_theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   } catch(e){}
   daApplyTheme(savedTheme);
+  const collectorId = new URLSearchParams(location.search).get('c');
+  if(collectorId) daLoadPublicCollector(collectorId);
   document.addEventListener('click', function(e){
     const menu = document.getElementById('lang-menu');
     if(menu && !menu.contains(e.target) && !e.target.closest('.da-lang-btn')) menu.remove();
