@@ -163,7 +163,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 
 /* ---- showcase / badges / testimonials ---- */
 .da-premium-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
-.da-premium-card{position:relative;overflow:hidden;background:var(--surface-2);border:0.5px solid var(--border);border-radius:14px;padding:18px 8px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;transition:transform 0.15s, box-shadow 0.15s, border-color 0.15s}
+.da-premium-card{position:relative;overflow:hidden;background:var(--surface-2);border:0.5px solid var(--border);border-radius:14px;padding:18px 8px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;transition:transform 0.15s, box-shadow 0.15s, border-color 0.15s;cursor:pointer}
 .da-premium-card:hover{transform:translateY(-3px);box-shadow:0 8px 20px -8px rgba(0,0,0,0.15);border-color:var(--border-strong)}
 .da-premium-card i{font-size:21px;color:var(--da-accent-deep);z-index:1}
 .da-premium-card span{font-size:12px;font-weight:600;color:var(--text-primary);z-index:1;line-height:1.2}
@@ -230,7 +230,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
-<div id="auth-modal" class="da-modal-overlay" style="display:none">
+<div id="auth-modal" class="da-modal-overlay" style="display:none" onclick="if(event.target===this) daCloseAuthModal()">
   <div class="da-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <p class="da-title" style="margin:0" id="auth-modal-title">Sign in</p>
@@ -247,7 +247,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
-<div id="admin-modal" class="da-modal-overlay" style="display:none">
+<div id="admin-modal" class="da-modal-overlay" style="display:none" onclick="if(event.target===this) daCloseAdmin()">
   <div class="da-modal" style="max-height:85vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <p class="da-title" style="margin:0">Site content admin</p>
@@ -262,6 +262,16 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <button class="da-btn" style="margin-top:10px;width:100%;justify-content:center" onclick="daAddAdminTestimonialField()"><i class="ti ti-plus"></i>Add testimonial</button>
     <div id="admin-err" class="da-err"></div>
     <button class="da-btn da-btn-primary" style="width:100%;justify-content:center;margin-top:16px" onclick="daSaveSiteContent()"><i class="ti ti-device-floppy"></i>Save changes</button>
+  </div>
+</div>
+
+<div id="preview-modal" class="da-modal-overlay" style="display:none" onclick="if(event.target===this) daClosePreview()">
+  <div class="da-modal" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <p class="da-title" style="margin:0" id="preview-modal-title">Preview</p>
+      <button class="da-btn" style="padding:6px 10px" onclick="daClosePreview()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="preview-modal-body"></div>
   </div>
 </div>
 
@@ -322,23 +332,23 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 
   <p class="da-section-title" data-i18n="what_you_get">What you get</p>
   <div class="da-premium-grid">
-    <div class="da-premium-card"><i class="ti ti-chart-bar"></i><span data-i18n="chip_bar">Bar</span><div class="corner corner-1"></div></div>
-    <div class="da-premium-card"><i class="ti ti-chart-line"></i><span data-i18n="chip_line">Line</span><div class="corner corner-2"></div></div>
-    <div class="da-premium-card"><i class="ti ti-chart-area-line"></i><span data-i18n="chip_area">Area</span><div class="corner corner-1"></div></div>
-    <div class="da-premium-card"><i class="ti ti-chart-pie"></i><span data-i18n="chip_pie">Pie</span><div class="corner corner-2"></div></div>
-    <div class="da-premium-card"><i class="ti ti-chart-dots"></i><span data-i18n="chip_scatter">Scatter</span><div class="corner corner-1"></div></div>
-    <div class="da-premium-card"><i class="ti ti-chart-histogram"></i><span data-i18n="chip_histogram">Histogram</span><div class="corner corner-2"></div></div>
+    <div class="da-premium-card" onclick="daOpenChartPreview('bar')"><i class="ti ti-chart-bar"></i><span data-i18n="chip_bar">Bar</span><div class="corner corner-1"></div></div>
+    <div class="da-premium-card" onclick="daOpenChartPreview('line')"><i class="ti ti-chart-line"></i><span data-i18n="chip_line">Line</span><div class="corner corner-2"></div></div>
+    <div class="da-premium-card" onclick="daOpenChartPreview('area')"><i class="ti ti-chart-area-line"></i><span data-i18n="chip_area">Area</span><div class="corner corner-1"></div></div>
+    <div class="da-premium-card" onclick="daOpenChartPreview('pie')"><i class="ti ti-chart-pie"></i><span data-i18n="chip_pie">Pie</span><div class="corner corner-2"></div></div>
+    <div class="da-premium-card" onclick="daOpenChartPreview('scatter')"><i class="ti ti-chart-dots"></i><span data-i18n="chip_scatter">Scatter</span><div class="corner corner-1"></div></div>
+    <div class="da-premium-card" onclick="daOpenChartPreview('histogram')"><i class="ti ti-chart-histogram"></i><span data-i18n="chip_histogram">Histogram</span><div class="corner corner-2"></div></div>
   </div>
   <p class="da-muted" style="margin:2px 0 1.5rem" data-i18n="what_you_get_desc">Every analysis picks the chart types that fit your data — all computed with real math, not a template.</p>
 
   <p class="da-section-title" data-i18n="works_with">Works with</p>
   <div class="da-premium-grid">
-    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#E4F5EC;color:#1E9E5A"><i class="ti ti-file-type-csv"></i></div><span>CSV</span><small data-i18n="fmt_csv_sub">Comma-separated</small><div class="corner corner-1"></div></div>
-    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#E5F3E6;color:#1D7A34"><i class="ti ti-file-spreadsheet"></i></div><span>Excel</span><small>.xlsx, .xls</small><div class="corner corner-2"></div></div>
-    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#F0EBFB;color:#6E3FC7"><i class="ti ti-braces"></i></div><span>JSON</span><small>.json</small><div class="corner corner-1"></div></div>
-    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#FBEAE8;color:#D64437"><i class="ti ti-file-type-pdf"></i></div><span>PDF</span><small>.pdf</small><div class="corner corner-2"></div></div>
-    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#FDECE1;color:#D8611F"><i class="ti ti-presentation"></i></div><span>PowerPoint</span><small>.pptx, .ppt</small><div class="corner corner-1"></div></div>
-    <div class="da-premium-card"><div class="da-fmt-icon" style="background:#EDEDED;color:#181818"><i class="ti ti-brand-github"></i></div><span>GitHub</span><small data-i18n="fmt_github_sub">Direct links</small><div class="corner corner-2"></div></div>
+    <div class="da-premium-card" onclick="daOpenFormatPreview('csv')"><div class="da-fmt-icon" style="background:#E4F5EC;color:#1E9E5A"><i class="ti ti-file-type-csv"></i></div><span>CSV</span><small data-i18n="fmt_csv_sub">Comma-separated</small><div class="corner corner-1"></div></div>
+    <div class="da-premium-card" onclick="daOpenFormatPreview('excel')"><div class="da-fmt-icon" style="background:#E5F3E6;color:#1D7A34"><i class="ti ti-file-spreadsheet"></i></div><span>Excel</span><small>.xlsx, .xls</small><div class="corner corner-2"></div></div>
+    <div class="da-premium-card" onclick="daOpenFormatPreview('json')"><div class="da-fmt-icon" style="background:#F0EBFB;color:#6E3FC7"><i class="ti ti-braces"></i></div><span>JSON</span><small>.json</small><div class="corner corner-1"></div></div>
+    <div class="da-premium-card" onclick="daOpenFormatPreview('pdf')"><div class="da-fmt-icon" style="background:#FBEAE8;color:#D64437"><i class="ti ti-file-type-pdf"></i></div><span>PDF</span><small>.pdf</small><div class="corner corner-2"></div></div>
+    <div class="da-premium-card" onclick="daOpenFormatPreview('pptx')"><div class="da-fmt-icon" style="background:#FDECE1;color:#D8611F"><i class="ti ti-presentation"></i></div><span>PowerPoint</span><small>.pptx, .ppt</small><div class="corner corner-1"></div></div>
+    <div class="da-premium-card" onclick="daOpenFormatPreview('github')"><div class="da-fmt-icon" style="background:#EDEDED;color:#181818"><i class="ti ti-brand-github"></i></div><span>GitHub</span><small data-i18n="fmt_github_sub">Direct links</small><div class="corner corner-2"></div></div>
   </div>
 
   <p class="da-section-title" data-i18n="what_people_say">What people say</p>
@@ -614,7 +624,7 @@ const OBJECTIVES = [
 ];
 
 let daState = { rows: [], columns: [], filename: '', summary: null, objective: null, result: null, user: null, authMode: 'signin', lang: 'en', theme: 'light', collectorBuilder: null, myCollectors: [], activeCollector: null, publicCollector: null, manualGrid: null };
-const DA_ADMIN_UID = 'REPLACE_WITH_YOUR_FIREBASE_UID';
+const DA_ADMIN_UID = 'kVRo65cQXMTnb1eiCN8SPrX2ZkO2';
 const DA_FIELD_TYPES = [ {id:'text', label:'Text'}, {id:'number', label:'Number'}, {id:'date', label:'Date'}, {id:'choice', label:'Choice (pick one)'} ];
 /* Firestore security rules required for the data collector feature:
    match /collectors/{collectorId} {
@@ -1667,6 +1677,125 @@ function daComputeCategoryBreakdown(catCols, rows, excludeCol){
 }
 
 function daChartCaption(text){ return `<p class="da-muted" style="margin:2px 0 12px">${text}</p>`; }
+
+/* ================= landing page previews (chart types & formats) ================= */
+function daOpenPreviewModal(title, bodyHtml){
+  document.getElementById('preview-modal-title').textContent = title;
+  document.getElementById('preview-modal-body').innerHTML = bodyHtml;
+  document.getElementById('preview-modal').style.display = 'flex';
+}
+function daClosePreview(){ document.getElementById('preview-modal').style.display = 'none'; }
+
+function daOpenChartPreview(type){
+  const rows = JSON.parse(JSON.stringify(DA_SAMPLE_DATA));
+  const columns = daAnalyzeColumns(rows);
+  const numericCols = columns.filter(c=>c.type==='numeric');
+  const catCols = columns.filter(c=>c.type==='categorical');
+  const topPerformers = daComputeTopPerformers(catCols, numericCols, rows);
+  const trend = daComputeTrend(columns, rows, topPerformers ? topPerformers.numColumn : null);
+  const categoryBreakdown = daComputeCategoryBreakdown(catCols, rows, topPerformers ? topPerformers.catColumn : null);
+  const scatter = daComputeScatter(numericCols, rows);
+  const histogram = daComputeHistogram(numericCols, rows);
+
+  const unavailable = '<p class="da-muted">The sample dataset doesn\'t have the right shape to demo this chart, but your own data might.</p>';
+  let title = '', chartHtml = unavailable;
+  switch(type){
+    case 'bar':
+      title = 'Bar chart';
+      if(topPerformers && topPerformers.ranked.length>0){
+        chartHtml = daChartCaption(`Totals ${daEsc(daHumanize(topPerformers.numColumn))}, grouped by ${daEsc(daHumanize(topPerformers.catColumn))}, ranked highest to lowest.`) + daSvgBarChart(topPerformers.ranked.map(r=>({label:r[0], value:r[1]})));
+      }
+      break;
+    case 'line': {
+      title = 'Line chart';
+      const items = trend ? trend.items : daSampleMonthlyRevenue();
+      const metricLabel = trend ? daHumanize(trend.metric) : 'Revenue';
+      const xLabel = trend ? daHumanize(trend.xColumn) : 'month';
+      chartHtml = daChartCaption(`Tracks ${daEsc(metricLabel)} over ${daEsc(xLabel)}, with a fitted trend line.`) + daSvgLineChart(items);
+      break;
+    }
+    case 'area': {
+      title = 'Area chart';
+      const items = trend ? trend.items : daSampleMonthlyRevenue();
+      chartHtml = daChartCaption('Same trend as the line chart, filled to emphasize volume over time.') + daSvgAreaChart(items);
+      break;
+    }
+    case 'pie':
+      title = 'Pie chart';
+      if(categoryBreakdown) chartHtml = daChartCaption(`Share of rows by each ${daEsc(daHumanize(categoryBreakdown.column))} value.`) + daSvgPieChart(categoryBreakdown.items);
+      break;
+    case 'scatter':
+      title = 'Scatter chart';
+      if(scatter) chartHtml = daChartCaption(`Plots ${daEsc(daHumanize(scatter.yCol))} against ${daEsc(daHumanize(scatter.xCol))} for every row.`) + daSvgScatterChart(scatter.points, daHumanize(scatter.xCol), daHumanize(scatter.yCol));
+      break;
+    case 'histogram':
+      title = 'Histogram';
+      if(histogram) chartHtml = daChartCaption(`Counts how many rows fall into each ${daEsc(daHumanize(histogram.column))} range.`) + daSvgHistogram(histogram.bins);
+      break;
+  }
+  daOpenPreviewModal(title, `
+    <p class="da-muted" style="margin-bottom:12px">Live example, built from the built-in sample sales dataset.</p>
+    ${chartHtml}
+    <button class="da-btn da-btn-primary" style="width:100%;justify-content:center;margin-top:14px" onclick="daClosePreview();daGoUpload()"><i class="ti ti-upload"></i>Try it with your data</button>
+  `);
+}
+
+function daSampleMonthlyRevenue(){
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const sums = {};
+  DA_SAMPLE_DATA.forEach(r=>{
+    const d = new Date(r.order_date);
+    if(isNaN(d)) return;
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    sums[key] = (sums[key]||0) + (parseFloat(r.revenue)||0);
+  });
+  return Object.keys(sums).sort().map(key=>({ label: monthNames[parseInt(key.split('-')[1],10)-1], value: sums[key] }));
+}
+function daSampleCsvSnippet(){
+  const rows = DA_SAMPLE_DATA.slice(0,3);
+  const cols = Object.keys(rows[0]);
+  return [cols.join(','), ...rows.map(r=>cols.map(c=>r[c]).join(','))].join('\n');
+}
+function daSampleJsonSnippet(){
+  return JSON.stringify(DA_SAMPLE_DATA.slice(0,2), null, 2);
+}
+function daPreviewCode(text){
+  return `<pre style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:10px;padding:10px;font-family:var(--font-mono);font-size:12px;overflow-x:auto;white-space:pre">${daEsc(text)}</pre>`;
+}
+function daPreviewTryUploadBtn(){
+  return `<button class="da-btn da-btn-primary" style="width:100%;justify-content:center;margin-top:14px" onclick="daClosePreview();daGoUpload()"><i class="ti ti-upload"></i>Try it with your data</button>`;
+}
+
+function daOpenFormatPreview(type){
+  let title = '', bodyHtml = '';
+  switch(type){
+    case 'csv':
+      title = 'CSV';
+      bodyHtml = `<p class="da-muted" style="margin-bottom:10px">A plain-text table with a header row and comma-separated values. Drop one on the Upload screen, or paste it directly.</p>${daPreviewCode(daSampleCsvSnippet())}${daPreviewTryUploadBtn()}`;
+      break;
+    case 'excel':
+      title = 'Excel';
+      bodyHtml = `<p class="da-muted" style="margin-bottom:10px">.xlsx or .xls workbooks — the first sheet is read automatically, using its top row as column headers.</p>${daPreviewCode(daSampleCsvSnippet())}${daPreviewTryUploadBtn()}`;
+      break;
+    case 'json':
+      title = 'JSON';
+      bodyHtml = `<p class="da-muted" style="margin-bottom:10px">A JSON array of objects, one object per row, with consistent keys.</p>${daPreviewCode(daSampleJsonSnippet())}${daPreviewTryUploadBtn()}`;
+      break;
+    case 'pdf':
+      title = 'PDF';
+      bodyHtml = `<p class="da-muted" style="margin-bottom:10px">A PDF that contains a real table (not a scanned image). Text and column positions are read directly from the page to rebuild the rows — a table with a clear header row works best.</p>${daPreviewTryUploadBtn()}`;
+      break;
+    case 'pptx':
+      title = 'PowerPoint';
+      bodyHtml = `<p class="da-muted" style="margin-bottom:10px">Not something you upload — once your data is analyzed, you can download the finished report as a PowerPoint deck with real, editable charts on each slide.</p><button class="da-btn da-btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="daClosePreview();daLoadSample()"><i class="ti ti-flask"></i>Try the sample dataset</button>`;
+      break;
+    case 'github':
+      title = 'GitHub';
+      bodyHtml = `<p class="da-muted" style="margin-bottom:10px">Paste a direct GitHub link to a .csv, .json, .xlsx, .xls, or .pdf file in the "Load from a URL" box — regular file-page links work too, they're converted automatically.</p>${daPreviewCode('https://github.com/owner/repo/blob/main/data.csv')}${daPreviewTryUploadBtn()}`;
+      break;
+  }
+  daOpenPreviewModal(title, bodyHtml);
+}
 const DA_CHART_TYPES = [
   { id:'bar', label:'Bar', icon:'ti-chart-bar', available: ()=>true,
     render: ()=> daState.topPerformers && daState.topPerformers.ranked.length>0
