@@ -645,7 +645,7 @@ function daLoadSample(){ daProcessRows(JSON.parse(JSON.stringify(DA_SAMPLE_DATA)
 
 
 /* ================= i18n ================= */
-const DA_LANGS = { en:'English', zh:'中文', ru:'Русский', ar:'العربية', es:'Español', fr:'Français', de:'Deutsch' };
+const DA_LANGS = { en:'English', zh:'中文', ru:'Русский', ar:'العربية', es:'Español', fr:'Français', de:'Deutsch', uz:'Oʻzbekcha' };
 const DA_I18N = {
   en: {
     brand:'Data Analyzer', brand_sub:'Upload → Inspect → Analyze → Export',
@@ -856,6 +856,36 @@ const DA_I18N = {
     collector_build_title:'Erstellen Sie Ihr Formular', collector_form_name:'Formularname', collector_fields:'Felder', collector_add_field:'Feld hinzufügen', collector_save_btn:'Speichern & Link erhalten',
     collector_detail_title:'Ihr Formular', collector_share_link:'Teilbarer Link', collector_share_desc:'Jeder mit diesem Link kann eine Antwort einreichen — kein Konto nötig.', collector_responses:'Antworten', collector_analyze_btn:'Antworten analysieren', collector_delete_btn:'Formular löschen',
     manual_entry_title:'Daten manuell eingeben', manual_entry_desc:'Benennen Sie Ihre Spalten und geben Sie Ihre Zeilen ein, wie in einer kleinen Tabelle.', manual_add_column:'Spalte hinzufügen', manual_add_row:'Zeile hinzufügen',
+  },
+  uz: {
+    brand:"Ma'lumot tahlilchisi", brand_sub:'Yuklash → Tekshirish → Tahlil qilish → Eksport qilish',
+    hero_h1:'Jadvalni javobga aylantiring.',
+    hero_p:'CSV, Excel, JSON yoki PDF faylini yuklang. Haqiqiy regressiya va korrelyatsiya hisob-kitoblari brauzeringizda ishlaydi — taxmin qilish yoʻq, serverni kutish yoʻq.',
+    upload_your_data:"Ma'lumotlaringizni yuklang", try_sample:"Namunaviy ma'lumotlarni sinab koʻring", stat_chart_types:'diagramma turi', stat_formats:'fayl formati', stat_browser:'brauzerda ishlaydi', stat_languages:'til', how_it_works:'Qanday ishlaydi',
+    step1_t:'Yuklash', step1_d:"Ma'lumotlaringizni joylashtiring yoki CSV, Excel, JSON yoki PDF faylini tanlang.",
+    step2_t:'Maqsadni tanlang', step2_d:'Biz ustunlaringizni tekshirib, nimani tahlil qilish foydali ekanini taklif qilamiz.',
+    step3_t:'Hisobotingizni oling', step3_d:'Interaktiv diagrammalar, haqiqiy statistika va chop etiladigan xulosa.',
+    what_you_get:'Nima olasiz', what_you_get_desc:"Har bir tahlil ma'lumotlaringizga mos diagramma turlarini tanlaydi — barchasi shablon emas, haqiqiy matematika bilan hisoblanadi.", chip_bar:'Ustunli', chip_line:'Chiziqli', chip_area:'Maydonli', chip_pie:'Doiraviy', chip_scatter:'Tarqoq nuqtali', chip_histogram:'Gistogramma', chip_stacked:'Qatlamli', works_with:'Mos ishlaydi', fmt_csv_sub:'Vergul bilan ajratilgan', fmt_github_sub:'Toʻgʻridan-toʻgʻri havolalar', what_people_say:'Odamlar nima deyishadi', no_reviews_yet:'Hali sharhlar yoʻq — tajribangizni ulashgan birinchi boʻling.', your_activity:'Sizning faoliyatingiz', datasets_analyzed:"Tahlil qilingan ma'lumotlar toʻplami", most_used_objective:'Eng koʻp ishlatilgan maqsad',
+    recent_analyses:'Soʻnggi tahlillar', no_analyses:'Hali tahlillar yoʻq — boshlash uchun fayl yuklang.',
+    upload_data:"Ma'lumot yuklash", choose_a_file:'Fayl tanlash', file_types:'CSV, Excel (.xlsx/.xls), JSON yoki jadval mavjud PDF',
+    or_paste_hint:'Yoki fayl tanlashni xohlamasangiz, quyida joylashtiring.', load_from_url:'Yoki URL orqali yuklang', url_desc:'Toʻgʻridan-toʻgʻri .csv, .json, .xlsx, .xls yoki .pdf fayliga havolani joylashtiring (GitHub havolalari ham ishlaydi)', ph_url:'https://example.com/data.csv', fetch_data:"Ma'lumotni olish",
+    paste_here:"Yoki ma'lumotingizni shu yerga joylashtiring", paste_desc:'Sarlavha qatori bilan CSV yoki obyektlar massivi (JSON) joylashtiring, soʻng quyidagi tugmani bosing',
+    analyze_this_data:"Ushbu ma'lumotni tahlil qilish",
+    inspecting_data:"Ma'lumot tekshirilmoqda", reading_file:'Fayl oʻqilmoqda…',
+    choose_objective:'Maqsadni tanlang', suggested_for_data:"Ushbu ma'lumot uchun tavsiya etiladi", see_all_objectives:'Barcha maqsadlarni koʻrish',
+    processing:'Qayta ishlanmoqda', running_analysis:'Tahlil bajarilmoqda…',
+    done:'Tayyor', download_pptx:'PowerPoint sifatida yuklab olish', building_pptx:'PowerPoint tayyorlanmoqda…', key_metrics:'Asosiy koʻrsatkichlar', top:'Eng yaxshi', by:'boʻyicha', breakdown:'taqsimot', ai_insights:'AI tahlillari', view_full_report:'Toʻliq hisobotni koʻrish', show_as_json:'JSON sifatida koʻrsatish', show_as_csv:'CSV sifatida koʻrsatish',
+    copy_hint:'Katakchani bosing, hammasini tanlang va nusxa oling — bu koʻrinishda yuklab olish qoʻllab-quvvatlanmaydi.',
+    analysis_report:'Tahlil hisoboti', back:'Orqaga', insights:'Tahlillar',
+    save_pdf:'PDF sifatida saqlash / Chop etish', print_hint:'Brauzeringizning chop etish oynasini ochadi — manzil sifatida "PDF sifatida saqlash"ni tanlang.',
+    footer_tagline:'Haqiqiy regressiya va korrelyatsiya hisob-kitoblari — toʻliq brauzeringizda ishlaydi.',
+    auth_desc:'Tahlillar tarixini barcha qurilmalaringizda saqlash uchun tizimga kiring. Hisobsiz ham ilovadan foydalanishni davom ettirishingiz mumkin.',
+    ph_email:'Email', ph_password:'Parol', signin:'Kirish', signup:'Roʻyxatdan oʻtish', no_account:'Hisobingiz yoʻqmi?', have_account:'Hisobingiz bormi?', please_wait:'Iltimos kuting…', err_enter_both:'Email va parolni kiriting.', err_connecting:'Hali ulanmoqda — birozdan soʻng qayta urinib koʻring.',
+    collect_title:"Hali ma'lumotingiz yoʻqmi?", collect_desc:"Ma'lumot toʻplagichdan foydalanib, ulashiladigan forma orqali boshqalardan yigʻing yoki oʻzingiz kiriting.", collect_form_btn:'Ulashiladigan forma yaratish', collect_manual_btn:"Ma'lumotni qoʻlda kiritish",
+    collector_hub_title:"Ma'lumot toʻplagich", collector_hub_build_title:'Ulashiladigan forma yaratish', collector_hub_build_desc:'Kerakli maydonlarni belgilang, havolani ulashing — har bir yuborilgan javob siz tahlil qila oladigan qatorga aylanadi.', collector_new_btn:'Yangi forma', collector_signin_hint:'Ulashiladigan formalar yaratish, boshqarish va kim javob berganini koʻrish uchun tizimga kiring.', collector_your_forms:'Sizning formalaringiz',
+    collector_build_title:'Formangizni yarating', collector_form_name:'Forma nomi', collector_fields:'Maydonlar', collector_add_field:'Maydon qoʻshish', collector_save_btn:'Saqlash va havola olish',
+    collector_detail_title:'Sizning formangiz', collector_share_link:'Ulashiladigan havola', collector_share_desc:'Ushbu havolaga ega har qanday kishi javob yuborishi mumkin — hisob talab qilinmaydi.', collector_responses:'Javoblar', collector_analyze_btn:'Javoblarni tahlil qilish', collector_delete_btn:'Formani oʻchirish',
+    manual_entry_title:"Ma'lumotni qoʻlda kiritish", manual_entry_desc:'Ustunlaringizga nom bering va qatorlarni kiriting — xuddi kichik jadval kabi.', manual_add_column:'Ustun qoʻshish', manual_add_row:'Qator qoʻshish',
   }
 };
 
