@@ -1097,6 +1097,18 @@ function daNormalizeDataUrl(url){
   return url;
 }
 
+function daPickBestSheetRows(wb){
+  // A workbook's first sheet is often a cover page, readme, or column glossary rather
+  // than the actual table — pick whichever sheet parses to the most rows instead of
+  // assuming sheet order.
+  let bestRows = [];
+  wb.SheetNames.forEach(name=>{
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:null});
+    if(rows.length > bestRows.length) bestRows = rows;
+  });
+  return bestRows;
+}
+
 async function daFetchFromUrl(){
   const input = document.getElementById('urlInput');
   const rawUrl = input.value.trim();
@@ -1123,8 +1135,7 @@ async function daFetchFromUrl(){
     } else if(path.endsWith('.xlsx') || path.endsWith('.xls')){
       const buf = await resp.arrayBuffer();
       const wb = XLSX.read(buf, {type:'array'});
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+      rows = daPickBestSheetRows(wb);
     } else if(path.endsWith('.pdf')){
       const buf = await resp.arrayBuffer();
       try { rows = await daExtractPdfTableFromBuffer(buf); }
@@ -1226,8 +1237,7 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
     } else if(file.name.endsWith('.xlsx')||file.name.endsWith('.xls')){
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, {type:'array'});
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+      rows = daPickBestSheetRows(wb);
     } else if(file.name.endsWith('.json')){
       const text = await file.text();
       rows = JSON.parse(text);
