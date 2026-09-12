@@ -369,7 +369,10 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 
 
 <div class="da-view" id="view-upload">
-  <p class="da-h1" data-i18n="upload_data">Upload data</p>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" data-i18n="upload_data">Upload data</p>
+    <button class="da-btn" onclick="daGoLanding()" data-i18n="back">Back</button>
+  </div>
   <div class="da-card da-card-in" style="animation-delay:0.05s">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <div class="da-upload-icon-badge"><i class="ti ti-file-upload"></i></div>
@@ -505,7 +508,10 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 </div>
 
 <div class="da-view" id="view-objective">
-  <p class="da-h1" data-i18n="choose_objective">Choose objective</p>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" data-i18n="choose_objective">Choose objective</p>
+    <button class="da-btn" onclick="daShowView('view-upload')" data-i18n="back">Back</button>
+  </div>
   <div class="da-card" id="quality-card"></div>
   <p class="da-title" data-i18n="suggested_for_data">Suggested for this data</p>
   <div id="suggested-objectives"></div>
