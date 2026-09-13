@@ -237,6 +237,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   <div class="da-logo"><i class="ti ti-chart-histogram"></i></div>
   <div><div class="da-brand" data-i18n="brand">Data Analyzer</div><div class="da-brand-sub" data-i18n="brand_sub">Upload → Inspect → Analyze → Export</div></div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <button class="da-icon-btn" onclick="daShowProModal()" title="Pro" style="background:linear-gradient(135deg,#E8A23C,#D8611F);color:#fff;border:none"><i class="ti ti-crown"></i></button>
     <button class="da-icon-btn" onclick="daToggleTheme()" id="theme-toggle-btn" title="Toggle theme"><i class="ti ti-moon"></i></button>
     <div id="lang-switcher"></div>
     <div id="auth-header-area"></div>
@@ -386,7 +387,10 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
       <svg class="da-stat-spark" viewBox="0 0 100 24" preserveAspectRatio="none"><path d="M0,10 L15,14 L30,8 L45,15 L60,9 L75,17 L100,6" fill="none" stroke="var(--da-accent-warm)" stroke-width="2"/></svg>
     </div>
   </div>
-  <p class="da-title" data-i18n="recent_analyses">Recent analyses</p>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <p class="da-title" data-i18n="recent_analyses">Recent analyses</p>
+    <a href="#" onclick="daGoHistory();return false;" style="font-size:13px;font-weight:600;color:var(--da-accent-deep);text-decoration:none" data-i18n="view_all">View all</a>
+  </div>
   <div id="recent-list"><div class="da-empty"><i class="ti ti-database-off"></i><span data-i18n="no_analyses">No analyses yet — upload a file to get started.</span></div></div>
 </div>
 
@@ -609,6 +613,14 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
   </div>
 </div>
 
+<div class="da-view" id="view-history">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p class="da-h1" style="margin:0" data-i18n="history_title">History</p>
+    <button class="da-btn" onclick="daGoLanding()" data-i18n="back">Back</button>
+  </div>
+  <div id="history-list"></div>
+</div>
+
 <style>
 @media print {
   body * { visibility: hidden; }
@@ -691,6 +703,7 @@ const DA_I18N = {
     collector_build_title:'Build your form', collector_form_name:'Form name', collector_fields:'Fields', collector_add_field:'Add field', collector_save_btn:'Save & get link',
     collector_detail_title:'Your form', collector_share_link:'Shareable link', collector_share_desc:'Anyone with this link can submit a response — no account needed.', collector_responses:'Responses', collector_analyze_btn:'Analyze responses', collector_delete_btn:'Delete form',
     manual_entry_title:'Enter data manually', manual_entry_desc:'Name your columns and type in your rows, like a small spreadsheet.', manual_add_column:'Add column', manual_add_row:'Add row',
+    history_title:'History', view_all:'View all', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro is coming soon — unlimited saved history, more shareable forms, and exports without limits. Stay tuned!',
   },
   zh: {
     brand:'数据分析器', brand_sub:'上传 → 检查 → 分析 → 导出',
@@ -721,6 +734,7 @@ const DA_I18N = {
     collector_build_title:'创建你的表单', collector_form_name:'表单名称', collector_fields:'字段', collector_add_field:'添加字段', collector_save_btn:'保存并获取链接',
     collector_detail_title:'你的表单', collector_share_link:'可分享的链接', collector_share_desc:'拥有此链接的任何人都可以提交回复 — 无需账户。', collector_responses:'回复', collector_analyze_btn:'分析回复', collector_delete_btn:'删除表单',
     manual_entry_title:'手动输入数据', manual_entry_desc:'为你的列命名，然后输入数据行，就像一个小型电子表格。', manual_add_column:'添加列', manual_add_row:'添加行',
+    history_title:'历史记录', view_all:'查看全部', pro_modal_title:'数据分析器 Pro', pro_modal_body:'Pro 即将推出——无限保存历史记录、更多可分享表单，以及无限制导出。敬请期待！',
   },
   ru: {
     brand:'Анализатор данных', brand_sub:'Загрузка → Проверка → Анализ → Экспорт',
@@ -751,6 +765,7 @@ const DA_I18N = {
     collector_build_title:'Создайте свою форму', collector_form_name:'Название формы', collector_fields:'Поля', collector_add_field:'Добавить поле', collector_save_btn:'Сохранить и получить ссылку',
     collector_detail_title:'Ваша форма', collector_share_link:'Ссылка для обмена', collector_share_desc:'Любой, у кого есть эта ссылка, может отправить ответ — аккаунт не нужен.', collector_responses:'Ответы', collector_analyze_btn:'Анализировать ответы', collector_delete_btn:'Удалить форму',
     manual_entry_title:'Ввод данных вручную', manual_entry_desc:'Назовите столбцы и введите строки — как в небольшой таблице.', manual_add_column:'Добавить столбец', manual_add_row:'Добавить строку',
+    history_title:'История', view_all:'Смотреть все', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro скоро появится — неограниченная история анализов, больше форм для сбора данных и экспорт без ограничений. Следите за обновлениями!',
   },
   ar: {
     brand:'محلل البيانات', brand_sub:'رفع ← فحص ← تحليل ← تصدير',
@@ -781,6 +796,7 @@ const DA_I18N = {
     collector_build_title:'أنشئ نموذجك', collector_form_name:'اسم النموذج', collector_fields:'الحقول', collector_add_field:'إضافة حقل', collector_save_btn:'حفظ والحصول على الرابط',
     collector_detail_title:'نموذجك', collector_share_link:'رابط المشاركة', collector_share_desc:'يمكن لأي شخص لديه هذا الرابط إرسال رد — بلا حاجة لحساب.', collector_responses:'الردود', collector_analyze_btn:'تحليل الردود', collector_delete_btn:'حذف النموذج',
     manual_entry_title:'إدخال البيانات يدويًا', manual_entry_desc:'سمِّ أعمدتك وأدخل صفوفك، تمامًا مثل جدول بيانات صغير.', manual_add_column:'إضافة عمود', manual_add_row:'إضافة صف',
+    history_title:'السجل', view_all:'عرض الكل', pro_modal_title:'محلل البيانات Pro', pro_modal_body:'ستتوفر ميزة Pro قريبًا — سجل تحليلات غير محدود، المزيد من النماذج القابلة للمشاركة، وتصدير بلا حدود. ترقبوا ذلك!',
   },
   es: {
     brand:'Analizador de Datos', brand_sub:'Subir → Inspeccionar → Analizar → Exportar',
@@ -811,6 +827,7 @@ const DA_I18N = {
     collector_build_title:'Crea tu formulario', collector_form_name:'Nombre del formulario', collector_fields:'Campos', collector_add_field:'Añadir campo', collector_save_btn:'Guardar y obtener enlace',
     collector_detail_title:'Tu formulario', collector_share_link:'Enlace para compartir', collector_share_desc:'Cualquiera con este enlace puede enviar una respuesta — no necesita cuenta.', collector_responses:'Respuestas', collector_analyze_btn:'Analizar respuestas', collector_delete_btn:'Eliminar formulario',
     manual_entry_title:'Ingresar datos manualmente', manual_entry_desc:'Nombra tus columnas y escribe tus filas, como en una pequeña hoja de cálculo.', manual_add_column:'Añadir columna', manual_add_row:'Añadir fila',
+    history_title:'Historial', view_all:'Ver todo', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro llegará pronto — historial de análisis ilimitado, más formularios compartibles y exportaciones sin límites. ¡Mantente atento!',
   },
   fr: {
     brand:'Analyseur de Données', brand_sub:'Importer → Inspecter → Analyser → Exporter',
@@ -841,6 +858,7 @@ const DA_I18N = {
     collector_build_title:'Créez votre formulaire', collector_form_name:'Nom du formulaire', collector_fields:'Champs', collector_add_field:'Ajouter un champ', collector_save_btn:'Enregistrer et obtenir le lien',
     collector_detail_title:'Votre formulaire', collector_share_link:'Lien de partage', collector_share_desc:'Toute personne disposant de ce lien peut envoyer une réponse — aucun compte requis.', collector_responses:'Réponses', collector_analyze_btn:'Analyser les réponses', collector_delete_btn:'Supprimer le formulaire',
     manual_entry_title:'Saisir les données manuellement', manual_entry_desc:'Nommez vos colonnes et saisissez vos lignes, comme un petit tableur.', manual_add_column:'Ajouter une colonne', manual_add_row:'Ajouter une ligne',
+    history_title:'Historique', view_all:'Tout voir', pro_modal_title:'Data Analyzer Pro', pro_modal_body:"La version Pro arrive bientôt — historique d'analyses illimité, plus de formulaires partageables, et exports sans limites. Restez à l'écoute !",
   },
   de: {
     brand:'Datenanalysator', brand_sub:'Hochladen → Prüfen → Analysieren → Exportieren',
@@ -871,6 +889,7 @@ const DA_I18N = {
     collector_build_title:'Erstellen Sie Ihr Formular', collector_form_name:'Formularname', collector_fields:'Felder', collector_add_field:'Feld hinzufügen', collector_save_btn:'Speichern & Link erhalten',
     collector_detail_title:'Ihr Formular', collector_share_link:'Teilbarer Link', collector_share_desc:'Jeder mit diesem Link kann eine Antwort einreichen — kein Konto nötig.', collector_responses:'Antworten', collector_analyze_btn:'Antworten analysieren', collector_delete_btn:'Formular löschen',
     manual_entry_title:'Daten manuell eingeben', manual_entry_desc:'Benennen Sie Ihre Spalten und geben Sie Ihre Zeilen ein, wie in einer kleinen Tabelle.', manual_add_column:'Spalte hinzufügen', manual_add_row:'Zeile hinzufügen',
+    history_title:'Verlauf', view_all:'Alle anzeigen', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro kommt bald — unbegrenzter Analyseverlauf, mehr teilbare Formulare und Exporte ohne Limit. Bleiben Sie gespannt!',
   },
   uz: {
     brand:"Ma'lumot tahlilchisi", brand_sub:'Yuklash → Tekshirish → Tahlil qilish → Eksport qilish',
@@ -901,6 +920,7 @@ const DA_I18N = {
     collector_build_title:'Formangizni yarating', collector_form_name:'Forma nomi', collector_fields:'Maydonlar', collector_add_field:'Maydon qoʻshish', collector_save_btn:'Saqlash va havola olish',
     collector_detail_title:'Sizning formangiz', collector_share_link:'Ulashiladigan havola', collector_share_desc:'Ushbu havolaga ega har qanday kishi javob yuborishi mumkin — hisob talab qilinmaydi.', collector_responses:'Javoblar', collector_analyze_btn:'Javoblarni tahlil qilish', collector_delete_btn:'Formani oʻchirish',
     manual_entry_title:"Ma'lumotni qoʻlda kiritish", manual_entry_desc:'Ustunlaringizga nom bering va qatorlarni kiriting — xuddi kichik jadval kabi.', manual_add_column:'Ustun qoʻshish', manual_add_row:'Qator qoʻshish',
+    history_title:'Tarix', view_all:"Barchasini koʻrish", pro_modal_title:'Data Analyzer Pro', pro_modal_body:"Pro tez orada — cheklanmagan tahlillar tarixi, koʻproq ulashiladigan formalar va cheksiz eksport. Kuzatib boring!",
   }
 };
 
@@ -1960,6 +1980,11 @@ function daLocalAnalysesSet(list){
   try { localStorage.setItem('da_local_analyses', JSON.stringify(list)); } catch(e){}
 }
 
+function daAnalysisRowHtml(r){
+  const d = new Date(r.date);
+  return `<div style="display:flex;align-items:center"><div class="da-obj-icon" style="width:30px;height:30px;font-size:14px"><i class="ti ${OBJECTIVE_ICONS[r.objectiveId]||'ti-chart-bar'}"></i></div><div><p style="margin:0;font-weight:600;font-size:14px">${daEsc(r.filename)}</p><p class="da-muted" style="margin:2px 0 0">${daEsc(r.objective)} · ${d.toLocaleDateString()}</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i>`;
+}
+
 async function daLoadRecent(){
   const recentDiv = document.getElementById('recent-list');
   const emptyHtml = '<div class="da-empty"><i class="ti ti-database-off"></i>No analyses yet — upload a file to get started.</div>';
@@ -1982,8 +2007,7 @@ async function daLoadRecent(){
       div.className = 'da-list-item';
       div.style.cursor = 'pointer';
       div.setAttribute('onclick', `daOpenSavedAnalysis(${i})`);
-      const d = new Date(r.date);
-      div.innerHTML = `<div style="display:flex;align-items:center"><div class="da-obj-icon" style="width:30px;height:30px;font-size:14px"><i class="ti ${OBJECTIVE_ICONS[r.objectiveId]||'ti-chart-bar'}"></i></div><div><p style="margin:0;font-weight:600;font-size:14px">${r.filename}</p><p class="da-muted" style="margin:2px 0 0">${r.objective} · ${d.toLocaleDateString()}</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i>`;
+      div.innerHTML = daAnalysisRowHtml(r);
       recentDiv.appendChild(div);
     });
     const objCounts = {};
@@ -1993,6 +2017,42 @@ async function daLoadRecent(){
   } catch(e){
     recentDiv.innerHTML = emptyHtml;
   }
+}
+
+function daGoHistory(){ daShowView('view-history'); daLoadHistory(); }
+
+async function daLoadHistory(){
+  const listDiv = document.getElementById('history-list');
+  const emptyHtml = `<div class="da-empty"><i class="ti ti-database-off"></i><span>${daT('no_analyses')}</span></div>`;
+  listDiv.innerHTML = '<p class="da-muted">…</p>';
+  try {
+    let records = [];
+    if(daState.user){
+      const fb = window.daFirebase;
+      const q = fb.query(fb.collection(fb.db, 'users', daState.user.uid, 'analyses'), fb.orderBy('date','desc'), fb.limit(50));
+      const snap = await fb.getDocs(q);
+      snap.forEach(d=>records.push(d.data()));
+    } else {
+      records = daLocalAnalysesGet();
+    }
+    daState.recentRecords = records;
+    if(records.length===0){ listDiv.innerHTML = emptyHtml; return; }
+    listDiv.innerHTML = '';
+    records.forEach((r,i)=>{
+      const div = document.createElement('div');
+      div.className = 'da-list-item';
+      div.style.cursor = 'pointer';
+      div.setAttribute('onclick', `daOpenSavedAnalysis(${i})`);
+      div.innerHTML = daAnalysisRowHtml(r);
+      listDiv.appendChild(div);
+    });
+  } catch(e){
+    listDiv.innerHTML = emptyHtml;
+  }
+}
+
+function daShowProModal(){
+  daOpenPreviewModal(daT('pro_modal_title'), `<p class="da-muted">${daEsc(daT('pro_modal_body'))}</p>`);
 }
 
 function daOpenSavedAnalysis(idx){
