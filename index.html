@@ -400,6 +400,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <p class="da-h1" style="margin:0" data-i18n="upload_data">Upload data</p>
     <button class="da-btn" onclick="daGoLanding()" data-i18n="back">Back</button>
   </div>
+  <div id="upload-err" class="da-err"></div>
   <div class="da-upload-grid">
   <div class="da-card da-card-in" style="animation-delay:0.05s">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -445,7 +446,6 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     </div>
   </div>
   </div>
-  <div id="upload-err" class="da-err"></div>
 </div>
 
 
@@ -1522,6 +1522,7 @@ function daSetAlert(id, message){
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function daSleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
 function daHumanize(name){
