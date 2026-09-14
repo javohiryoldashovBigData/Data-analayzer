@@ -577,6 +577,7 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
     <button class="da-btn" onclick="daExportCSV()" data-i18n="show_as_csv">Show as CSV</button>
     <button class="da-btn da-btn-primary" id="pptx-export-btn" onclick="daExportPPTX()" style="background:var(--da-accent-warm);border-color:var(--da-accent-warm)"><i class="ti ti-presentation"></i><span data-i18n="download_pptx">Download as PowerPoint</span></button>
   </div>
+  <div id="dashboard-err" class="da-err"></div>
   <div id="export-panel" style="display:none;margin-top:12px">
     <textarea id="export-output" readonly rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);box-sizing:border-box"></textarea>
     <p class="da-muted" style="margin-top:6px" data-i18n="copy_hint">Tap the box, select all, and copy — downloads aren't supported in this preview.</p>
@@ -704,6 +705,13 @@ const DA_I18N = {
     collector_detail_title:'Your form', collector_share_link:'Shareable link', collector_share_desc:'Anyone with this link can submit a response — no account needed.', collector_responses:'Responses', collector_analyze_btn:'Analyze responses', collector_delete_btn:'Delete form',
     manual_entry_title:'Enter data manually', manual_entry_desc:'Name your columns and type in your rows, like a small spreadsheet.', manual_add_column:'Add column', manual_add_row:'Add row',
     history_title:'History', view_all:'View all', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro is coming soon — unlimited saved history, more shareable forms, and exports without limits. Stay tuned!',
+    err_no_data_found:"We couldn't find any data in that file. Please enter real data — a table with rows and columns.", err_file_empty:'That file looks empty. Please enter real data — a table with rows and columns.', err_need_two_columns:"This doesn't look like real data — we need at least two columns to analyze. Please check the file and try again.", err_need_two_rows:"We only found one row of data. Please upload a file with more than one row so there's something to analyze.", err_mostly_empty:'Most of this file appears empty or unreadable. Please enter real data — a table with rows and columns.',
+    err_paste_url_first:'Paste a URL first.', err_pdf_no_table:"We couldn't find a data table in that PDF.", err_unrecognized_url_type:'Unrecognized file type at that URL — use a link ending in .csv, .json, .xlsx, .xls, or .pdf', err_url_load_prefix:"Couldn't load that URL: ", err_url_load_suffix:' — some sites block cross-origin access. GitHub raw links usually work.', err_server_returned:'Server returned ', err_could_not_process_prefix:'Could not process data: ',
+    err_paste_data_first:'Paste some data first.', err_paste_unreadable:"We couldn't read that as data. Please enter real data — CSV with a header row, or a JSON array of objects.", err_pdf_no_table_paste:"We couldn't find a data table in this PDF. Please enter real data — try exporting it as CSV/Excel, or paste the table below.", err_unsupported_file_type:'Unsupported file type — use CSV, Excel, JSON, or PDF', err_could_not_read_file_prefix:'Could not read file: ', err_could_not_read_file_suffix:' — please enter real data, or try pasting it instead.', err_could_not_generate_dashboard_prefix:'Could not generate dashboard: ',
+    err_no_forms_yet:'No forms yet — build one above.', err_could_not_load_prefix:'Could not load: ', err_form_name_required:'Give your form a name.', err_field_required:'Add at least one field with a name.', err_choice_options_required:'Choice fields need at least two comma-separated options.', err_could_not_save_prefix:'Could not save: ',
+    loading_responses:'Loading responses…', no_responses_yet:'No responses yet — share the link to start collecting.', response_count_singular:'response collected.', response_count_plural:'responses collected.', err_could_not_delete_prefix:'Could not delete: ',
+    loading_form:'Loading form…', err_form_not_found:"This form couldn't be found. It may have been deleted.", collector_fill_hint:'Fill this in and submit — no account needed.', submit_btn:'Submit', err_fill_every_field:'Please fill in every field.', collector_thanks:'Thanks! Your response has been recorded.', err_could_not_submit_prefix:'Could not submit: ',
+    err_column_name_required:'Every column needs a name.', err_column_names_unique:'Column names must be unique.', err_not_authorized:'Not authorized.', err_pptx_lib_failed:"PowerPoint export couldn't load its library — check your connection and try again in a moment.", err_pptx_export_failed_prefix:'PowerPoint export failed: ',
   },
   zh: {
     brand:'数据分析器', brand_sub:'上传 → 检查 → 分析 → 导出',
@@ -735,6 +743,13 @@ const DA_I18N = {
     collector_detail_title:'你的表单', collector_share_link:'可分享的链接', collector_share_desc:'拥有此链接的任何人都可以提交回复 — 无需账户。', collector_responses:'回复', collector_analyze_btn:'分析回复', collector_delete_btn:'删除表单',
     manual_entry_title:'手动输入数据', manual_entry_desc:'为你的列命名，然后输入数据行，就像一个小型电子表格。', manual_add_column:'添加列', manual_add_row:'添加行',
     history_title:'历史记录', view_all:'查看全部', pro_modal_title:'数据分析器 Pro', pro_modal_body:'Pro 即将推出——无限保存历史记录、更多可分享表单，以及无限制导出。敬请期待！',
+    err_no_data_found:'我们在该文件中未找到任何数据。请输入真实数据——一个有行有列的表格。', err_file_empty:'该文件看起来是空的。请输入真实数据——一个有行有列的表格。', err_need_two_columns:'这看起来不像真实数据——我们至少需要两列才能进行分析。请检查文件后重试。', err_need_two_rows:'我们只找到一行数据。请上传包含多行数据的文件，以便有内容可供分析。', err_mostly_empty:'此文件的大部分内容为空或无法读取。请输入真实数据——一个有行有列的表格。',
+    err_paste_url_first:'请先粘贴网址。', err_pdf_no_table:'我们在该 PDF 中未找到数据表格。', err_unrecognized_url_type:'该网址的文件类型无法识别——请使用以 .csv、.json、.xlsx、.xls 或 .pdf 结尾的链接', err_url_load_prefix:'无法加载该网址：', err_url_load_suffix:'——某些网站会阻止跨域访问。GitHub 原始链接通常可以使用。', err_server_returned:'服务器返回了 ', err_could_not_process_prefix:'无法处理数据：',
+    err_paste_data_first:'请先粘贴数据。', err_paste_unreadable:'我们无法将其读取为数据。请输入真实数据——带表头行的 CSV，或对象的 JSON 数组。', err_pdf_no_table_paste:'我们在此 PDF 中未找到数据表格。请输入真实数据——尝试导出为 CSV/Excel，或在下方粘贴表格。', err_unsupported_file_type:'不支持的文件类型——请使用 CSV、Excel、JSON 或 PDF', err_could_not_read_file_prefix:'无法读取文件：', err_could_not_read_file_suffix:'——请输入真实数据，或尝试改为粘贴。', err_could_not_generate_dashboard_prefix:'无法生成仪表盘：',
+    err_no_forms_yet:'还没有表单——在上方创建一个。', err_could_not_load_prefix:'无法加载：', err_form_name_required:'请为表单命名。', err_field_required:'请至少添加一个带名称的字段。', err_choice_options_required:'选择题字段至少需要两个用逗号分隔的选项。', err_could_not_save_prefix:'无法保存：',
+    loading_responses:'正在加载回复…', no_responses_yet:'暂无回复——分享链接以开始收集。', response_count_singular:'条回复已收集。', response_count_plural:'条回复已收集。', err_could_not_delete_prefix:'无法删除：',
+    loading_form:'正在加载表单…', err_form_not_found:'未找到此表单。可能已被删除。', collector_fill_hint:'填写后提交——无需账户。', submit_btn:'提交', err_fill_every_field:'请填写所有字段。', collector_thanks:'谢谢！您的回复已记录。', err_could_not_submit_prefix:'无法提交：',
+    err_column_name_required:'每一列都需要一个名称。', err_column_names_unique:'列名称必须唯一。', err_not_authorized:'无权限。', err_pptx_lib_failed:'PowerPoint 导出未能加载其库——请检查网络连接后重试。', err_pptx_export_failed_prefix:'PowerPoint 导出失败：',
   },
   ru: {
     brand:'Анализатор данных', brand_sub:'Загрузка → Проверка → Анализ → Экспорт',
@@ -766,6 +781,13 @@ const DA_I18N = {
     collector_detail_title:'Ваша форма', collector_share_link:'Ссылка для обмена', collector_share_desc:'Любой, у кого есть эта ссылка, может отправить ответ — аккаунт не нужен.', collector_responses:'Ответы', collector_analyze_btn:'Анализировать ответы', collector_delete_btn:'Удалить форму',
     manual_entry_title:'Ввод данных вручную', manual_entry_desc:'Назовите столбцы и введите строки — как в небольшой таблице.', manual_add_column:'Добавить столбец', manual_add_row:'Добавить строку',
     history_title:'История', view_all:'Смотреть все', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro скоро появится — неограниченная история анализов, больше форм для сбора данных и экспорт без ограничений. Следите за обновлениями!',
+    err_no_data_found:'Не удалось найти данные в этом файле. Пожалуйста, введите настоящие данные — таблицу со строками и столбцами.', err_file_empty:'Этот файл выглядит пустым. Пожалуйста, введите настоящие данные — таблицу со строками и столбцами.', err_need_two_columns:'Это не похоже на настоящие данные — для анализа нужно как минимум два столбца. Проверьте файл и попробуйте снова.', err_need_two_rows:'Найдена только одна строка данных. Загрузите файл с более чем одной строкой, чтобы было что анализировать.', err_mostly_empty:'Большая часть этого файла пуста или нечитаема. Пожалуйста, введите настоящие данные — таблицу со строками и столбцами.',
+    err_paste_url_first:'Сначала вставьте ссылку.', err_pdf_no_table:'Не удалось найти таблицу данных в этом PDF.', err_unrecognized_url_type:'Неопознанный тип файла по этой ссылке — используйте ссылку, заканчивающуюся на .csv, .json, .xlsx, .xls или .pdf', err_url_load_prefix:'Не удалось загрузить эту ссылку: ', err_url_load_suffix:' — некоторые сайты блокируют межсайтовый доступ. Прямые ссылки GitHub обычно работают.', err_server_returned:'Сервер вернул ', err_could_not_process_prefix:'Не удалось обработать данные: ',
+    err_paste_data_first:'Сначала вставьте данные.', err_paste_unreadable:'Не удалось прочитать это как данные. Пожалуйста, введите настоящие данные — CSV с заголовком или массив объектов JSON.', err_pdf_no_table_paste:'Не удалось найти таблицу данных в этом PDF. Пожалуйста, введите настоящие данные — попробуйте экспортировать в CSV/Excel или вставьте таблицу ниже.', err_unsupported_file_type:'Неподдерживаемый тип файла — используйте CSV, Excel, JSON или PDF', err_could_not_read_file_prefix:'Не удалось прочитать файл: ', err_could_not_read_file_suffix:' — пожалуйста, введите настоящие данные или попробуйте вставить их вместо этого.', err_could_not_generate_dashboard_prefix:'Не удалось создать панель: ',
+    err_no_forms_yet:'Пока нет форм — создайте одну выше.', err_could_not_load_prefix:'Не удалось загрузить: ', err_form_name_required:'Дайте название вашей форме.', err_field_required:'Добавьте хотя бы одно поле с названием.', err_choice_options_required:'Для полей с выбором нужно как минимум два варианта через запятую.', err_could_not_save_prefix:'Не удалось сохранить: ',
+    loading_responses:'Загрузка ответов…', no_responses_yet:'Пока нет ответов — поделитесь ссылкой, чтобы начать сбор.', response_count_singular:'ответ собран.', response_count_plural:'ответов собрано.', err_could_not_delete_prefix:'Не удалось удалить: ',
+    loading_form:'Загрузка формы…', err_form_not_found:'Эта форма не найдена. Возможно, она была удалена.', collector_fill_hint:'Заполните и отправьте — аккаунт не нужен.', submit_btn:'Отправить', err_fill_every_field:'Пожалуйста, заполните все поля.', collector_thanks:'Спасибо! Ваш ответ записан.', err_could_not_submit_prefix:'Не удалось отправить: ',
+    err_column_name_required:'Каждому столбцу нужно название.', err_column_names_unique:'Названия столбцов должны быть уникальными.', err_not_authorized:'Нет доступа.', err_pptx_lib_failed:'Не удалось загрузить библиотеку для экспорта в PowerPoint — проверьте соединение и повторите попытку через момент.', err_pptx_export_failed_prefix:'Экспорт в PowerPoint не удался: ',
   },
   ar: {
     brand:'محلل البيانات', brand_sub:'رفع ← فحص ← تحليل ← تصدير',
@@ -797,6 +819,13 @@ const DA_I18N = {
     collector_detail_title:'نموذجك', collector_share_link:'رابط المشاركة', collector_share_desc:'يمكن لأي شخص لديه هذا الرابط إرسال رد — بلا حاجة لحساب.', collector_responses:'الردود', collector_analyze_btn:'تحليل الردود', collector_delete_btn:'حذف النموذج',
     manual_entry_title:'إدخال البيانات يدويًا', manual_entry_desc:'سمِّ أعمدتك وأدخل صفوفك، تمامًا مثل جدول بيانات صغير.', manual_add_column:'إضافة عمود', manual_add_row:'إضافة صف',
     history_title:'السجل', view_all:'عرض الكل', pro_modal_title:'محلل البيانات Pro', pro_modal_body:'ستتوفر ميزة Pro قريبًا — سجل تحليلات غير محدود، المزيد من النماذج القابلة للمشاركة، وتصدير بلا حدود. ترقبوا ذلك!',
+    err_no_data_found:'لم نتمكن من العثور على أي بيانات في هذا الملف. يرجى إدخال بيانات حقيقية — جدول يحتوي على صفوف وأعمدة.', err_file_empty:'يبدو هذا الملف فارغًا. يرجى إدخال بيانات حقيقية — جدول يحتوي على صفوف وأعمدة.', err_need_two_columns:'هذا لا يبدو كبيانات حقيقية — نحتاج إلى عمودين على الأقل للتحليل. يرجى التحقق من الملف والمحاولة مرة أخرى.', err_need_two_rows:'وجدنا صفًا واحدًا فقط من البيانات. يرجى رفع ملف يحتوي على أكثر من صف واحد حتى يكون هناك ما يمكن تحليله.', err_mostly_empty:'يبدو أن معظم هذا الملف فارغ أو غير قابل للقراءة. يرجى إدخال بيانات حقيقية — جدول يحتوي على صفوف وأعمدة.',
+    err_paste_url_first:'الصق رابطًا أولاً.', err_pdf_no_table:'لم نتمكن من العثور على جدول بيانات في ملف PDF هذا.', err_unrecognized_url_type:'نوع ملف غير معروف في هذا الرابط — استخدم رابطًا ينتهي بـ .csv أو .json أو .xlsx أو .xls أو .pdf', err_url_load_prefix:'تعذّر تحميل هذا الرابط: ', err_url_load_suffix:' — بعض المواقع تمنع الوصول عبر النطاقات المختلفة. روابط GitHub المباشرة تعمل عادةً.', err_server_returned:'أعاد الخادم ', err_could_not_process_prefix:'تعذّرت معالجة البيانات: ',
+    err_paste_data_first:'الصق بعض البيانات أولاً.', err_paste_unreadable:'تعذّرت قراءة ذلك كبيانات. يرجى إدخال بيانات حقيقية — CSV بصف عناوين، أو مصفوفة JSON من الكائنات.', err_pdf_no_table_paste:'لم نتمكن من العثور على جدول بيانات في ملف PDF هذا. يرجى إدخال بيانات حقيقية — جرّب تصديره كـ CSV/Excel، أو الصق الجدول أدناه.', err_unsupported_file_type:'نوع ملف غير مدعوم — استخدم CSV أو Excel أو JSON أو PDF', err_could_not_read_file_prefix:'تعذّرت قراءة الملف: ', err_could_not_read_file_suffix:' — يرجى إدخال بيانات حقيقية، أو جرّب لصقها بدلاً من ذلك.', err_could_not_generate_dashboard_prefix:'تعذّر إنشاء لوحة التحكم: ',
+    err_no_forms_yet:'لا توجد نماذج بعد — أنشئ واحدًا أعلاه.', err_could_not_load_prefix:'تعذّر التحميل: ', err_form_name_required:'أعطِ نموذجك اسمًا.', err_field_required:'أضف حقلاً واحدًا على الأقل باسم.', err_choice_options_required:'تحتاج حقول الاختيار إلى خيارين على الأقل مفصولين بفاصلة.', err_could_not_save_prefix:'تعذّر الحفظ: ',
+    loading_responses:'جارٍ تحميل الردود…', no_responses_yet:'لا توجد ردود بعد — شارك الرابط لبدء الجمع.', response_count_singular:'رد تم جمعه.', response_count_plural:'ردود تم جمعها.', err_could_not_delete_prefix:'تعذّر الحذف: ',
+    loading_form:'جارٍ تحميل النموذج…', err_form_not_found:'تعذّر العثور على هذا النموذج. ربما تم حذفه.', collector_fill_hint:'املأ هذا وأرسله — لا حاجة لحساب.', submit_btn:'إرسال', err_fill_every_field:'يرجى ملء جميع الحقول.', collector_thanks:'شكرًا! تم تسجيل ردك.', err_could_not_submit_prefix:'تعذّر الإرسال: ',
+    err_column_name_required:'يحتاج كل عمود إلى اسم.', err_column_names_unique:'يجب أن تكون أسماء الأعمدة فريدة.', err_not_authorized:'غير مصرّح.', err_pptx_lib_failed:'تعذّر على تصدير PowerPoint تحميل مكتبته — تحقق من اتصالك وحاول مرة أخرى بعد قليل.', err_pptx_export_failed_prefix:'فشل تصدير PowerPoint: ',
   },
   es: {
     brand:'Analizador de Datos', brand_sub:'Subir → Inspeccionar → Analizar → Exportar',
@@ -828,6 +857,13 @@ const DA_I18N = {
     collector_detail_title:'Tu formulario', collector_share_link:'Enlace para compartir', collector_share_desc:'Cualquiera con este enlace puede enviar una respuesta — no necesita cuenta.', collector_responses:'Respuestas', collector_analyze_btn:'Analizar respuestas', collector_delete_btn:'Eliminar formulario',
     manual_entry_title:'Ingresar datos manualmente', manual_entry_desc:'Nombra tus columnas y escribe tus filas, como en una pequeña hoja de cálculo.', manual_add_column:'Añadir columna', manual_add_row:'Añadir fila',
     history_title:'Historial', view_all:'Ver todo', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro llegará pronto — historial de análisis ilimitado, más formularios compartibles y exportaciones sin límites. ¡Mantente atento!',
+    err_no_data_found:"No pudimos encontrar ningún dato en ese archivo. Por favor, introduce datos reales — una tabla con filas y columnas.", err_file_empty:'Ese archivo parece estar vacío. Por favor, introduce datos reales — una tabla con filas y columnas.', err_need_two_columns:'Esto no parece ser datos reales — necesitamos al menos dos columnas para analizar. Revisa el archivo e inténtalo de nuevo.', err_need_two_rows:'Solo encontramos una fila de datos. Sube un archivo con más de una fila para que haya algo que analizar.', err_mostly_empty:'Gran parte de este archivo parece estar vacío o ilegible. Por favor, introduce datos reales — una tabla con filas y columnas.',
+    err_paste_url_first:'Pega primero una URL.', err_pdf_no_table:'No pudimos encontrar una tabla de datos en ese PDF.', err_unrecognized_url_type:'Tipo de archivo no reconocido en esa URL — usa un enlace que termine en .csv, .json, .xlsx, .xls o .pdf', err_url_load_prefix:'No se pudo cargar esa URL: ', err_url_load_suffix:' — algunos sitios bloquean el acceso entre orígenes. Los enlaces sin procesar de GitHub suelen funcionar.', err_server_returned:'El servidor devolvió ', err_could_not_process_prefix:'No se pudieron procesar los datos: ',
+    err_paste_data_first:'Pega algunos datos primero.', err_paste_unreadable:'No pudimos leer eso como datos. Por favor, introduce datos reales — CSV con fila de encabezado, o un array JSON de objetos.', err_pdf_no_table_paste:'No pudimos encontrar una tabla de datos en este PDF. Por favor, introduce datos reales — intenta exportarlo como CSV/Excel, o pega la tabla abajo.', err_unsupported_file_type:'Tipo de archivo no compatible — usa CSV, Excel, JSON o PDF', err_could_not_read_file_prefix:'No se pudo leer el archivo: ', err_could_not_read_file_suffix:' — por favor, introduce datos reales, o intenta pegarlos en su lugar.', err_could_not_generate_dashboard_prefix:'No se pudo generar el panel: ',
+    err_no_forms_yet:'Aún no hay formularios — crea uno arriba.', err_could_not_load_prefix:'No se pudo cargar: ', err_form_name_required:'Dale un nombre a tu formulario.', err_field_required:'Añade al menos un campo con nombre.', err_choice_options_required:'Los campos de opción necesitan al menos dos opciones separadas por comas.', err_could_not_save_prefix:'No se pudo guardar: ',
+    loading_responses:'Cargando respuestas…', no_responses_yet:'Aún no hay respuestas — comparte el enlace para empezar a recopilar.', response_count_singular:'respuesta recopilada.', response_count_plural:'respuestas recopiladas.', err_could_not_delete_prefix:'No se pudo eliminar: ',
+    loading_form:'Cargando formulario…', err_form_not_found:'No se pudo encontrar este formulario. Puede que haya sido eliminado.', collector_fill_hint:'Complétalo y envíalo — no se necesita cuenta.', submit_btn:'Enviar', err_fill_every_field:'Por favor, completa todos los campos.', collector_thanks:'¡Gracias! Tu respuesta ha sido registrada.', err_could_not_submit_prefix:'No se pudo enviar: ',
+    err_column_name_required:'Cada columna necesita un nombre.', err_column_names_unique:'Los nombres de las columnas deben ser únicos.', err_not_authorized:'No autorizado.', err_pptx_lib_failed:'La exportación a PowerPoint no pudo cargar su librería — comprueba tu conexión e inténtalo de nuevo en un momento.', err_pptx_export_failed_prefix:'Error al exportar a PowerPoint: ',
   },
   fr: {
     brand:'Analyseur de Données', brand_sub:'Importer → Inspecter → Analyser → Exporter',
@@ -859,6 +895,13 @@ const DA_I18N = {
     collector_detail_title:'Votre formulaire', collector_share_link:'Lien de partage', collector_share_desc:'Toute personne disposant de ce lien peut envoyer une réponse — aucun compte requis.', collector_responses:'Réponses', collector_analyze_btn:'Analyser les réponses', collector_delete_btn:'Supprimer le formulaire',
     manual_entry_title:'Saisir les données manuellement', manual_entry_desc:'Nommez vos colonnes et saisissez vos lignes, comme un petit tableur.', manual_add_column:'Ajouter une colonne', manual_add_row:'Ajouter une ligne',
     history_title:'Historique', view_all:'Tout voir', pro_modal_title:'Data Analyzer Pro', pro_modal_body:"La version Pro arrive bientôt — historique d'analyses illimité, plus de formulaires partageables, et exports sans limites. Restez à l'écoute !",
+    err_no_data_found:"Nous n'avons trouvé aucune donnée dans ce fichier. Veuillez saisir de vraies données — un tableau avec des lignes et des colonnes.", err_file_empty:'Ce fichier semble vide. Veuillez saisir de vraies données — un tableau avec des lignes et des colonnes.', err_need_two_columns:"Cela ne ressemble pas à de vraies données — il faut au moins deux colonnes pour analyser. Vérifiez le fichier et réessayez.", err_need_two_rows:"Nous n'avons trouvé qu'une seule ligne de données. Importez un fichier avec plus d'une ligne pour avoir quelque chose à analyser.", err_mostly_empty:'Une grande partie de ce fichier semble vide ou illisible. Veuillez saisir de vraies données — un tableau avec des lignes et des colonnes.',
+    err_paste_url_first:"Collez d'abord une URL.", err_pdf_no_table:"Nous n'avons trouvé aucun tableau de données dans ce PDF.", err_unrecognized_url_type:'Type de fichier non reconnu à cette URL — utilisez un lien se terminant par .csv, .json, .xlsx, .xls ou .pdf', err_url_load_prefix:'Impossible de charger cette URL : ', err_url_load_suffix:" — certains sites bloquent l'accès inter-origines. Les liens bruts GitHub fonctionnent généralement.", err_server_returned:'Le serveur a répondu ', err_could_not_process_prefix:'Impossible de traiter les données : ',
+    err_paste_data_first:"Collez d'abord des données.", err_paste_unreadable:"Nous n'avons pas pu lire cela comme des données. Veuillez saisir de vraies données — un CSV avec une ligne d'en-tête, ou un tableau JSON d'objets.", err_pdf_no_table_paste:"Nous n'avons trouvé aucun tableau de données dans ce PDF. Veuillez saisir de vraies données — essayez de l'exporter en CSV/Excel, ou collez le tableau ci-dessous.", err_unsupported_file_type:'Type de fichier non pris en charge — utilisez CSV, Excel, JSON ou PDF', err_could_not_read_file_prefix:'Impossible de lire le fichier : ', err_could_not_read_file_suffix:' — veuillez saisir de vraies données, ou essayez de les coller à la place.', err_could_not_generate_dashboard_prefix:'Impossible de générer le tableau de bord : ',
+    err_no_forms_yet:"Pas encore de formulaires — créez-en un ci-dessus.", err_could_not_load_prefix:'Impossible de charger : ', err_form_name_required:'Donnez un nom à votre formulaire.', err_field_required:'Ajoutez au moins un champ avec un nom.', err_choice_options_required:"Les champs à choix ont besoin d'au moins deux options séparées par des virgules.", err_could_not_save_prefix:"Impossible d'enregistrer : ",
+    loading_responses:'Chargement des réponses…', no_responses_yet:"Pas encore de réponses — partagez le lien pour commencer à en recueillir.", response_count_singular:'réponse recueillie.', response_count_plural:'réponses recueillies.', err_could_not_delete_prefix:'Impossible de supprimer : ',
+    loading_form:'Chargement du formulaire…', err_form_not_found:"Ce formulaire est introuvable. Il a peut-être été supprimé.", collector_fill_hint:'Remplissez et envoyez — aucun compte requis.', submit_btn:'Envoyer', err_fill_every_field:'Veuillez remplir tous les champs.', collector_thanks:'Merci ! Votre réponse a été enregistrée.', err_could_not_submit_prefix:"Impossible d'envoyer : ",
+    err_column_name_required:"Chaque colonne a besoin d'un nom.", err_column_names_unique:'Les noms de colonnes doivent être uniques.', err_not_authorized:'Non autorisé.', err_pptx_lib_failed:"L'export PowerPoint n'a pas pu charger sa bibliothèque — vérifiez votre connexion et réessayez dans un instant.", err_pptx_export_failed_prefix:"Échec de l'export PowerPoint : ",
   },
   de: {
     brand:'Datenanalysator', brand_sub:'Hochladen → Prüfen → Analysieren → Exportieren',
@@ -890,6 +933,13 @@ const DA_I18N = {
     collector_detail_title:'Ihr Formular', collector_share_link:'Teilbarer Link', collector_share_desc:'Jeder mit diesem Link kann eine Antwort einreichen — kein Konto nötig.', collector_responses:'Antworten', collector_analyze_btn:'Antworten analysieren', collector_delete_btn:'Formular löschen',
     manual_entry_title:'Daten manuell eingeben', manual_entry_desc:'Benennen Sie Ihre Spalten und geben Sie Ihre Zeilen ein, wie in einer kleinen Tabelle.', manual_add_column:'Spalte hinzufügen', manual_add_row:'Zeile hinzufügen',
     history_title:'Verlauf', view_all:'Alle anzeigen', pro_modal_title:'Data Analyzer Pro', pro_modal_body:'Pro kommt bald — unbegrenzter Analyseverlauf, mehr teilbare Formulare und Exporte ohne Limit. Bleiben Sie gespannt!',
+    err_no_data_found:'Wir konnten in dieser Datei keine Daten finden. Bitte geben Sie echte Daten ein — eine Tabelle mit Zeilen und Spalten.', err_file_empty:'Diese Datei scheint leer zu sein. Bitte geben Sie echte Daten ein — eine Tabelle mit Zeilen und Spalten.', err_need_two_columns:'Das sieht nicht wie echte Daten aus — wir benötigen mindestens zwei Spalten zur Analyse. Bitte überprüfen Sie die Datei und versuchen Sie es erneut.', err_need_two_rows:'Wir haben nur eine Datenzeile gefunden. Bitte laden Sie eine Datei mit mehr als einer Zeile hoch, damit es etwas zu analysieren gibt.', err_mostly_empty:'Der Großteil dieser Datei scheint leer oder unlesbar zu sein. Bitte geben Sie echte Daten ein — eine Tabelle mit Zeilen und Spalten.',
+    err_paste_url_first:'Fügen Sie zuerst eine URL ein.', err_pdf_no_table:'Wir konnten in diesem PDF keine Datentabelle finden.', err_unrecognized_url_type:'Unbekannter Dateityp bei dieser URL — verwenden Sie einen Link, der auf .csv, .json, .xlsx, .xls oder .pdf endet', err_url_load_prefix:'Diese URL konnte nicht geladen werden: ', err_url_load_suffix:' — manche Websites blockieren Cross-Origin-Zugriffe. GitHub-Rohlinks funktionieren normalerweise.', err_server_returned:'Server antwortete mit ', err_could_not_process_prefix:'Daten konnten nicht verarbeitet werden: ',
+    err_paste_data_first:'Fügen Sie zuerst Daten ein.', err_paste_unreadable:'Wir konnten das nicht als Daten lesen. Bitte geben Sie echte Daten ein — CSV mit Kopfzeile oder ein JSON-Array von Objekten.', err_pdf_no_table_paste:'Wir konnten in diesem PDF keine Datentabelle finden. Bitte geben Sie echte Daten ein — versuchen Sie den Export als CSV/Excel oder fügen Sie die Tabelle unten ein.', err_unsupported_file_type:'Nicht unterstützter Dateityp — verwenden Sie CSV, Excel, JSON oder PDF', err_could_not_read_file_prefix:'Datei konnte nicht gelesen werden: ', err_could_not_read_file_suffix:' — bitte geben Sie echte Daten ein oder versuchen Sie stattdessen, sie einzufügen.', err_could_not_generate_dashboard_prefix:'Dashboard konnte nicht erstellt werden: ',
+    err_no_forms_yet:'Noch keine Formulare — erstellen Sie oben eines.', err_could_not_load_prefix:'Laden fehlgeschlagen: ', err_form_name_required:'Geben Sie Ihrem Formular einen Namen.', err_field_required:'Fügen Sie mindestens ein benanntes Feld hinzu.', err_choice_options_required:'Auswahlfelder benötigen mindestens zwei durch Kommas getrennte Optionen.', err_could_not_save_prefix:'Speichern fehlgeschlagen: ',
+    loading_responses:'Antworten werden geladen…', no_responses_yet:'Noch keine Antworten — teilen Sie den Link, um mit dem Sammeln zu beginnen.', response_count_singular:'Antwort gesammelt.', response_count_plural:'Antworten gesammelt.', err_could_not_delete_prefix:'Löschen fehlgeschlagen: ',
+    loading_form:'Formular wird geladen…', err_form_not_found:'Dieses Formular konnte nicht gefunden werden. Es wurde möglicherweise gelöscht.', collector_fill_hint:'Füllen Sie dies aus und senden Sie es — kein Konto erforderlich.', submit_btn:'Senden', err_fill_every_field:'Bitte füllen Sie alle Felder aus.', collector_thanks:'Danke! Ihre Antwort wurde erfasst.', err_could_not_submit_prefix:'Senden fehlgeschlagen: ',
+    err_column_name_required:'Jede Spalte benötigt einen Namen.', err_column_names_unique:'Spaltennamen müssen eindeutig sein.', err_not_authorized:'Nicht autorisiert.', err_pptx_lib_failed:'Der PowerPoint-Export konnte seine Bibliothek nicht laden — überprüfen Sie Ihre Verbindung und versuchen Sie es gleich noch einmal.', err_pptx_export_failed_prefix:'PowerPoint-Export fehlgeschlagen: ',
   },
   uz: {
     brand:"Ma'lumot tahlilchisi", brand_sub:'Yuklash → Tekshirish → Tahlil qilish → Eksport qilish',
@@ -921,6 +971,13 @@ const DA_I18N = {
     collector_detail_title:'Sizning formangiz', collector_share_link:'Ulashiladigan havola', collector_share_desc:'Ushbu havolaga ega har qanday kishi javob yuborishi mumkin — hisob talab qilinmaydi.', collector_responses:'Javoblar', collector_analyze_btn:'Javoblarni tahlil qilish', collector_delete_btn:'Formani oʻchirish',
     manual_entry_title:"Ma'lumotni qoʻlda kiritish", manual_entry_desc:'Ustunlaringizga nom bering va qatorlarni kiriting — xuddi kichik jadval kabi.', manual_add_column:'Ustun qoʻshish', manual_add_row:'Qator qoʻshish',
     history_title:'Tarix', view_all:"Barchasini koʻrish", pro_modal_title:'Data Analyzer Pro', pro_modal_body:"Pro tez orada — cheklanmagan tahlillar tarixi, koʻproq ulashiladigan formalar va cheksiz eksport. Kuzatib boring!",
+    err_no_data_found:"Bu faylda hech qanday ma'lumot topa olmadik. Iltimos, haqiqiy ma'lumot kiriting — qator va ustunlardan iborat jadval.", err_file_empty:"Bu fayl boʻsh koʻrinadi. Iltimos, haqiqiy ma'lumot kiriting — qator va ustunlardan iborat jadval.", err_need_two_columns:"Bu haqiqiy ma'lumotga oʻxshamaydi — tahlil qilish uchun kamida ikkita ustun kerak. Faylni tekshirib, qayta urinib koʻring.", err_need_two_rows:"Faqat bitta qator ma'lumot topildi. Tahlil qiladigan narsa boʻlishi uchun bir qatordan ortiq ma'lumotli fayl yuklang.", err_mostly_empty:"Ushbu faylning katta qismi boʻsh yoki oʻqib boʻlmaydigan koʻrinishda. Iltimos, haqiqiy ma'lumot kiriting — qator va ustunlardan iborat jadval.",
+    err_paste_url_first:'Avval havolani joylashtiring.', err_pdf_no_table:"Bu PDF faylida ma'lumotlar jadvalini topa olmadik.", err_unrecognized_url_type:'Bu havoladagi fayl turi aniqlanmadi — .csv, .json, .xlsx, .xls yoki .pdf bilan tugaydigan havoladan foydalaning', err_url_load_prefix:'Bu havolani yuklab boʻlmadi: ', err_url_load_suffix:" — ba'zi saytlar turli manbalardan kirishni bloklaydi. GitHub xom havolalari odatda ishlaydi.", err_server_returned:'Server javobi: ', err_could_not_process_prefix:"Ma'lumotni qayta ishlab boʻlmadi: ",
+    err_paste_data_first:"Avval ma'lumot joylashtiring.", err_paste_unreadable:"Buni ma'lumot sifatida oʻqib boʻlmadi. Iltimos, haqiqiy ma'lumot kiriting — sarlavha qatorli CSV yoki obyektlar massivi (JSON).", err_pdf_no_table_paste:"Bu PDF faylida ma'lumotlar jadvalini topa olmadik. Iltimos, haqiqiy ma'lumot kiriting — uni CSV/Excel sifatida eksport qilib koʻring yoki jadvalni pastga joylashtiring.", err_unsupported_file_type:'Qoʻllab-quvvatlanmaydigan fayl turi — CSV, Excel, JSON yoki PDF dan foydalaning', err_could_not_read_file_prefix:'Faylni oʻqib boʻlmadi: ', err_could_not_read_file_suffix:" — iltimos, haqiqiy ma'lumot kiriting yoki uning oʻrniga joylashtirib koʻring.", err_could_not_generate_dashboard_prefix:'Boshqaruv panelini yaratib boʻlmadi: ',
+    err_no_forms_yet:'Hali formalar yoʻq — yuqorida birini yarating.', err_could_not_load_prefix:'Yuklab boʻlmadi: ', err_form_name_required:'Formangizga nom bering.', err_field_required:'Kamida bitta nomlangan maydon qoʻshing.', err_choice_options_required:'Tanlov maydonlari uchun vergul bilan ajratilgan kamida ikkita variant kerak.', err_could_not_save_prefix:'Saqlab boʻlmadi: ',
+    loading_responses:'Javoblar yuklanmoqda…', no_responses_yet:'Hali javoblar yoʻq — yigʻishni boshlash uchun havolani ulashing.', response_count_singular:'javob toʻplandi.', response_count_plural:'javob toʻplandi.', err_could_not_delete_prefix:'Oʻchirib boʻlmadi: ',
+    loading_form:'Forma yuklanmoqda…', err_form_not_found:'Bu forma topilmadi. U oʻchirilgan boʻlishi mumkin.', collector_fill_hint:'Buni toʻldirib yuboring — hisob talab qilinmaydi.', submit_btn:'Yuborish', err_fill_every_field:'Iltimos, barcha maydonlarni toʻldiring.', collector_thanks:'Rahmat! Javobingiz qayd etildi.', err_could_not_submit_prefix:'Yuborib boʻlmadi: ',
+    err_column_name_required:'Har bir ustun uchun nom kerak.', err_column_names_unique:'Ustun nomlari bir xil boʻlmasligi kerak.', err_not_authorized:'Ruxsat yoʻq.', err_pptx_lib_failed:'PowerPoint eksporti oʻz kutubxonasini yuklay olmadi — internet aloqangizni tekshirib, birozdan soʻng qayta urinib koʻring.', err_pptx_export_failed_prefix:'PowerPoint eksporti muvaffaqiyatsiz tugadi: ',
   }
 };
 
@@ -1082,23 +1139,23 @@ function daPearsonCorrelation(xs, ys){
 
 function daValidateRows(rows){
   if(!Array.isArray(rows) || rows.length===0){
-    throw new Error("We couldn't find any data in that file. Please enter real data — a table with rows and columns.");
+    throw daFriendlyError('err_no_data_found');
   }
   const cleanRows = rows.filter(r=>r && typeof r==='object' && Object.values(r).some(v=>v!==null && v!==''));
   if(cleanRows.length===0){
-    throw new Error("That file looks empty. Please enter real data — a table with rows and columns.");
+    throw daFriendlyError('err_file_empty');
   }
   const keys = Object.keys(cleanRows[0]).filter(k=>k && k.trim());
   if(keys.length < 2){
-    throw new Error("This doesn't look like real data — we need at least two columns to analyze. Please check the file and try again.");
+    throw daFriendlyError('err_need_two_columns');
   }
   if(cleanRows.length < 2){
-    throw new Error("We only found one row of data. Please upload a file with more than one row so there's something to analyze.");
+    throw daFriendlyError('err_need_two_rows');
   }
   const totalCells = cleanRows.length * keys.length;
   const filledCells = cleanRows.reduce((sum,r)=>sum + keys.filter(k=>r[k]!==null && r[k]!==undefined && String(r[k]).trim()!=='').length, 0);
   if(filledCells / totalCells < 0.35){
-    throw new Error("Most of this file appears empty or unreadable. Please enter real data — a table with rows and columns.");
+    throw daFriendlyError('err_mostly_empty');
   }
   return cleanRows;
 }
@@ -1178,7 +1235,7 @@ async function daFetchFromUrl(){
   const input = document.getElementById('urlInput');
   const rawUrl = input.value.trim();
   daSetAlert('upload-err', '');
-  if(!rawUrl){ daSetAlert('upload-err', 'Paste a URL first.'); return; }
+  if(!rawUrl){ daSetAlert('upload-err', daT('err_paste_url_first')); return; }
   const url = daNormalizeDataUrl(rawUrl);
   const btn = document.getElementById('url-fetch-btn');
   const originalHtml = btn.innerHTML;
@@ -1186,7 +1243,7 @@ async function daFetchFromUrl(){
   btn.disabled = true;
   try {
     const resp = await fetch(url);
-    if(!resp.ok) throw new Error('Server returned ' + resp.status);
+    if(!resp.ok) throw new Error(daT('err_server_returned') + resp.status);
     const path = url.split('?')[0].toLowerCase();
     let rows;
     if(path.endsWith('.csv')){
@@ -1204,16 +1261,16 @@ async function daFetchFromUrl(){
     } else if(path.endsWith('.pdf')){
       const buf = await resp.arrayBuffer();
       try { rows = await daExtractPdfTableFromBuffer(buf); }
-      catch(e){ throw new Error("We couldn't find a data table in that PDF."); }
+      catch(e){ throw daFriendlyError('err_pdf_no_table'); }
     } else {
-      throw new Error('Unrecognized file type at that URL — use a link ending in .csv, .json, .xlsx, .xls, or .pdf');
+      throw daFriendlyError('err_unrecognized_url_type');
     }
     const filename = decodeURIComponent(path.split('/').pop() || 'url-data');
     daProcessRows(rows, filename);
   } catch(e){
-    daSetAlert('upload-err', e.message.includes('enter real data') || e.message.includes("couldn't find")
+    daSetAlert('upload-err', e.daFriendly
       ? e.message
-      : "Couldn't load that URL: " + e.message + ' — some sites block cross-origin access. GitHub raw links usually work.');
+      : daT('err_url_load_prefix') + e.message + daT('err_url_load_suffix'));
   }
   btn.innerHTML = originalHtml;
   btn.disabled = false;
@@ -1259,7 +1316,7 @@ async function daProcessRows(rows, filename){
     daShowView('view-objective');
   } catch(err){
     daShowView('view-upload');
-    daSetAlert('upload-err', 'Could not process data: ' + err.message);
+    daSetAlert('upload-err', err.daFriendly ? err.message : daT('err_could_not_process_prefix') + err.message);
   }
 }
 
@@ -1271,7 +1328,7 @@ function daParseCSVText(text){
 function daHandlePaste(){
   const raw = document.getElementById('pasteInput').value.trim();
   daSetAlert('upload-err', '');
-  if(!raw){ daSetAlert('upload-err', 'Paste some data first.'); return; }
+  if(!raw){ daSetAlert('upload-err', daT('err_paste_data_first')); return; }
   let rows;
   try {
     if(raw.startsWith('[') || raw.startsWith('{')){
@@ -1281,7 +1338,7 @@ function daHandlePaste(){
       rows = daParseCSVText(raw);
     }
   } catch(err){
-    daSetAlert('upload-err', "We couldn't read that as data. Please enter real data — CSV with a header row, or a JSON array of objects.");
+    daSetAlert('upload-err', daT('err_paste_unreadable'));
     return;
   }
   daProcessRows(rows, 'pasted-data');
@@ -1313,16 +1370,16 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
       try {
         rows = await daExtractPdfTable(file);
       } catch(e){
-        throw new Error("We couldn't find a data table in this PDF. Please enter real data — try exporting it as CSV/Excel, or paste the table below.");
+        throw daFriendlyError('err_pdf_no_table_paste');
       }
     } else {
-      throw new Error('Unsupported file type — use CSV, Excel, JSON, or PDF');
+      throw daFriendlyError('err_unsupported_file_type');
     }
     daProcessRows(rows, file.name);
   } catch(err){
     document.getElementById('dropzone').classList.remove('has-file');
     document.getElementById('file-picked-name').textContent = '';
-    daSetAlert('upload-err', err.message.includes('enter real data') ? err.message : 'Could not read file: ' + err.message + ' — please enter real data, or try pasting it instead.');
+    daSetAlert('upload-err', err.daFriendly ? err.message : daT('err_could_not_read_file_prefix') + err.message + daT('err_could_not_read_file_suffix'));
   }
 });
 
@@ -1508,11 +1565,16 @@ async function daSelectObjective(id, label){
     daShowSuccessBurst();
   } catch(err){
     daShowView('view-objective');
-    daSetAlert('objective-err', 'Could not generate dashboard: ' + err.message);
+    daSetAlert('objective-err', err.daFriendly ? err.message : daT('err_could_not_generate_dashboard_prefix') + err.message);
   }
 }
 
 function daEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function daFriendlyError(key){
+  const e = new Error(daT(key));
+  e.daFriendly = true;
+  return e;
+}
 function daSetAlert(id, message){
   const el = document.getElementById(id);
   if(!el) return;
@@ -2094,14 +2156,14 @@ async function daRenderCollectHub(){
     snap.forEach(d=>items.push({ id: d.id, ...d.data() }));
     daState.myCollectors = items;
     if(items.length===0){
-      listEl.innerHTML = '<div class="da-empty"><i class="ti ti-forms"></i><span>No forms yet — build one above.</span></div>';
+      listEl.innerHTML = `<div class="da-empty"><i class="ti ti-forms"></i><span>${daEsc(daT('err_no_forms_yet'))}</span></div>`;
       return;
     }
     listEl.innerHTML = items.map((c,i)=>
       `<div class="da-obj" onclick="daOpenCollectorDetail(${i})"><div style="display:flex;align-items:center"><div class="da-obj-icon"><i class="ti ti-clipboard-list"></i></div><div><p style="margin:0;font-weight:600">${daEsc(c.title)}</p><p class="da-muted" style="margin:2px 0 0">${(c.fields||[]).length} fields</p></div></div><i class="ti ti-chevron-right" aria-hidden="true"></i></div>`
     ).join('');
   } catch(e){
-    listEl.innerHTML = `<div class="da-alert"><i class="ti ti-alert-circle"></i><span>Could not load your forms: ${daEsc(e.message)}</span></div>`;
+    listEl.innerHTML = `<div class="da-alert"><i class="ti ti-alert-circle"></i><span>${daEsc(daT('err_could_not_load_prefix') + e.message)}</span></div>`;
   }
 }
 
@@ -2153,9 +2215,9 @@ async function daSaveCollectorForm(){
     if(field.type==='choice') field.options = (f.options||'').split(',').map(s=>s.trim()).filter(Boolean);
     return field;
   }).filter(f=>f.label);
-  if(!title){ errEl.textContent = 'Give your form a name.'; return; }
-  if(fields.length===0){ errEl.textContent = 'Add at least one field with a name.'; return; }
-  if(fields.some(f=>f.type==='choice' && f.options.length<2)){ errEl.textContent = 'Choice fields need at least two comma-separated options.'; return; }
+  if(!title){ errEl.textContent = daT('err_form_name_required'); return; }
+  if(fields.length===0){ errEl.textContent = daT('err_field_required'); return; }
+  if(fields.some(f=>f.type==='choice' && f.options.length<2)){ errEl.textContent = daT('err_choice_options_required'); return; }
   const btn = document.getElementById('collect-build-save-btn');
   const original = btn.innerHTML;
   btn.innerHTML = '<i class="ti ti-loader-2"></i> Saving…';
@@ -2168,7 +2230,7 @@ async function daSaveCollectorForm(){
     daShowView('view-collect-detail');
     daRenderCollectorDetail();
   } catch(e){
-    errEl.textContent = 'Could not save: ' + e.message;
+    errEl.textContent = daT('err_could_not_save_prefix') + e.message;
   }
   btn.innerHTML = original;
   btn.disabled = false;
@@ -2186,7 +2248,7 @@ async function daRenderCollectorDetail(){
   const c = daState.activeCollector;
   document.getElementById('collect-detail-title').textContent = c.title;
   document.getElementById('collect-detail-link').value = `${location.origin}${location.pathname}?c=${c.id}`;
-  document.getElementById('collect-detail-count').textContent = 'Loading responses…';
+  document.getElementById('collect-detail-count').textContent = daT('loading_responses');
   document.getElementById('collect-detail-err').textContent = '';
   document.getElementById('collect-detail-analyze-btn').disabled = true;
   try {
@@ -2194,11 +2256,11 @@ async function daRenderCollectorDetail(){
     const snap = await fb.getDocs(fb.collection(fb.db, 'collectors', c.id, 'submissions'));
     daState.activeCollector.submissionCount = snap.size;
     document.getElementById('collect-detail-count').textContent = snap.size === 0
-      ? 'No responses yet — share the link to start collecting.'
-      : `${snap.size} response${snap.size===1?'':'s'} collected.`;
+      ? daT('no_responses_yet')
+      : `${snap.size} ${daT(snap.size===1 ? 'response_count_singular' : 'response_count_plural')}`;
     document.getElementById('collect-detail-analyze-btn').disabled = snap.size === 0;
   } catch(e){
-    document.getElementById('collect-detail-count').textContent = 'Could not load responses: ' + e.message;
+    document.getElementById('collect-detail-count').textContent = daT('err_could_not_load_prefix') + e.message;
   }
 }
 
@@ -2222,7 +2284,7 @@ async function daAnalyzeCollectorResponses(){
     snap.forEach(d=>rows.push(d.data()));
     daProcessRows(rows, c.title);
   } catch(e){
-    errEl.textContent = 'Could not load responses: ' + e.message;
+    errEl.textContent = daT('err_could_not_load_prefix') + e.message;
   }
 }
 
@@ -2238,7 +2300,7 @@ async function daDeleteCollector(){
     await fb.deleteDoc(fb.doc(fb.db, 'collectors', c.id));
     daGoCollectHub();
   } catch(e){
-    errEl.textContent = 'Could not delete: ' + e.message;
+    errEl.textContent = daT('err_could_not_delete_prefix') + e.message;
   }
 }
 
@@ -2246,11 +2308,11 @@ async function daDeleteCollector(){
 async function daLoadPublicCollector(id){
   daShowView('view-collect-submit');
   const body = document.getElementById('collect-submit-body');
-  body.innerHTML = '<div class="da-progress"><div class="da-spinner"></div><span class="da-muted">Loading form…</span></div>';
+  body.innerHTML = `<div class="da-progress"><div class="da-spinner"></div><span class="da-muted">${daEsc(daT('loading_form'))}</span></div>`;
   try {
     const fb = window.daFirebase;
     const snap = await fb.getDoc(fb.doc(fb.db, 'collectors', id));
-    if(!snap.exists()) throw new Error("This form couldn't be found. It may have been deleted.");
+    if(!snap.exists()) throw daFriendlyError('err_form_not_found');
     daState.publicCollector = { id, ...snap.data() };
     daRenderPublicCollectorForm();
   } catch(e){
@@ -2273,10 +2335,10 @@ function daRenderPublicCollectorForm(){
   body.innerHTML = `
     <div class="da-card da-card-in">
       <p class="da-h1" style="margin-bottom:4px">${daEsc(c.title)}</p>
-      <p class="da-muted" style="margin-bottom:4px">Fill this in and submit — no account needed.</p>
+      <p class="da-muted" style="margin-bottom:4px">${daEsc(daT('collector_fill_hint'))}</p>
       ${fieldsHtml}
       <div id="collect-submit-err" class="da-err"></div>
-      <button class="da-btn da-btn-primary" id="collect-submit-btn" style="width:100%;justify-content:center;margin-top:16px" onclick="daSubmitCollectorEntry()"><i class="ti ti-send"></i>Submit</button>
+      <button class="da-btn da-btn-primary" id="collect-submit-btn" style="width:100%;justify-content:center;margin-top:16px" onclick="daSubmitCollectorEntry()"><i class="ti ti-send"></i>${daEsc(daT('submit_btn'))}</button>
     </div>`;
 }
 
@@ -2292,16 +2354,16 @@ async function daSubmitCollectorEntry(){
     values[f.label] = (f.type==='number' && v!=='') ? parseFloat(v) : v;
   });
   const errEl = document.getElementById('collect-submit-err');
-  if(missing){ errEl.textContent = 'Please fill in every field.'; return; }
+  if(missing){ errEl.textContent = daT('err_fill_every_field'); return; }
   errEl.textContent = '';
   const btn = document.getElementById('collect-submit-btn');
   btn.disabled = true;
   try {
     const fb = window.daFirebase;
     await fb.addDoc(fb.collection(fb.db, 'collectors', c.id, 'submissions'), { ...values, submittedAt: new Date().toISOString() });
-    document.getElementById('collect-submit-body').innerHTML = `<div class="da-card"><div class="da-empty"><i class="ti ti-circle-check"></i><span>Thanks! Your response has been recorded.</span></div></div>`;
+    document.getElementById('collect-submit-body').innerHTML = `<div class="da-card"><div class="da-empty"><i class="ti ti-circle-check"></i><span>${daEsc(daT('collector_thanks'))}</span></div></div>`;
   } catch(e){
-    errEl.textContent = 'Could not submit: ' + e.message;
+    errEl.textContent = daT('err_could_not_submit_prefix') + e.message;
     btn.disabled = false;
   }
 }
@@ -2365,8 +2427,8 @@ function daAnalyzeManualGrid(){
   const g = daState.manualGrid;
   const errEl = document.getElementById('manual-entry-err');
   const cols = g.columns.map(c=>c.trim());
-  if(cols.some(c=>!c)){ errEl.textContent = 'Every column needs a name.'; return; }
-  if(new Set(cols).size !== cols.length){ errEl.textContent = 'Column names must be unique.'; return; }
+  if(cols.some(c=>!c)){ errEl.textContent = daT('err_column_name_required'); return; }
+  if(new Set(cols).size !== cols.length){ errEl.textContent = daT('err_column_names_unique'); return; }
   const rows = g.rows
     .filter(r=>r.some(v=>String(v).trim()!==''))
     .map(r=>{
@@ -2456,7 +2518,7 @@ function daAddAdminTestimonialField(quote, name, role, rating){
 async function daSaveSiteContent(){
   const fb = window.daFirebase;
   if(!daState.user || daState.user.uid !== DA_ADMIN_UID){
-    document.getElementById('admin-err').textContent = 'Not authorized.';
+    document.getElementById('admin-err').textContent = daT('err_not_authorized');
     return;
   }
   const rating = parseFloat(document.getElementById('admin-rating').value) || null;
@@ -2472,7 +2534,7 @@ async function daSaveSiteContent(){
     daCloseAdmin();
     daRenderTestimonialCard({ rating, ratingCount, testimonials });
   } catch(e){
-    document.getElementById('admin-err').textContent = 'Save failed: ' + e.message;
+    document.getElementById('admin-err').textContent = daT('err_could_not_save_prefix') + e.message;
   }
 }
 
@@ -2612,9 +2674,10 @@ async function daExportPPTX(){
   const btn = document.getElementById('pptx-export-btn');
   const original = btn ? btn.innerHTML : null;
   if(typeof PptxGenJS === 'undefined'){
-    daSetAlert('upload-err', "PowerPoint export couldn't load its library — check your connection and try again in a moment.");
+    daSetAlert('dashboard-err', daT('err_pptx_lib_failed'));
     return;
   }
+  daSetAlert('dashboard-err', '');
   if(btn){ btn.innerHTML = '<i class="ti ti-loader-2"></i> ' + daT('building_pptx'); btn.disabled = true; }
   try {
     const pres = new PptxGenJS();
@@ -2672,7 +2735,7 @@ async function daExportPPTX(){
 
     await pres.writeFile({ fileName: (daState.filename.replace(/\.[^.]+$/,'') || 'analysis') + '.pptx' });
   } catch(e){
-    daSetAlert('upload-err', 'PowerPoint export failed: ' + e.message);
+    daSetAlert('dashboard-err', daT('err_pptx_export_failed_prefix') + e.message);
   }
   if(btn){ btn.innerHTML = original; btn.disabled = false; }
 }
