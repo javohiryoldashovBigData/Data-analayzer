@@ -234,8 +234,10 @@ input[type="file"]::file-selector-button,input[type="file"]::-webkit-file-upload
 <div class="da-app" id="daApp">
 
 <div class="da-header">
-  <div class="da-logo"><i class="ti ti-chart-histogram"></i></div>
-  <div><div class="da-brand" data-i18n="brand">Data Analyzer</div><div class="da-brand-sub" data-i18n="brand_sub">Upload → Inspect → Analyze → Export</div></div>
+  <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="daGoLanding()" title="Home">
+    <div class="da-logo"><i class="ti ti-chart-histogram"></i></div>
+    <div><div class="da-brand" data-i18n="brand">Data Analyzer</div><div class="da-brand-sub" data-i18n="brand_sub">Upload → Inspect → Analyze → Export</div></div>
+  </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
     <button class="da-icon-btn" onclick="daShowProModal()" title="Pro" style="background:linear-gradient(135deg,#E8A23C,#D8611F);color:#fff;border:none"><i class="ti ti-crown"></i></button>
     <button class="da-icon-btn" onclick="daToggleTheme()" id="theme-toggle-btn" title="Toggle theme"><i class="ti ti-moon"></i></button>
