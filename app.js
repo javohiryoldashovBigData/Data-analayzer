@@ -716,7 +716,7 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
   daSetAlert('upload-err', '');
   document.getElementById('dropzone').classList.add('has-file');
   const sizeNote = file.size > 8*1024*1024 ? ` <span class="da-muted" style="font-weight:400">(${(file.size/1024/1024).toFixed(1)} MB — large file, this may take a moment)</span>` : '';
-  document.getElementById('file-picked-name').innerHTML = `<i class="ti ti-file-check" style="margin-right:4px"></i>${file.name}${sizeNote}`;
+  document.getElementById('file-picked-name').innerHTML = `<i class="ti ti-file-check" style="margin-right:4px"></i>${daEsc(file.name)}${sizeNote}`;
   try {
     let rows = [];
     if(file.name.endsWith('.csv')){
@@ -1361,7 +1361,7 @@ function daRenderDashboard(){
     const d = document.createElement('div');
     d.className = 'da-stat da-kpi-in';
     d.style.animationDelay = (i*0.06)+'s';
-    d.innerHTML = `<div class="n" style="font-size:18px">${k.value}</div><div class="l">${k.label}</div>`;
+    d.innerHTML = `<div class="n" style="font-size:18px">${daEsc(k.value)}</div><div class="l">${daEsc(k.label)}</div>`;
     kpiDiv.appendChild(d);
   });
   const insDiv = document.getElementById('dash-insights');
@@ -1999,7 +1999,7 @@ function daShowReport(){
   daState.result.kpis.forEach(k=>{
     const d = document.createElement('div');
     d.className = 'da-stat';
-    d.innerHTML = `<div class="n" style="font-size:18px">${k.value}</div><div class="l">${k.label}</div>`;
+    d.innerHTML = `<div class="n" style="font-size:18px">${daEsc(k.value)}</div><div class="l">${daEsc(k.label)}</div>`;
     kpiDiv.appendChild(d);
   });
   const insDiv = document.getElementById('report-insights');
