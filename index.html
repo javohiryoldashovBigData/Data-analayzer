@@ -2160,10 +2160,11 @@ async function daRenderCollectHub(){
   listEl.innerHTML = '<p class="da-muted">Loading…</p>';
   try {
     const fb = window.daFirebase;
-    const q = fb.query(fb.collection(fb.db, 'collectors'), fb.where('ownerUid','==',daState.user.uid), fb.orderBy('createdAt','desc'), fb.limit(20));
+    const q = fb.query(fb.collection(fb.db, 'collectors'), fb.where('ownerUid','==',daState.user.uid), fb.limit(20));
     const snap = await fb.getDocs(q);
     const items = [];
     snap.forEach(d=>items.push({ id: d.id, ...d.data() }));
+    items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
     daState.myCollectors = items;
     if(items.length===0){
       listEl.innerHTML = `<div class="da-empty"><i class="ti ti-forms"></i><span>${daEsc(daT('err_no_forms_yet'))}</span></div>`;
