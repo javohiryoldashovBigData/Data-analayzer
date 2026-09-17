@@ -20,6 +20,11 @@ const DA_FIELD_TYPES = [ {id:'text', label:'Text'}, {id:'number', label:'Number'
      allow write: if request.auth != null && request.auth.uid in ["kVRo65cQXMTnb1eiCN8SPrX2ZkO2"];
    }
 */
+/* Firestore security rule for each signed-in user's own saved analysis history (the History page):
+   match /users/{userId}/analyses/{analysisId} {
+     allow read, write: if request.auth != null && request.auth.uid == userId;
+   }
+*/
 /* Firestore security rules required for the data collector feature:
    match /collectors/{collectorId} {
      allow get: if true;
