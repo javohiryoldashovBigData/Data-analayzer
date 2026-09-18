@@ -13,6 +13,15 @@ let daState = { rows: [], columns: [], filename: '', summary: null, objective: n
 const DA_ADMIN_UIDS = ['kVRo65cQXMTnb1eiCN8SPrX2ZkO2'];
 function daIsAdmin(user){ return !!user && DA_ADMIN_UIDS.includes(user.uid); }
 const DA_FIELD_TYPES = [ {id:'text', label:'Text'}, {id:'number', label:'Number'}, {id:'date', label:'Date'}, {id:'choice', label:'Choice (pick one)'} ];
+/* Free-plan limits. Admins are exempt (they act as "Pro" until real billing exists).
+   The history and per-user form limits are soft, client-side checks — low stakes since
+   the only person they'd stop is the account owner circumventing their own plan.
+   The submission cap is the one that matters for security (protects a form owner from
+   a stranger flooding their form), so it's also enforced server-side — see the
+   Firestore rules comment above daSubmitCollectorEntry(). */
+const DA_FREE_HISTORY_LIMIT = 15;
+const DA_FREE_FORM_LIMIT = 1;
+const DA_FREE_SUBMISSION_LIMIT = 50;
 /* DA_ADMIN_UIDS above must stay in sync with the Firestore rule for site_content/public —
    it needs the SAME list of UIDs so a newly added admin can actually save, not just see the gear icon:
    match /site_content/{docId} {
@@ -25,14 +34,24 @@ const DA_FIELD_TYPES = [ {id:'text', label:'Text'}, {id:'number', label:'Number'
      allow read, write: if request.auth != null && request.auth.uid == userId;
    }
 */
-/* Firestore security rules required for the data collector feature:
+/* Firestore security rules required for the data collector feature. The free-plan
+   submission cap (DA_FREE_SUBMISSION_LIMIT above) is enforced HERE, not just in the
+   app's JS — a client-side-only check can't stop someone from scripting around it, so
+   the actual gate is the submissions/{submissionId} create rule reading the live
+   submissionCount off the parent form. That counter is kept accurate by letting anyone
+   bump it by exactly 1 (and nothing else) each time they submit — see the second
+   `allow update` below. Every read of submissionCount uses get(key, 0) so forms created
+   before this field existed don't get locked out (a missing map key otherwise throws
+   and denies the request):
    match /collectors/{collectorId} {
      allow get: if true;
      allow list: if request.auth != null && request.auth.uid == resource.data.ownerUid;
      allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
      allow update, delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+     allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissionCount'])
+       && request.resource.data.submissionCount == resource.data.get('submissionCount', 0) + 1;
      match /submissions/{submissionId} {
-       allow create: if true;
+       allow create: if get(/databases/$(database)/documents/collectors/$(collectorId)).data.get('submissionCount', 0) < 50;
        allow read, delete: if request.auth != null &&
          request.auth.uid == get(/databases/$(database)/documents/collectors/$(collectorId)).data.ownerUid;
      }
@@ -81,7 +100,7 @@ const DA_I18N = {
     err_paste_data_first:'Paste some data first.', err_paste_unreadable:"We couldn't read that as data. Please enter real data — CSV with a header row, or a JSON array of objects.", err_pdf_no_table_paste:"We couldn't find a data table in this PDF. Please enter real data — try exporting it as CSV/Excel, or paste the table below.", err_unsupported_file_type:'Unsupported file type — use CSV, Excel, JSON, or PDF', err_could_not_read_file_prefix:'Could not read file: ', err_could_not_read_file_suffix:' — please enter real data, or try pasting it instead.', err_could_not_generate_dashboard_prefix:'Could not generate dashboard: ',
     err_no_forms_yet:'No forms yet — build one above.', err_could_not_load_prefix:'Could not load: ', err_form_name_required:'Give your form a name.', err_field_required:'Add at least one field with a name.', err_choice_options_required:'Choice fields need at least two comma-separated options.', err_could_not_save_prefix:'Could not save: ',
     loading_responses:'Loading responses…', no_responses_yet:'No responses yet — share the link to start collecting.', response_count_singular:'response collected.', response_count_plural:'responses collected.', err_could_not_delete_prefix:'Could not delete: ',
-    loading_form:'Loading form…', err_form_not_found:"This form couldn't be found. It may have been deleted.", collector_fill_hint:'Fill this in and submit — no account needed.', submit_btn:'Submit', err_fill_every_field:'Please fill in every field.', collector_thanks:'Thanks! Your response has been recorded.', err_could_not_submit_prefix:'Could not submit: ',
+    loading_form:'Loading form…', err_form_not_found:"This form couldn't be found. It may have been deleted.", err_form_full:'This form is no longer accepting responses.', collector_fill_hint:'Fill this in and submit — no account needed.', submit_btn:'Submit', err_fill_every_field:'Please fill in every field.', collector_thanks:'Thanks! Your response has been recorded.', err_could_not_submit_prefix:'Could not submit: ',
     err_column_name_required:'Every column needs a name.', err_column_names_unique:'Column names must be unique.', err_not_authorized:'Not authorized.', err_pptx_lib_failed:"PowerPoint export couldn't load its library — check your connection and try again in a moment.", err_pptx_export_failed_prefix:'PowerPoint export failed: ',
   },
   zh: {
@@ -119,7 +138,7 @@ const DA_I18N = {
     err_paste_data_first:'请先粘贴数据。', err_paste_unreadable:'我们无法将其读取为数据。请输入真实数据——带表头行的 CSV，或对象的 JSON 数组。', err_pdf_no_table_paste:'我们在此 PDF 中未找到数据表格。请输入真实数据——尝试导出为 CSV/Excel，或在下方粘贴表格。', err_unsupported_file_type:'不支持的文件类型——请使用 CSV、Excel、JSON 或 PDF', err_could_not_read_file_prefix:'无法读取文件：', err_could_not_read_file_suffix:'——请输入真实数据，或尝试改为粘贴。', err_could_not_generate_dashboard_prefix:'无法生成仪表盘：',
     err_no_forms_yet:'还没有表单——在上方创建一个。', err_could_not_load_prefix:'无法加载：', err_form_name_required:'请为表单命名。', err_field_required:'请至少添加一个带名称的字段。', err_choice_options_required:'选择题字段至少需要两个用逗号分隔的选项。', err_could_not_save_prefix:'无法保存：',
     loading_responses:'正在加载回复…', no_responses_yet:'暂无回复——分享链接以开始收集。', response_count_singular:'条回复已收集。', response_count_plural:'条回复已收集。', err_could_not_delete_prefix:'无法删除：',
-    loading_form:'正在加载表单…', err_form_not_found:'未找到此表单。可能已被删除。', collector_fill_hint:'填写后提交——无需账户。', submit_btn:'提交', err_fill_every_field:'请填写所有字段。', collector_thanks:'谢谢！您的回复已记录。', err_could_not_submit_prefix:'无法提交：',
+    loading_form:'正在加载表单…', err_form_not_found:'未找到此表单。可能已被删除。', err_form_full:'此表单不再接受回复。', collector_fill_hint:'填写后提交——无需账户。', submit_btn:'提交', err_fill_every_field:'请填写所有字段。', collector_thanks:'谢谢！您的回复已记录。', err_could_not_submit_prefix:'无法提交：',
     err_column_name_required:'每一列都需要一个名称。', err_column_names_unique:'列名称必须唯一。', err_not_authorized:'无权限。', err_pptx_lib_failed:'PowerPoint 导出未能加载其库——请检查网络连接后重试。', err_pptx_export_failed_prefix:'PowerPoint 导出失败：',
   },
   ru: {
@@ -157,7 +176,7 @@ const DA_I18N = {
     err_paste_data_first:'Сначала вставьте данные.', err_paste_unreadable:'Не удалось прочитать это как данные. Пожалуйста, введите настоящие данные — CSV с заголовком или массив объектов JSON.', err_pdf_no_table_paste:'Не удалось найти таблицу данных в этом PDF. Пожалуйста, введите настоящие данные — попробуйте экспортировать в CSV/Excel или вставьте таблицу ниже.', err_unsupported_file_type:'Неподдерживаемый тип файла — используйте CSV, Excel, JSON или PDF', err_could_not_read_file_prefix:'Не удалось прочитать файл: ', err_could_not_read_file_suffix:' — пожалуйста, введите настоящие данные или попробуйте вставить их вместо этого.', err_could_not_generate_dashboard_prefix:'Не удалось создать панель: ',
     err_no_forms_yet:'Пока нет форм — создайте одну выше.', err_could_not_load_prefix:'Не удалось загрузить: ', err_form_name_required:'Дайте название вашей форме.', err_field_required:'Добавьте хотя бы одно поле с названием.', err_choice_options_required:'Для полей с выбором нужно как минимум два варианта через запятую.', err_could_not_save_prefix:'Не удалось сохранить: ',
     loading_responses:'Загрузка ответов…', no_responses_yet:'Пока нет ответов — поделитесь ссылкой, чтобы начать сбор.', response_count_singular:'ответ собран.', response_count_plural:'ответов собрано.', err_could_not_delete_prefix:'Не удалось удалить: ',
-    loading_form:'Загрузка формы…', err_form_not_found:'Эта форма не найдена. Возможно, она была удалена.', collector_fill_hint:'Заполните и отправьте — аккаунт не нужен.', submit_btn:'Отправить', err_fill_every_field:'Пожалуйста, заполните все поля.', collector_thanks:'Спасибо! Ваш ответ записан.', err_could_not_submit_prefix:'Не удалось отправить: ',
+    loading_form:'Загрузка формы…', err_form_not_found:'Эта форма не найдена. Возможно, она была удалена.', err_form_full:'Эта форма больше не принимает ответы.', collector_fill_hint:'Заполните и отправьте — аккаунт не нужен.', submit_btn:'Отправить', err_fill_every_field:'Пожалуйста, заполните все поля.', collector_thanks:'Спасибо! Ваш ответ записан.', err_could_not_submit_prefix:'Не удалось отправить: ',
     err_column_name_required:'Каждому столбцу нужно название.', err_column_names_unique:'Названия столбцов должны быть уникальными.', err_not_authorized:'Нет доступа.', err_pptx_lib_failed:'Не удалось загрузить библиотеку для экспорта в PowerPoint — проверьте соединение и повторите попытку через момент.', err_pptx_export_failed_prefix:'Экспорт в PowerPoint не удался: ',
   },
   ar: {
@@ -195,7 +214,7 @@ const DA_I18N = {
     err_paste_data_first:'الصق بعض البيانات أولاً.', err_paste_unreadable:'تعذّرت قراءة ذلك كبيانات. يرجى إدخال بيانات حقيقية — CSV بصف عناوين، أو مصفوفة JSON من الكائنات.', err_pdf_no_table_paste:'لم نتمكن من العثور على جدول بيانات في ملف PDF هذا. يرجى إدخال بيانات حقيقية — جرّب تصديره كـ CSV/Excel، أو الصق الجدول أدناه.', err_unsupported_file_type:'نوع ملف غير مدعوم — استخدم CSV أو Excel أو JSON أو PDF', err_could_not_read_file_prefix:'تعذّرت قراءة الملف: ', err_could_not_read_file_suffix:' — يرجى إدخال بيانات حقيقية، أو جرّب لصقها بدلاً من ذلك.', err_could_not_generate_dashboard_prefix:'تعذّر إنشاء لوحة التحكم: ',
     err_no_forms_yet:'لا توجد نماذج بعد — أنشئ واحدًا أعلاه.', err_could_not_load_prefix:'تعذّر التحميل: ', err_form_name_required:'أعطِ نموذجك اسمًا.', err_field_required:'أضف حقلاً واحدًا على الأقل باسم.', err_choice_options_required:'تحتاج حقول الاختيار إلى خيارين على الأقل مفصولين بفاصلة.', err_could_not_save_prefix:'تعذّر الحفظ: ',
     loading_responses:'جارٍ تحميل الردود…', no_responses_yet:'لا توجد ردود بعد — شارك الرابط لبدء الجمع.', response_count_singular:'رد تم جمعه.', response_count_plural:'ردود تم جمعها.', err_could_not_delete_prefix:'تعذّر الحذف: ',
-    loading_form:'جارٍ تحميل النموذج…', err_form_not_found:'تعذّر العثور على هذا النموذج. ربما تم حذفه.', collector_fill_hint:'املأ هذا وأرسله — لا حاجة لحساب.', submit_btn:'إرسال', err_fill_every_field:'يرجى ملء جميع الحقول.', collector_thanks:'شكرًا! تم تسجيل ردك.', err_could_not_submit_prefix:'تعذّر الإرسال: ',
+    loading_form:'جارٍ تحميل النموذج…', err_form_not_found:'تعذّر العثور على هذا النموذج. ربما تم حذفه.', err_form_full:'لم يعد هذا النموذج يقبل الردود.', collector_fill_hint:'املأ هذا وأرسله — لا حاجة لحساب.', submit_btn:'إرسال', err_fill_every_field:'يرجى ملء جميع الحقول.', collector_thanks:'شكرًا! تم تسجيل ردك.', err_could_not_submit_prefix:'تعذّر الإرسال: ',
     err_column_name_required:'يحتاج كل عمود إلى اسم.', err_column_names_unique:'يجب أن تكون أسماء الأعمدة فريدة.', err_not_authorized:'غير مصرّح.', err_pptx_lib_failed:'تعذّر على تصدير PowerPoint تحميل مكتبته — تحقق من اتصالك وحاول مرة أخرى بعد قليل.', err_pptx_export_failed_prefix:'فشل تصدير PowerPoint: ',
   },
   es: {
@@ -233,7 +252,7 @@ const DA_I18N = {
     err_paste_data_first:'Pega algunos datos primero.', err_paste_unreadable:'No pudimos leer eso como datos. Por favor, introduce datos reales — CSV con fila de encabezado, o un array JSON de objetos.', err_pdf_no_table_paste:'No pudimos encontrar una tabla de datos en este PDF. Por favor, introduce datos reales — intenta exportarlo como CSV/Excel, o pega la tabla abajo.', err_unsupported_file_type:'Tipo de archivo no compatible — usa CSV, Excel, JSON o PDF', err_could_not_read_file_prefix:'No se pudo leer el archivo: ', err_could_not_read_file_suffix:' — por favor, introduce datos reales, o intenta pegarlos en su lugar.', err_could_not_generate_dashboard_prefix:'No se pudo generar el panel: ',
     err_no_forms_yet:'Aún no hay formularios — crea uno arriba.', err_could_not_load_prefix:'No se pudo cargar: ', err_form_name_required:'Dale un nombre a tu formulario.', err_field_required:'Añade al menos un campo con nombre.', err_choice_options_required:'Los campos de opción necesitan al menos dos opciones separadas por comas.', err_could_not_save_prefix:'No se pudo guardar: ',
     loading_responses:'Cargando respuestas…', no_responses_yet:'Aún no hay respuestas — comparte el enlace para empezar a recopilar.', response_count_singular:'respuesta recopilada.', response_count_plural:'respuestas recopiladas.', err_could_not_delete_prefix:'No se pudo eliminar: ',
-    loading_form:'Cargando formulario…', err_form_not_found:'No se pudo encontrar este formulario. Puede que haya sido eliminado.', collector_fill_hint:'Complétalo y envíalo — no se necesita cuenta.', submit_btn:'Enviar', err_fill_every_field:'Por favor, completa todos los campos.', collector_thanks:'¡Gracias! Tu respuesta ha sido registrada.', err_could_not_submit_prefix:'No se pudo enviar: ',
+    loading_form:'Cargando formulario…', err_form_not_found:'No se pudo encontrar este formulario. Puede que haya sido eliminado.', err_form_full:'Este formulario ya no acepta respuestas.', collector_fill_hint:'Complétalo y envíalo — no se necesita cuenta.', submit_btn:'Enviar', err_fill_every_field:'Por favor, completa todos los campos.', collector_thanks:'¡Gracias! Tu respuesta ha sido registrada.', err_could_not_submit_prefix:'No se pudo enviar: ',
     err_column_name_required:'Cada columna necesita un nombre.', err_column_names_unique:'Los nombres de las columnas deben ser únicos.', err_not_authorized:'No autorizado.', err_pptx_lib_failed:'La exportación a PowerPoint no pudo cargar su librería — comprueba tu conexión e inténtalo de nuevo en un momento.', err_pptx_export_failed_prefix:'Error al exportar a PowerPoint: ',
   },
   fr: {
@@ -271,7 +290,7 @@ const DA_I18N = {
     err_paste_data_first:"Collez d'abord des données.", err_paste_unreadable:"Nous n'avons pas pu lire cela comme des données. Veuillez saisir de vraies données — un CSV avec une ligne d'en-tête, ou un tableau JSON d'objets.", err_pdf_no_table_paste:"Nous n'avons trouvé aucun tableau de données dans ce PDF. Veuillez saisir de vraies données — essayez de l'exporter en CSV/Excel, ou collez le tableau ci-dessous.", err_unsupported_file_type:'Type de fichier non pris en charge — utilisez CSV, Excel, JSON ou PDF', err_could_not_read_file_prefix:'Impossible de lire le fichier : ', err_could_not_read_file_suffix:' — veuillez saisir de vraies données, ou essayez de les coller à la place.', err_could_not_generate_dashboard_prefix:'Impossible de générer le tableau de bord : ',
     err_no_forms_yet:"Pas encore de formulaires — créez-en un ci-dessus.", err_could_not_load_prefix:'Impossible de charger : ', err_form_name_required:'Donnez un nom à votre formulaire.', err_field_required:'Ajoutez au moins un champ avec un nom.', err_choice_options_required:"Les champs à choix ont besoin d'au moins deux options séparées par des virgules.", err_could_not_save_prefix:"Impossible d'enregistrer : ",
     loading_responses:'Chargement des réponses…', no_responses_yet:"Pas encore de réponses — partagez le lien pour commencer à en recueillir.", response_count_singular:'réponse recueillie.', response_count_plural:'réponses recueillies.', err_could_not_delete_prefix:'Impossible de supprimer : ',
-    loading_form:'Chargement du formulaire…', err_form_not_found:"Ce formulaire est introuvable. Il a peut-être été supprimé.", collector_fill_hint:'Remplissez et envoyez — aucun compte requis.', submit_btn:'Envoyer', err_fill_every_field:'Veuillez remplir tous les champs.', collector_thanks:'Merci ! Votre réponse a été enregistrée.', err_could_not_submit_prefix:"Impossible d'envoyer : ",
+    loading_form:'Chargement du formulaire…', err_form_not_found:"Ce formulaire est introuvable. Il a peut-être été supprimé.", err_form_full:"Ce formulaire n'accepte plus de réponses.", collector_fill_hint:'Remplissez et envoyez — aucun compte requis.', submit_btn:'Envoyer', err_fill_every_field:'Veuillez remplir tous les champs.', collector_thanks:'Merci ! Votre réponse a été enregistrée.', err_could_not_submit_prefix:"Impossible d'envoyer : ",
     err_column_name_required:"Chaque colonne a besoin d'un nom.", err_column_names_unique:'Les noms de colonnes doivent être uniques.', err_not_authorized:'Non autorisé.', err_pptx_lib_failed:"L'export PowerPoint n'a pas pu charger sa bibliothèque — vérifiez votre connexion et réessayez dans un instant.", err_pptx_export_failed_prefix:"Échec de l'export PowerPoint : ",
   },
   de: {
@@ -309,7 +328,7 @@ const DA_I18N = {
     err_paste_data_first:'Fügen Sie zuerst Daten ein.', err_paste_unreadable:'Wir konnten das nicht als Daten lesen. Bitte geben Sie echte Daten ein — CSV mit Kopfzeile oder ein JSON-Array von Objekten.', err_pdf_no_table_paste:'Wir konnten in diesem PDF keine Datentabelle finden. Bitte geben Sie echte Daten ein — versuchen Sie den Export als CSV/Excel oder fügen Sie die Tabelle unten ein.', err_unsupported_file_type:'Nicht unterstützter Dateityp — verwenden Sie CSV, Excel, JSON oder PDF', err_could_not_read_file_prefix:'Datei konnte nicht gelesen werden: ', err_could_not_read_file_suffix:' — bitte geben Sie echte Daten ein oder versuchen Sie stattdessen, sie einzufügen.', err_could_not_generate_dashboard_prefix:'Dashboard konnte nicht erstellt werden: ',
     err_no_forms_yet:'Noch keine Formulare — erstellen Sie oben eines.', err_could_not_load_prefix:'Laden fehlgeschlagen: ', err_form_name_required:'Geben Sie Ihrem Formular einen Namen.', err_field_required:'Fügen Sie mindestens ein benanntes Feld hinzu.', err_choice_options_required:'Auswahlfelder benötigen mindestens zwei durch Kommas getrennte Optionen.', err_could_not_save_prefix:'Speichern fehlgeschlagen: ',
     loading_responses:'Antworten werden geladen…', no_responses_yet:'Noch keine Antworten — teilen Sie den Link, um mit dem Sammeln zu beginnen.', response_count_singular:'Antwort gesammelt.', response_count_plural:'Antworten gesammelt.', err_could_not_delete_prefix:'Löschen fehlgeschlagen: ',
-    loading_form:'Formular wird geladen…', err_form_not_found:'Dieses Formular konnte nicht gefunden werden. Es wurde möglicherweise gelöscht.', collector_fill_hint:'Füllen Sie dies aus und senden Sie es — kein Konto erforderlich.', submit_btn:'Senden', err_fill_every_field:'Bitte füllen Sie alle Felder aus.', collector_thanks:'Danke! Ihre Antwort wurde erfasst.', err_could_not_submit_prefix:'Senden fehlgeschlagen: ',
+    loading_form:'Formular wird geladen…', err_form_not_found:'Dieses Formular konnte nicht gefunden werden. Es wurde möglicherweise gelöscht.', err_form_full:'Dieses Formular akzeptiert keine Antworten mehr.', collector_fill_hint:'Füllen Sie dies aus und senden Sie es — kein Konto erforderlich.', submit_btn:'Senden', err_fill_every_field:'Bitte füllen Sie alle Felder aus.', collector_thanks:'Danke! Ihre Antwort wurde erfasst.', err_could_not_submit_prefix:'Senden fehlgeschlagen: ',
     err_column_name_required:'Jede Spalte benötigt einen Namen.', err_column_names_unique:'Spaltennamen müssen eindeutig sein.', err_not_authorized:'Nicht autorisiert.', err_pptx_lib_failed:'Der PowerPoint-Export konnte seine Bibliothek nicht laden — überprüfen Sie Ihre Verbindung und versuchen Sie es gleich noch einmal.', err_pptx_export_failed_prefix:'PowerPoint-Export fehlgeschlagen: ',
   },
   uz: {
@@ -347,7 +366,7 @@ const DA_I18N = {
     err_paste_data_first:"Avval ma'lumot joylashtiring.", err_paste_unreadable:"Buni ma'lumot sifatida oʻqib boʻlmadi. Iltimos, haqiqiy ma'lumot kiriting — sarlavha qatorli CSV yoki obyektlar massivi (JSON).", err_pdf_no_table_paste:"Bu PDF faylida ma'lumotlar jadvalini topa olmadik. Iltimos, haqiqiy ma'lumot kiriting — uni CSV/Excel sifatida eksport qilib koʻring yoki jadvalni pastga joylashtiring.", err_unsupported_file_type:'Qoʻllab-quvvatlanmaydigan fayl turi — CSV, Excel, JSON yoki PDF dan foydalaning', err_could_not_read_file_prefix:'Faylni oʻqib boʻlmadi: ', err_could_not_read_file_suffix:" — iltimos, haqiqiy ma'lumot kiriting yoki uning oʻrniga joylashtirib koʻring.", err_could_not_generate_dashboard_prefix:'Boshqaruv panelini yaratib boʻlmadi: ',
     err_no_forms_yet:'Hali formalar yoʻq — yuqorida birini yarating.', err_could_not_load_prefix:'Yuklab boʻlmadi: ', err_form_name_required:'Formangizga nom bering.', err_field_required:'Kamida bitta nomlangan maydon qoʻshing.', err_choice_options_required:'Tanlov maydonlari uchun vergul bilan ajratilgan kamida ikkita variant kerak.', err_could_not_save_prefix:'Saqlab boʻlmadi: ',
     loading_responses:'Javoblar yuklanmoqda…', no_responses_yet:'Hali javoblar yoʻq — yigʻishni boshlash uchun havolani ulashing.', response_count_singular:'javob toʻplandi.', response_count_plural:'javob toʻplandi.', err_could_not_delete_prefix:'Oʻchirib boʻlmadi: ',
-    loading_form:'Forma yuklanmoqda…', err_form_not_found:'Bu forma topilmadi. U oʻchirilgan boʻlishi mumkin.', collector_fill_hint:'Buni toʻldirib yuboring — hisob talab qilinmaydi.', submit_btn:'Yuborish', err_fill_every_field:'Iltimos, barcha maydonlarni toʻldiring.', collector_thanks:'Rahmat! Javobingiz qayd etildi.', err_could_not_submit_prefix:'Yuborib boʻlmadi: ',
+    loading_form:'Forma yuklanmoqda…', err_form_not_found:'Bu forma topilmadi. U oʻchirilgan boʻlishi mumkin.', err_form_full:'Bu forma endi javoblarni qabul qilmaydi.', collector_fill_hint:'Buni toʻldirib yuboring — hisob talab qilinmaydi.', submit_btn:'Yuborish', err_fill_every_field:'Iltimos, barcha maydonlarni toʻldiring.', collector_thanks:'Rahmat! Javobingiz qayd etildi.', err_could_not_submit_prefix:'Yuborib boʻlmadi: ',
     err_column_name_required:'Har bir ustun uchun nom kerak.', err_column_names_unique:'Ustun nomlari bir xil boʻlmasligi kerak.', err_not_authorized:'Ruxsat yoʻq.', err_pptx_lib_failed:'PowerPoint eksporti oʻz kutubxonasini yuklay olmadi — internet aloqangizni tekshirib, birozdan soʻng qayta urinib koʻring.', err_pptx_export_failed_prefix:'PowerPoint eksporti muvaffaqiyatsiz tugadi: ',
   }
 };
@@ -1399,12 +1418,27 @@ async function daSaveAnalysis(){
     if(daState.user){
       const fb = window.daFirebase;
       await fb.setDoc(fb.doc(fb.db, 'users', daState.user.uid, 'analyses', id), record);
+      await daEnforceHistoryLimit();
     } else {
       const list = daLocalAnalysesGet();
       list.unshift(record);
       daLocalAnalysesSet(list.slice(0,20));
     }
   } catch(e){ console.error('save failed', e); }
+}
+
+// Free plan keeps the most recent DA_FREE_HISTORY_LIMIT analyses; older ones quietly roll off.
+async function daEnforceHistoryLimit(){
+  if(daIsAdmin(daState.user)) return;
+  try {
+    const fb = window.daFirebase;
+    const q = fb.query(fb.collection(fb.db, 'users', daState.user.uid, 'analyses'), fb.orderBy('date','asc'));
+    const snap = await fb.getDocs(q);
+    const extra = snap.size - DA_FREE_HISTORY_LIMIT;
+    if(extra > 0){
+      await Promise.all(snap.docs.slice(0, extra).map(d => fb.deleteDoc(d.ref)));
+    }
+  } catch(e){ console.error('history limit enforcement failed', e); }
 }
 
 function daLocalAnalysesGet(){
@@ -1541,6 +1575,7 @@ async function daRenderCollectHub(){
 
 function daGoCollectorBuilder(){
   if(!daState.user){ daOpenAuthModal('signin'); return; }
+  if(!daIsAdmin(daState.user) && daState.myCollectors.length >= DA_FREE_FORM_LIMIT){ daShowProModal(); return; }
   daState.collectorBuilder = { title: '', fields: [ {label:'', type:'text', options:''}, {label:'', type:'text', options:''} ] };
   document.getElementById('collect-build-err').textContent = '';
   daShowView('view-collect-build');
@@ -1596,7 +1631,7 @@ async function daSaveCollectorForm(){
   btn.disabled = true;
   try {
     const fb = window.daFirebase;
-    const record = { ownerUid: daState.user.uid, title, fields, createdAt: new Date().toISOString() };
+    const record = { ownerUid: daState.user.uid, title, fields, createdAt: new Date().toISOString(), submissionCount: 0 };
     const ref = await fb.addDoc(fb.collection(fb.db, 'collectors'), record);
     daState.activeCollector = { id: ref.id, ...record };
     daShowView('view-collect-detail');
@@ -1695,6 +1730,10 @@ async function daLoadPublicCollector(id){
 function daRenderPublicCollectorForm(){
   const c = daState.publicCollector;
   const body = document.getElementById('collect-submit-body');
+  if((c.submissionCount||0) >= DA_FREE_SUBMISSION_LIMIT){
+    body.innerHTML = `<div class="da-card"><div class="da-empty"><i class="ti ti-lock"></i><span>${daEsc(daT('err_form_full'))}</span></div></div>`;
+    return;
+  }
   const fieldsHtml = c.fields.map((f,i)=>{
     if(f.type==='choice'){
       return `<label class="da-muted" style="font-size:12px;font-weight:600;display:block;margin-top:12px">${daEsc(f.label)}</label>
@@ -1733,6 +1772,7 @@ async function daSubmitCollectorEntry(){
   try {
     const fb = window.daFirebase;
     await fb.addDoc(fb.collection(fb.db, 'collectors', c.id, 'submissions'), { ...values, submittedAt: new Date().toISOString() });
+    try { await fb.updateDoc(fb.doc(fb.db, 'collectors', c.id), { submissionCount: fb.increment(1) }); } catch(e){}
     document.getElementById('collect-submit-body').innerHTML = `<div class="da-card"><div class="da-empty"><i class="ti ti-circle-check"></i><span>${daEsc(daT('collector_thanks'))}</span></div></div>`;
   } catch(e){
     errEl.textContent = daT('err_could_not_submit_prefix') + e.message;

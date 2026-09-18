@@ -1,6 +1,6 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, increment } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDDl82Dyn6ixDIC0rwbkJykJ8toeab6lkI",
@@ -16,7 +16,7 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  window.daFirebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs };
+  window.daFirebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, increment };
 
   onAuthStateChanged(auth, (user)=>{
     if(window.daOnAuthChange) window.daOnAuthChange(user);
