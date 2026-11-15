@@ -1,8 +1,17 @@
 -- ============================================================================
--- MAKTAB+ — schema v2 (PostgreSQL 15+ / self-hosted Supabase)
+-- MAKTAB+ — schema v3 (PostgreSQL 15+ / self-hosted Supabase)
 --
--- This file REPLACES the v1 draft. Every problem found in testing v1
--- (brief §9) is fixed and marked below with "FIX #n".
+-- v2 was designed by Perplexity; v3 is the joint version (Perplexity + Claude).
+-- Every problem found in testing v1 (brief §9) is fixed and marked "FIX #n".
+-- v3 changes are marked "V3:" — see docs/06-v3-changes.md. Main ideas:
+--   * ONE WINDOW PER SCHOOL: each school has its own address (slug), branding,
+--     people and data. Nobody outside the school — not another school, not a
+--     district admin, not even the platform super admin — can read its
+--     personal data. Government admins get NUMBERS ONLY (app.school_stats).
+--   * Parents and students see teachers' NAMES only (app.my_teachers()), never
+--     phones. They contact a teacher through the school office (contact_requests).
+--   * Weekly tests are cheat-proof: answer keys live in a separate table, and
+--     scoring happens on the server (app.submit_attempt).
 --
 -- Deployment modes:
 --   * Self-hosted Supabase in Uzbekistan: run schema.sql directly
@@ -25,7 +34,8 @@ create extension if not exists pgcrypto;
 -- ---------------------------------------------------------------------------
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
-create type user_role         as enum ('super_admin','region_admin','district_admin','school_admin','director','zavuch','teacher','student','parent');
+-- V3: 'methodologist' = platform-level Library reviewer (no school scope).
+create type user_role         as enum ('super_admin','methodologist','region_admin','district_admin','school_admin','director','zavuch','teacher','student','parent');
 create type school_mode       as enum ('private','government');
 create type school_type       as enum ('general','specialized','lyceum','gymnasium','evening');
 create type gender            as enum ('m','f');
@@ -44,11 +54,13 @@ create type library_status    as enum ('ai_made','under_review','checked');
 create type test_status       as enum ('draft','published','closed');
 create type attempt_mode      as enum ('paper','online');
 create type flag_kind         as enum ('similar_answers','identical_wrong','level_jump','fast_answers','pasted_text','left_window');
+create type flag_decision     as enum ('pending','dismissed','talked_to_student');   -- V3: teacher decides
+create type contact_status    as enum ('open','forwarded','answered','closed');      -- V3: parent → school office
 create type invoice_status    as enum ('issued','paid','overdue','cancelled');
 create type pay_provider      as enum ('click','payme','cash');
 create type pay_status        as enum ('pending','completed','failed');
 create type admission_status  as enum ('applied','testing','interview','accepted','rejected','enrolled');
-create type notification_kind as enum ('grade_posted','absence','homework','announcement','timetable_change','gate_in','gate_out','skipped_lesson','absence_report','fee_due','payment_received','test_result','problem','system');
+create type notification_kind as enum ('grade_posted','absence','homework','announcement','timetable_change','gate_in','gate_out','skipped_lesson','absence_report','fee_due','payment_received','test_result','problem','parent_message','system');
 create type device_platform   as enum ('fcm_android','fcm_ios','telegram');
 
 -- ---------------------------------------------------------------------------
@@ -76,6 +88,13 @@ create table schools (
   address     text,
   phone       text,
   settings    jsonb not null default '{}'::jsonb,
+  -- V3: the school's own "window"
+  slug        text not null unique                          -- school-a → school-a.maktabplus.uz
+              check (slug ~ '^[a-z0-9]([a-z0-9-]{1,40}[a-z0-9])$'),
+  logo_url    text,
+  brand_color text not null default '#1d6fd8' check (brand_color ~ '^#[0-9a-fA-F]{6}$'),
+  is_active   boolean not null default true,                -- false = window closed (unpaid, etc.)
+  share_stats_with_government boolean not null default false, -- private schools opt in; check with a lawyer
   created_at  timestamptz not null default now()
 );
 create index schools_district_idx on schools(district_id);
@@ -129,7 +148,7 @@ create table user_school_roles (
       and school_id is not null and district_id is null and region_id is null )
     or ( role = 'district_admin' and district_id is not null and school_id is null and region_id is null )
     or ( role = 'region_admin' and region_id is not null and school_id is null and district_id is null )
-    or ( role = 'super_admin' and school_id is null and district_id is null and region_id is null )
+    or ( role in ('super_admin','methodologist') and school_id is null and district_id is null and region_id is null )
   )
 );
 create unique index user_school_roles_scope_uk on user_school_roles (
@@ -522,11 +541,18 @@ create table test_questions (
   test_id       uuid not null references weekly_tests(id) on delete cascade,
   question_text text not null,
   options       jsonb not null,                           -- ["a","b","c","d"]
-  correct_index smallint not null,
   points        smallint not null default 1,
   position      smallint not null
 );
 create index test_questions_test_idx on test_questions(test_id, position);
+
+-- V3 (hole A4): the answer key is in its own table so students can read the
+-- questions without the correct answers. Students see keys only after the
+-- test is closed ("see answers").
+create table test_answer_keys (
+  question_id   uuid primary key references test_questions(id) on delete cascade,
+  correct_index smallint not null
+);
 
 create table test_attempts (
   id           uuid primary key default gen_random_uuid(),
@@ -558,6 +584,7 @@ create table integrity_flags (                            -- signals ONLY, teach
   kind         flag_kind not null,
   details      jsonb not null default '{}'::jsonb,
   teacher_seen boolean not null default false,
+  decision     flag_decision not null default 'pending',  -- V3: the teacher decides (rule 1)
   created_at   timestamptz not null default now()
 );
 create index integrity_flags_test_idx on integrity_flags(test_id, teacher_seen);
@@ -578,6 +605,7 @@ create table library_items (
   content          jsonb not null default '{}'::jsonb,    -- graph spec, quiz body…
   status           library_status not null default 'ai_made',  -- "AI-made, not yet checked"
   author_user_id   uuid references auth.users(id),
+  origin_school_id uuid references schools(id) on delete set null,  -- V3: who made it (null = platform)
   methodologist_id uuid references auth.users(id),
   reviewed_at      timestamptz,
   usage_count      integer not null default 0,
@@ -652,6 +680,29 @@ create table admission_applications (
   created_at    timestamptz not null default now()
 );
 create index admission_school_idx on admission_applications(school_id, status);
+
+-- ---------------------------------------------------------------------------
+-- 13b. V3: PARENT → SCHOOL OFFICE MESSAGES
+-- Parents see teachers' names only. To reach a teacher they write to the
+-- school office (school_admin / director / zavuch), who answers or forwards.
+-- ---------------------------------------------------------------------------
+create table contact_requests (
+  id                uuid primary key default gen_random_uuid(),
+  school_id         uuid not null references schools(id) on delete cascade,
+  student_id        uuid not null references students(id) on delete cascade,
+  parent_user_id    uuid not null references auth.users(id) on delete cascade,
+  about_teacher_id  uuid references teachers(id) on delete set null,  -- optional: "about the math teacher"
+  topic             text not null,
+  body              text not null,
+  status            contact_status not null default 'open',
+  forwarded_to      uuid references teachers(id) on delete set null,  -- office forwards to a teacher
+  handled_by        uuid references auth.users(id),
+  reply             text,
+  created_at        timestamptz not null default now(),
+  answered_at       timestamptz
+);
+create index contact_requests_school_idx on contact_requests(school_id, status, created_at desc);
+create index contact_requests_parent_idx on contact_requests(parent_user_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- 14. NOTIFICATIONS (outbox pattern; FIX #5: PK includes partition key)
@@ -729,44 +780,105 @@ create schema if not exists app;
 
 create or replace function app.my_teacher_id()
 returns uuid language sql stable security definer set search_path = public as $$
-  select t.id from teachers t where t.user_id = auth.uid() limit 1
+  select t.id from teachers t
+  join schools s on s.id = t.school_id and s.is_active      -- V3: closed window = no access
+  where t.user_id = auth.uid() and t.status = 'active' limit 1
 $$;
 
--- Any active role at this school (incl. teachers) or scope admins above it.
+-- V3 — ONE WINDOW PER SCHOOL. Only people with a role INSIDE the school pass
+-- these checks. District/region/super admins are NOT members of any school:
+-- they never see names, grades or attendance. Government admins get numbers
+-- through app.school_stats(); platform staff work through the service role,
+-- which is audited.
+-- A school whose window is closed (is_active = false) lets nobody in.
+
+-- Any active role inside this (open) school.
 create or replace function app.member_at(p_school_id uuid)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from user_school_roles r
+    join schools s on s.id = r.school_id and s.is_active
     where r.user_id = auth.uid()
       and r.is_active
-      and ( r.school_id = p_school_id
-         or r.role = 'super_admin'
-         or (r.role = 'district_admin' and r.district_id =
-              (select s.district_id from schools s where s.id = p_school_id))
-         or (r.role = 'region_admin' and r.region_id =
-              (select d.region_id from districts d
-               join schools s on s.district_id = d.id
-               where s.id = p_school_id)) )
+      and r.school_id = p_school_id
   )
 $$;
 
--- School leadership + district/region/super admins (read-everything, manage).
+-- School leadership inside this school: school_admin, director, zavuch.
 create or replace function app.manages_school(p_school_id uuid)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from user_school_roles r
+    join schools s on s.id = r.school_id and s.is_active
     where r.user_id = auth.uid()
       and r.is_active
-      and r.role in ('super_admin','region_admin','district_admin','school_admin','director','zavuch')
-      and ( r.school_id = p_school_id
-         or r.role = 'super_admin'
-         or (r.role = 'district_admin' and r.district_id =
-              (select s.district_id from schools s where s.id = p_school_id))
-         or (r.role = 'region_admin' and r.region_id =
-              (select d.region_id from districts d
-               join schools s on s.district_id = d.id
-               where s.id = p_school_id)) )
+      and r.role in ('school_admin','director','zavuch')
+      and r.school_id = p_school_id
   )
+$$;
+
+-- V3: top of the school only (school_admin, director): staff roles, settings,
+-- branding, billing. A zavuch cannot make anyone (or themselves) an admin.
+create or replace function app.is_school_admin(p_school_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from user_school_roles r
+    join schools s on s.id = r.school_id and s.is_active
+    where r.user_id = auth.uid()
+      and r.is_active
+      and r.role in ('school_admin','director')
+      and r.school_id = p_school_id
+  )
+$$;
+
+-- V3: staff = leadership + teachers (not parents/students).
+create or replace function app.is_staff_at(p_school_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from user_school_roles r
+    join schools s on s.id = r.school_id and s.is_active
+    where r.user_id = auth.uid()
+      and r.is_active
+      and r.role in ('school_admin','director','zavuch','teacher')
+      and r.school_id = p_school_id
+  )
+$$;
+
+-- V3: which school a class belongs to (used to stop rows claiming the wrong school).
+create or replace function app.class_school(p_class_id uuid)
+returns uuid language sql stable security definer set search_path = public as $$
+  select c.school_id from classes c where c.id = p_class_id
+$$;
+
+create or replace function app.teacher_school(p_teacher_id uuid)
+returns uuid language sql stable security definer set search_path = public as $$
+  select t.school_id from teachers t where t.id = p_teacher_id
+$$;
+
+create or replace function app.student_school(p_student_id uuid)
+returns uuid language sql stable security definer set search_path = public as $$
+  select s.school_id from students s where s.id = p_student_id
+$$;
+
+-- V3: caller is a student of this class, or a parent of one.
+create or replace function app.in_class(p_class_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1
+    from class_members cm
+    join students s on s.id = cm.student_id
+    where cm.class_id = p_class_id
+      and cm.status = 'active'
+      and ( s.user_id = auth.uid()
+         or exists (select 1 from guardians g
+                    where g.student_id = s.id and g.parent_user_id = auth.uid()) )
+  )
+$$;
+
+create or replace function app.is_methodologist()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from user_school_roles r
+                 where r.user_id = auth.uid() and r.is_active and r.role = 'methodologist')
 $$;
 
 -- Caller teaches p_subject (null = any subject) to this student's active class.
@@ -800,6 +912,7 @@ create or replace function app.can_see_student(p_student_id uuid)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from students s
+    join schools sc on sc.id = s.school_id and sc.is_active  -- V3: closed window = no access
     where s.id = p_student_id
       and ( s.user_id = auth.uid()
          or exists (select 1 from guardians g
@@ -868,39 +981,139 @@ returns boolean language sql stable security definer set search_path = public as
   )
 $$;
 
-create or replace function app.can_edit_library()
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from user_school_roles r
-    where r.user_id = auth.uid() and r.is_active
-      and r.role in ('super_admin','region_admin','district_admin',
-                     'school_admin','director','zavuch')
-  )
-$$;
-
--- Profiles: self, or staff/teacher sharing a school, or scope admins.
+-- V3: full profiles (with phone numbers):
+--   * yourself;
+--   * school leadership: everyone in their own school (they run the office);
+--   * teachers: their colleagues (staff of the same school) only.
+-- Parents and students never read other people's profiles. They get teachers'
+-- NAMES from app.my_teachers() and reach teachers via contact_requests.
 create or replace function app.can_see_profile(p_user_id uuid)
 returns boolean language sql stable security definer set search_path = public as $$
   select p_user_id = auth.uid()
      or exists (
        select 1
-       from user_school_roles mine
-       where mine.user_id = auth.uid()
-         and mine.is_active
-         and mine.role in ('super_admin','region_admin','district_admin',
-                           'school_admin','director','zavuch','teacher')
-         and exists (
-           select 1
-           from user_school_roles theirs
-           join schools s on s.id = theirs.school_id
-           join districts dd on dd.id = s.district_id
-           where theirs.user_id = p_user_id
-             and theirs.is_active
-             and ( mine.role = 'super_admin'
-                or mine.school_id = theirs.school_id
-                or (mine.role = 'district_admin' and dd.id = mine.district_id)
-                or (mine.role = 'region_admin' and dd.region_id = mine.region_id) ) ) )
+       from user_school_roles theirs
+       where theirs.user_id = p_user_id
+         and theirs.is_active
+         and theirs.school_id is not null
+         and ( app.manages_school(theirs.school_id)
+            or ( theirs.role in ('school_admin','director','zavuch','teacher')
+                 and app.is_staff_at(theirs.school_id) ) ) )
 $$;
+
+-- V3: teacher NAMES for parents and students (no phone, no other details):
+-- the teachers of the caller's own class / children's classes.
+create or replace function app.my_teachers()
+returns table (student_id uuid, teacher_id uuid, first_name text, last_name text,
+               subject_id smallint, is_class_teacher boolean)
+language sql stable security definer set search_path = public as $$
+  with kids as (
+    select s.id from students s
+    where s.user_id = auth.uid()
+       or exists (select 1 from guardians g where g.student_id = s.id and g.parent_user_id = auth.uid())
+  ), links as (
+    select cm.student_id, ta.teacher_id, ta.subject_id, false as is_class_teacher
+    from class_members cm join teacher_assignments ta on ta.class_id = cm.class_id
+    where cm.student_id in (select id from kids) and cm.status = 'active'
+    union
+    select cm.student_id, c.class_teacher_id, null::smallint, true
+    from class_members cm join classes c on c.id = cm.class_id
+    where cm.student_id in (select id from kids) and cm.status = 'active'
+      and c.class_teacher_id is not null
+  )
+  select l.student_id, l.teacher_id, p.first_name, p.last_name, l.subject_id, l.is_class_teacher
+  from links l
+  join teachers t on t.id = l.teacher_id
+  join schools sc on sc.id = t.school_id and sc.is_active
+  join profiles p on p.user_id = t.user_id
+$$;
+
+-- V3: attendance authority for one row (used by insert AND update checks).
+create or replace function app.can_mark_attendance(p_student_id uuid, p_class_id uuid, p_subject_id smallint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from class_members cm
+                 where cm.student_id = p_student_id and cm.class_id = p_class_id
+                   and cm.status = 'active')
+     and ( app.manages_school(app.student_school(p_student_id))
+        or app.is_class_teacher_of(p_student_id)
+        or (p_subject_id is not null and app.teaches(p_student_id, p_subject_id)) )
+$$;
+
+-- V3: the login page of a school window needs its name/logo BEFORE login.
+-- Only public branding comes out — nothing else about the school.
+create or replace function app.school_window(p_slug text)
+returns table (school_id uuid, name text, logo_url text, brand_color text, mode school_mode)
+language sql stable security definer set search_path = public as $$
+  select s.id, s.name, s.logo_url, s.brand_color, s.mode
+  from schools s where s.slug = lower(p_slug) and s.is_active
+$$;
+
+-- V3: the windows this user may enter (school picker after login).
+create or replace function app.my_schools()
+returns table (school_id uuid, slug text, name text, roles user_role[])
+language sql stable security definer set search_path = public as $$
+  select s.id, s.slug, s.name, array_agg(r.role order by r.role)
+  from user_school_roles r join schools s on s.id = r.school_id and s.is_active
+  where r.user_id = auth.uid() and r.is_active
+  group by s.id, s.slug, s.name
+$$;
+
+-- V3: government dashboards get NUMBERS ONLY, never names.
+-- Government schools: always. Private schools: only if they opted in
+-- (share_stats_with_government) — check with a lawyer what the law requires.
+create or replace function app.school_stats(p_school_id uuid, p_from date default current_date - 30)
+returns table (students bigint, attendance_rate numeric, avg_current_grade numeric)
+language plpgsql stable security definer set search_path = public as $$
+declare v_school schools%rowtype;
+begin
+  select * into v_school from schools where id = p_school_id;
+  if not found
+     or not (app.manages_school(p_school_id) or app.manages_district(v_school.district_id))
+     or (v_school.mode = 'private' and not v_school.share_stats_with_government
+         and not app.manages_school(p_school_id)) then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  return query
+    select (select count(*) from students s where s.school_id = p_school_id and s.status = 'active'),
+           (select round(100.0 * count(*) filter (where a.status in ('present','late'))
+                     / nullif(count(*), 0), 1)
+              from attendance_logs a join classes c on c.id = a.class_id
+             where c.school_id = p_school_id and a.date >= p_from),
+           (select round(avg(g.value), 2)
+              from grades g join students s on s.id = g.student_id
+             where s.school_id = p_school_id and g.grade_type = 'current'
+               and g.deleted_at is null and g.created_at >= p_from);
+end $$;
+
+-- V3: student finishes a test. Scoring happens HERE, on the server, against
+-- the hidden answer key — the student can never write a score (holes A5, A6).
+create or replace function app.submit_attempt(p_attempt_id uuid)
+returns numeric language plpgsql volatile security definer set search_path = public as $$
+declare v_score numeric(5,2);
+begin
+  if not exists (
+    select 1 from test_attempts ta
+    join students s on s.id = ta.student_id
+    join weekly_tests wt on wt.id = ta.test_id
+    where ta.id = p_attempt_id and s.user_id = auth.uid()
+      and ta.submitted_at is null and wt.status = 'published') then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  update attempt_answers aa
+     set is_correct = (aa.answer = to_jsonb(k.correct_index))
+    from test_answer_keys k
+   where aa.attempt_id = p_attempt_id and k.question_id = aa.question_id;
+  select round(100.0 * coalesce(sum(q.points) filter (where aa.is_correct), 0)
+               / nullif(sum(q.points), 0), 2)
+    into v_score
+    from test_attempts ta
+    join test_questions q on q.test_id = ta.test_id
+    left join attempt_answers aa on aa.attempt_id = ta.id and aa.question_id = q.id
+   where ta.id = p_attempt_id;
+  update test_attempts set submitted_at = now(), score = coalesce(v_score, 0)
+   where id = p_attempt_id;
+  return coalesce(v_score, 0);
+end $$;
 
 -- ============================================================================
 -- ROW LEVEL SECURITY — enable on EVERY table (FIX #3)
@@ -931,10 +1144,15 @@ create policy ref_read_districts on districts   for select to authenticated usin
 create policy ref_read_subjects  on subjects    for select to authenticated using (true);
 create policy ref_read_gtypes    on grade_types for select to authenticated using (true);
 
--- ---- organization ----
-create policy schools_read  on schools    for select to authenticated using (true);
-create policy schools_write on schools    for all    to authenticated using (app.manages_school(id));
-create policy subs_read     on school_subscriptions for select to authenticated using (app.manages_school(school_id));
+-- ---- organization (V3: one window per school) ----
+-- A user sees only the schools they belong to. The public login page uses
+-- app.school_window(slug), which returns branding only.
+create policy schools_read   on schools for select to authenticated using (app.member_at(id) or app.is_super());
+create policy schools_insert on schools for insert to authenticated with check (app.is_super());
+create policy schools_update on schools for update to authenticated
+  using (app.is_school_admin(id) or app.is_super()) with check (app.is_school_admin(id) or app.is_super());
+create policy schools_delete on schools for delete to authenticated using (app.is_super());
+create policy subs_read     on school_subscriptions for select to authenticated using (app.is_school_admin(school_id) or app.is_super());
 create policy years_read    on academic_years for select to authenticated using (true);
 create policy terms_read    on terms        for select to authenticated using (true);
 create policy rooms_read    on rooms        for select to authenticated using (app.member_at(school_id));
@@ -953,11 +1171,15 @@ create policy roles_select on user_school_roles for select to authenticated usin
   or (district_id is not null and app.manages_district(district_id))
   or (region_id is not null and app.manages_region(region_id))
 );
+-- V3: only school_admin/director hand out school roles (a zavuch could make
+-- themselves admin before). Super admin creates the first school admin and
+-- the district/region/methodologist roles.
 create policy roles_write on user_school_roles for all to authenticated using (
+  app.is_super() or (school_id is not null and app.is_school_admin(school_id))
+) with check (
   app.is_super()
-  or (school_id is not null and app.manages_school(school_id))
-  or (district_id is not null and app.manages_district(district_id))
-  or (region_id is not null and app.manages_region(region_id))
+  or ( school_id is not null and app.is_school_admin(school_id)
+       and role in ('school_admin','director','zavuch','teacher','student','parent') )
 );
 
 -- ---- people ----
@@ -965,48 +1187,51 @@ create policy students_read  on students  for select to authenticated using (app
 create policy students_write on students  for all    to authenticated using (app.manages_school(school_id));
 
 create policy guardians_read on guardians for select to authenticated using (
-  parent_user_id = auth.uid() or app.can_see_student(student_id) or app.manages_school(
-    (select s.school_id from students s where s.id = guardians.student_id))
+  parent_user_id = auth.uid() or app.can_see_student(student_id)
 );
-create policy guardians_write on guardians for all to authenticated using (app.manages_school(
-  (select s.school_id from students s where s.id = guardians.student_id)));
+create policy guardians_write on guardians for all to authenticated using (
+  app.manages_school(app.student_school(student_id)));
 
-create policy teachers_read  on teachers  for select to authenticated using (app.member_at(school_id));
+-- V3: the teachers table is staff-only; parents get names via app.my_teachers().
+create policy teachers_read  on teachers  for select to authenticated using (app.is_staff_at(school_id));
 create policy teachers_write on teachers  for all    to authenticated using (app.manages_school(school_id));
 
 -- ---- classes & timetable ----
 create policy classes_read  on classes for select to authenticated using (app.member_at(school_id));
 create policy classes_write on classes for all    to authenticated using (app.manages_school(school_id));
 
+-- V3: rosters are staff-only; a parent/student sees only their own row.
 create policy cmembers_read on class_members for select to authenticated using (
-  app.can_see_student(student_id)
-  or app.member_at((select c.school_id from classes c where c.id = class_members.class_id))
+  app.can_see_student(student_id) or app.is_staff_at(app.class_school(class_id))
 );
-create policy cmembers_write on class_members for all to authenticated using (app.manages_school(
-  (select c.school_id from classes c where c.id = class_members.class_id)));
+create policy cmembers_write on class_members for all to authenticated using (
+  app.manages_school(app.class_school(class_id)));
 
 create policy timetable_read  on timetable_slots for select to authenticated using (
-  app.member_at((select c.school_id from classes c where c.id = timetable_slots.class_id)));
-create policy timetable_write on timetable_slots for all to authenticated using (app.manages_school(
-  (select c.school_id from classes c where c.id = timetable_slots.class_id)));
+  app.member_at(app.class_school(class_id)));
+create policy timetable_write on timetable_slots for all to authenticated using (
+  app.manages_school(app.class_school(class_id)));
 
 create policy tassign_read on teacher_assignments for select to authenticated using (
-  app.member_at((select c.school_id from classes c where c.id = teacher_assignments.class_id)));
-create policy tassign_write on teacher_assignments for all to authenticated using (app.manages_school(
-  (select c.school_id from classes c where c.id = teacher_assignments.class_id)));
+  app.member_at(app.class_school(class_id)));
+create policy tassign_write on teacher_assignments for all to authenticated using (
+  app.manages_school(app.class_school(class_id)));
 
-create policy subst_read  on substitutions for select to authenticated using (app.member_at(school_id));
+create policy subst_read  on substitutions for select to authenticated using (app.is_staff_at(school_id));
 create policy subst_write on substitutions for all    to authenticated using (app.manages_school(school_id));
 
 -- ---- grades ----
 create policy grades_select on grades for select to authenticated using (app.can_see_student(student_id));
--- FIX (brief §9 extra): insert checks teacher identity, subject/class authority,
--- grade type authority, and that the term belongs to the class's academic year.
+-- V3 grade authority (hole A8):
+--   * subject teacher: current / exam / quarter grades in the subject they teach
+--     to this student's class (class-teacher status no longer lets you grade
+--     subjects you don't teach);
+--   * final (yearly) grade: school leadership only (zavuch/director confirm).
+--     ASSUMPTION — change here if the school wants teachers to post finals.
+--   * the term must belong to the student's class's academic year;
+--   * created_by is always the caller.
 create policy grades_insert on grades for insert to authenticated with check (
-  app.my_teacher_id() is not null
-  and teacher_id = app.my_teacher_id()
-  and ( app.teaches(student_id, subject_id)
-     or app.is_class_teacher_of(student_id) )
+  created_by = auth.uid()
   and exists (
     select 1
     from terms t
@@ -1014,18 +1239,21 @@ create policy grades_insert on grades for insert to authenticated with check (
     join class_members cm on cm.class_id = c.id
          and cm.student_id = grades.student_id and cm.status = 'active'
     where t.id = grades.term_id )
+  and (
+    ( teacher_id = app.my_teacher_id()
+      and grade_type <> 'final'
+      and app.teaches(student_id, subject_id) )
+    or
+    ( app.manages_school(app.student_school(student_id))
+      and app.teacher_school(teacher_id) = app.student_school(student_id) ) )
 );
 create policy grades_update on grades for update to authenticated using (
-  app.manages_school((select s.school_id from students s where s.id = grades.student_id))
-  or ( teacher_id = app.my_teacher_id()
-       and ( app.teaches(grades.student_id, grades.subject_id)
-          or app.is_class_teacher_of(grades.student_id) ) )
-);
-create policy grades_update_chk on grades for update to authenticated with check (
-  app.manages_school((select s.school_id from students s where s.id = grades.student_id))
-  or ( teacher_id = app.my_teacher_id()
-       and ( app.teaches(grades.student_id, grades.subject_id)
-          or app.is_class_teacher_of(grades.student_id) ) )
+  app.manages_school(app.student_school(student_id))
+  or ( teacher_id = app.my_teacher_id() and app.teaches(student_id, subject_id) )
+) with check (
+  app.manages_school(app.student_school(student_id))
+  or ( teacher_id = app.my_teacher_id() and grade_type <> 'final'
+       and app.teaches(student_id, subject_id) )
 );
 -- no DELETE policy for authenticated: corrections are soft deletes via UPDATE.
 
@@ -1036,25 +1264,15 @@ create policy summary_select on student_term_summary
 -- ---- attendance ----
 create policy attendance_select on attendance_logs
   for select to authenticated using (app.can_see_student(student_id));
--- FIX (brief §9 extra): only the lesson's subject teacher, the class teacher,
--- or school leadership may mark; marked_by must be the caller; class must match.
+-- V3: one helper for insert AND update, so an update can never move a row to
+-- a student/class the teacher has no authority over.
 create policy attendance_insert on attendance_logs for insert to authenticated with check (
-  marked_by = auth.uid()
-  and exists (select 1 from class_members cm
-              where cm.student_id = attendance_logs.student_id
-                and cm.class_id = attendance_logs.class_id
-                and cm.status = 'active')
-  and ( app.manages_school((select s.school_id from students s where s.id = attendance_logs.student_id))
-     or app.is_class_teacher_of(attendance_logs.student_id)
-     or (subject_id is not null and app.teaches(attendance_logs.student_id, subject_id)) )
+  marked_by = auth.uid() and app.can_mark_attendance(student_id, class_id, subject_id)
 );
 create policy attendance_update on attendance_logs for update to authenticated using (
-  app.manages_school((select s.school_id from students s where s.id = attendance_logs.student_id))
-  or marked_by = auth.uid()
-);
-create policy attendance_update_chk on attendance_logs for update to authenticated with check (
-  app.manages_school((select s.school_id from students s where s.id = attendance_logs.student_id))
-  or marked_by = auth.uid()
+  app.can_mark_attendance(student_id, class_id, subject_id)
+) with check (
+  marked_by = auth.uid() and app.can_mark_attendance(student_id, class_id, subject_id)
 );
 
 -- ---- gate ----
@@ -1067,143 +1285,228 @@ create policy gate_devices_read on gate_devices
 create policy absence_reports_select on parent_absence_reports for select to authenticated using (
   parent_user_id = auth.uid()
   or app.can_see_student(student_id)
-  or app.manages_school(school_id)
 );
+-- V3 (hole A1): the guardian check was "g.student_id = student_id", which
+-- compared guardians.student_id with itself. Now fully qualified, and the
+-- school must be the child's school, and the date cannot be in the past.
 create policy absence_reports_insert on parent_absence_reports for insert to authenticated with check (
   parent_user_id = auth.uid()
+  and status = 'pending' and reviewed_by is null
+  and absence_date >= current_date
+  and school_id = app.student_school(parent_absence_reports.student_id)
   and exists (select 1 from guardians g
-              where g.student_id = student_id and g.parent_user_id = auth.uid())
+              where g.student_id = parent_absence_reports.student_id
+                and g.parent_user_id = auth.uid())
 );
 create policy absence_reports_update on parent_absence_reports for update to authenticated using (
   app.is_class_teacher_of(student_id) or app.manages_school(school_id)
-);
-create policy absence_reports_update_chk on parent_absence_reports for update to authenticated with check (
-  app.is_class_teacher_of(student_id) or app.manages_school(school_id)
+) with check (
+  ( app.is_class_teacher_of(student_id) or app.manages_school(school_id) )
+  and school_id = app.student_school(parent_absence_reports.student_id)
+  and (status = 'pending' or reviewed_by = auth.uid())
 );
 
 create policy skipped_select on skipped_lesson_events for select to authenticated using (
-  app.can_see_student(student_id) or app.manages_school(school_id)
+  app.can_see_student(student_id)
 );
 -- skipped_lesson_events are written by the detection job (service role).
 
 -- ---- problems & lesson cards ----
 create policy problems_select on problems for select to authenticated using (
-  raised_by = auth.uid() or assigned_to = auth.uid() or escalated_to = auth.uid()
+  ( (raised_by = auth.uid() or assigned_to = auth.uid() or escalated_to = auth.uid())
+    and app.member_at(school_id) )
   or app.manages_school(school_id)
 );
+-- V3: the problem inbox is for staff. Parents use contact_requests.
 create policy problems_insert on problems for insert to authenticated with check (
-  raised_by = auth.uid() and app.member_at(school_id)
+  raised_by = auth.uid() and app.is_staff_at(school_id)
 );
-create policy problems_update on problems for update to authenticated using (app.manages_school(school_id));
-create policy problems_update_chk on problems for update to authenticated with check (app.manages_school(school_id));
+create policy problems_update on problems for update to authenticated
+  using (app.manages_school(school_id)) with check (app.manages_school(school_id));
 
-create policy cards_select on lesson_cards for select to authenticated using (app.member_at(school_id));
+-- V3 (hole A2): lesson cards hold the private "who to ask first" list, so only
+-- the card's teacher, a substitute teaching that lesson, and leadership read them.
+-- Parents/students get topic and homework from the homework table.
+create policy cards_select on lesson_cards for select to authenticated using (
+  teacher_id = app.my_teacher_id()
+  or app.manages_school(school_id)
+  or exists (select 1 from substitutions su
+             where su.class_id = lesson_cards.class_id and su.date = lesson_cards.lesson_date
+               and su.period = lesson_cards.period
+               and su.substitute_teacher_id = app.my_teacher_id())
+);
 create policy cards_insert on lesson_cards for insert to authenticated with check (
   teacher_id = app.my_teacher_id()
+  and school_id = app.class_school(class_id)
   and ( app.teaches_class(class_id, subject_id)
      or app.is_class_teacher_of_class(class_id) )
 );
 create policy cards_update on lesson_cards for update to authenticated using (
   teacher_id = app.my_teacher_id() or app.manages_school(school_id)
-);
-create policy cards_update_chk on lesson_cards for update to authenticated with check (
-  teacher_id = app.my_teacher_id() or app.manages_school(school_id)
+) with check (
+  school_id = app.class_school(class_id)
+  and ( app.manages_school(school_id)
+     or ( teacher_id = app.my_teacher_id()
+          and ( app.teaches_class(class_id, subject_id)
+             or app.is_class_teacher_of_class(class_id) ) ) )
 );
 
 -- ---- homework & announcements ----
+-- V3: homework of a class is visible to staff and to that class's students/parents only.
 create policy homework_select on homework for select to authenticated using (
-  app.member_at((select c.school_id from classes c where c.id = homework.class_id))
+  app.is_staff_at(app.class_school(class_id)) or app.in_class(class_id)
 );
 create policy homework_insert on homework for insert to authenticated with check (
   teacher_id = app.my_teacher_id()
   and ( app.teaches_class(class_id, subject_id)
      or app.is_class_teacher_of_class(class_id)
-     or app.manages_school((select c.school_id from classes c where c.id = homework.class_id)) )
+     or app.manages_school(app.class_school(class_id)) )
 );
 create policy homework_update on homework for update to authenticated using (
-  teacher_id = app.my_teacher_id()
-  or app.manages_school((select c.school_id from classes c where c.id = homework.class_id))
-);
-create policy homework_update_chk on homework for update to authenticated with check (
-  teacher_id = app.my_teacher_id()
-  or app.manages_school((select c.school_id from classes c where c.id = homework.class_id))
+  teacher_id = app.my_teacher_id() or app.manages_school(app.class_school(class_id))
+) with check (
+  app.manages_school(app.class_school(class_id))
+  or ( teacher_id = app.my_teacher_id()
+       and ( app.teaches_class(class_id, subject_id) or app.is_class_teacher_of_class(class_id) ) )
 );
 
-create policy ann_select on announcements for select to authenticated using (app.member_at(school_id));
-create policy ann_write on announcements for all to authenticated using (
-  app.manages_school(school_id)
-  or (author_id = auth.uid() and app.is_teacher_at(school_id))
+-- V3: school-wide announcements → everyone in the school; class announcements
+-- → staff + that class. Teachers post only to classes they teach.
+create policy ann_select on announcements for select to authenticated using (
+  case when class_id is null then app.member_at(school_id)
+       else app.is_staff_at(school_id) or app.in_class(class_id) end
 );
-create policy ann_write_chk on announcements for all to authenticated with check (
-  app.manages_school(school_id)
-  or (author_id = auth.uid() and app.is_teacher_at(school_id))
+create policy ann_write on announcements for all to authenticated using (
+  app.manages_school(school_id) or author_id = auth.uid()
+) with check (
+  (class_id is null or school_id = app.class_school(class_id))
+  and ( app.manages_school(school_id)
+     or ( author_id = auth.uid() and class_id is not null
+          and ( app.teaches_class(class_id, null) or app.is_class_teacher_of_class(class_id) ) ) )
 );
 
 -- ---- weekly tests ----
-create policy tests_select on weekly_tests for select to authenticated using (app.member_at(school_id));
+-- V3: students/parents see a test only once it is published.
+create policy tests_select on weekly_tests for select to authenticated using (
+  app.is_staff_at(school_id) or (status <> 'draft' and app.in_class(class_id))
+);
 create policy tests_write on weekly_tests for all to authenticated using (
-  teacher_id = app.my_teacher_id() or app.manages_school(school_id));
-create policy tests_write_chk on weekly_tests for all to authenticated with check (
-  ( teacher_id = app.my_teacher_id()
-    and ( app.teaches_class(class_id, subject_id)
-       or app.is_class_teacher_of_class(class_id) ) )
-  or app.manages_school(school_id));
+  teacher_id = app.my_teacher_id() or app.manages_school(school_id)
+) with check (
+  school_id = app.class_school(class_id)
+  and ( ( teacher_id = app.my_teacher_id()
+          and ( app.teaches_class(class_id, subject_id) or app.is_class_teacher_of_class(class_id) ) )
+     or app.manages_school(school_id) )
+);
+
+create or replace function app.owns_test(p_test_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from weekly_tests wt
+                 where wt.id = p_test_id
+                   and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id)))
+$$;
+create or replace function app.test_visible_to_class(p_test_id uuid, p_min_status test_status)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from weekly_tests wt
+                 where wt.id = p_test_id and wt.status >= p_min_status
+                   and app.in_class(wt.class_id))
+$$;
 
 create policy questions_select on test_questions for select to authenticated using (
-  app.member_at((select wt.school_id from weekly_tests wt where wt.id = test_questions.test_id)));
-create policy questions_write on test_questions for all to authenticated using (
-  exists (select 1 from weekly_tests wt
-          where wt.id = test_questions.test_id
-            and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id))));
-create policy questions_write_chk on test_questions for all to authenticated with check (
-  exists (select 1 from weekly_tests wt
-          where wt.id = test_questions.test_id
-            and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id))));
+  app.owns_test(test_id) or app.test_visible_to_class(test_id, 'published')
+);
+create policy questions_write on test_questions for all to authenticated
+  using (app.owns_test(test_id)) with check (app.owns_test(test_id));
+
+-- V3 (hole A4): answer keys — test owner / leadership; class only after the test is closed.
+create policy keys_select on test_answer_keys for select to authenticated using (
+  app.owns_test((select q.test_id from test_questions q where q.id = test_answer_keys.question_id))
+  or app.test_visible_to_class((select q.test_id from test_questions q where q.id = test_answer_keys.question_id), 'closed')
+);
+create policy keys_write on test_answer_keys for all to authenticated using (
+  app.owns_test((select q.test_id from test_questions q where q.id = test_answer_keys.question_id))
+) with check (
+  app.owns_test((select q.test_id from test_questions q where q.id = test_answer_keys.question_id))
+);
 
 create policy attempts_select on test_attempts for select to authenticated using (
-  app.can_see_student(student_id)
-  or exists (select 1 from weekly_tests wt
-             where wt.id = test_attempts.test_id
-               and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id)))
+  app.can_see_student(student_id) or app.owns_test(test_id)
 );
+-- V3 (hole A5): a student may only START their own attempt on a published
+-- test of their own class — empty: no score, not submitted. Scoring happens
+-- in app.submit_attempt().
 create policy attempts_insert on test_attempts for insert to authenticated with check (
-  exists (select 1 from students s
-          where s.id = student_id and s.user_id = auth.uid())
+  ( exists (select 1 from students s
+            where s.id = test_attempts.student_id and s.user_id = auth.uid())
+    and score is null and submitted_at is null and mode = 'online'
+    and exists (select 1 from weekly_tests wt
+                join class_members cm on cm.class_id = wt.class_id
+                     and cm.student_id = test_attempts.student_id and cm.status = 'active'
+                where wt.id = test_attempts.test_id and wt.status = 'published') )
+  or app.owns_test(test_id)          -- teacher records a paper attempt
 );
-create policy attempts_update on test_attempts for update to authenticated using (
-  exists (select 1 from weekly_tests wt
-          where wt.id = test_attempts.test_id
-            and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id)))
-);
-create policy attempts_update_chk on test_attempts for update to authenticated with check (
-  exists (select 1 from weekly_tests wt
-          where wt.id = test_attempts.test_id
-            and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id)))
-);
+create policy attempts_update on test_attempts for update to authenticated
+  using (app.owns_test(test_id)) with check (app.owns_test(test_id));
+
+create or replace function app.my_open_attempt(p_attempt_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from test_attempts ta join students s on s.id = ta.student_id
+                 where ta.id = p_attempt_id and s.user_id = auth.uid() and ta.submitted_at is null)
+$$;
 
 create policy answers_select on attempt_answers for select to authenticated using (
-  app.can_see_student((select ta.student_id from test_attempts ta where ta.id = attempt_answers.attempt_id))
-  or exists (select 1 from test_attempts ta join weekly_tests wt on wt.id = ta.test_id
-             where ta.id = attempt_answers.attempt_id
-               and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id)))
+  app.my_open_attempt(attempt_id)
+  or app.can_see_student((select ta.student_id from test_attempts ta where ta.id = attempt_answers.attempt_id))
+  or app.owns_test((select ta.test_id from test_attempts ta where ta.id = attempt_answers.attempt_id))
 );
+-- V3 (hole A6): a student writes answers only into their own UNSUBMITTED
+-- attempt, only for questions of that test, and can never set is_correct.
 create policy answers_insert on attempt_answers for insert to authenticated with check (
-  exists (select 1 from test_attempts ta join students s on s.id = ta.student_id
-          where ta.id = attempt_answers.attempt_id and s.user_id = auth.uid())
+  ( app.my_open_attempt(attempt_id) and is_correct is null
+    and exists (select 1 from test_attempts ta join test_questions q on q.test_id = ta.test_id
+                where ta.id = attempt_answers.attempt_id and q.id = attempt_answers.question_id) )
+  or app.owns_test((select ta.test_id from test_attempts ta where ta.id = attempt_answers.attempt_id))
 );
--- answers are graded by the service (AI photo check) or the test owner.
+create policy answers_update on attempt_answers for update to authenticated using (
+  app.my_open_attempt(attempt_id)
+  or app.owns_test((select ta.test_id from test_attempts ta where ta.id = attempt_answers.attempt_id))
+) with check (
+  ( app.my_open_attempt(attempt_id) and is_correct is null )
+  or app.owns_test((select ta.test_id from test_attempts ta where ta.id = attempt_answers.attempt_id))
+);
 
-create policy flags_select on integrity_flags for select to authenticated using (
-  app.can_see_student(student_id)
-  or exists (select 1 from weekly_tests wt
-             where wt.id = integrity_flags.test_id
-               and (wt.teacher_id = app.my_teacher_id() or app.manages_school(wt.school_id)))
-);
+-- V3 (hole A3): integrity flags are for the teacher only (rule 1: AI suggests,
+-- people decide). Students and parents never see them.
+create policy flags_select on integrity_flags for select to authenticated using (app.owns_test(test_id));
+create policy flags_update on integrity_flags for update to authenticated
+  using (app.owns_test(test_id)) with check (app.owns_test(test_id));
 -- integrity flags are written by the detection job (service role).
 
--- ---- library ----
-create policy library_select on library_items for select to authenticated using (true);
-create policy library_write on library_items for all to authenticated using (app.can_edit_library());
+-- ---- library (V3: holes A9, A10) ----
+-- Everyone reads CHECKED items. AI-made items: their author, staff of the
+-- school that made them, and methodologists. Teachers/staff add items as
+-- 'ai_made'; only a methodologist can mark 'checked'. Nobody but the author
+-- (while unchecked) or a methodologist can change or delete an item.
+create policy library_select on library_items for select to authenticated using (
+  status = 'checked'
+  or author_user_id = auth.uid()
+  or app.is_methodologist()
+  or (origin_school_id is not null and app.is_staff_at(origin_school_id))
+);
+create policy library_insert on library_items for insert to authenticated with check (
+  app.is_methodologist()
+  or ( author_user_id = auth.uid() and status = 'ai_made' and methodologist_id is null
+       and origin_school_id is not null and app.is_staff_at(origin_school_id) )
+);
+create policy library_update on library_items for update to authenticated using (
+  app.is_methodologist() or (author_user_id = auth.uid() and status = 'ai_made')
+) with check (
+  app.is_methodologist()
+  or (author_user_id = auth.uid() and status in ('ai_made','under_review') and methodologist_id is null)
+);
+create policy library_delete on library_items for delete to authenticated using (
+  app.is_methodologist() or (author_user_id = auth.uid() and status = 'ai_made')
+);
 
 -- ---- AI quotas ----
 create policy quotas_select on ai_quotas for select to authenticated using (user_id = auth.uid());
@@ -1211,12 +1514,12 @@ create policy quotas_write  on ai_quotas for all    to authenticated using (app.
 
 -- ---- payments & admissions ----
 create policy invoices_select on fee_invoices for select to authenticated using (
-  app.manages_school(school_id)
+  app.is_school_admin(school_id)
   or exists (select 1 from guardians g
              where g.student_id = fee_invoices.student_id and g.parent_user_id = auth.uid())
 );
 create policy payments_select on payments for select to authenticated using (
-  app.manages_school((select fi.school_id from fee_invoices fi where fi.id = payments.invoice_id))
+  app.is_school_admin((select fi.school_id from fee_invoices fi where fi.id = payments.invoice_id))
   or exists (
     select 1
     from fee_invoices fi
@@ -1227,6 +1530,30 @@ create policy payments_select on payments for select to authenticated using (
 -- payments/admissions writes: Click/Payme webhooks + public admission form → service role.
 create policy admissions_select on admission_applications for select to authenticated using (
   app.manages_school(school_id));
+create policy admissions_update on admission_applications for update to authenticated
+  using (app.manages_school(school_id)) with check (app.manages_school(school_id));
+
+-- ---- V3: parent → school office ----
+create policy contact_select on contact_requests for select to authenticated using (
+  parent_user_id = auth.uid()
+  or app.manages_school(school_id)
+  or (forwarded_to is not null and forwarded_to = app.my_teacher_id())
+);
+create policy contact_insert on contact_requests for insert to authenticated with check (
+  parent_user_id = auth.uid()
+  and status = 'open' and forwarded_to is null and handled_by is null and reply is null
+  and school_id = app.student_school(contact_requests.student_id)
+  and exists (select 1 from guardians g
+              where g.student_id = contact_requests.student_id and g.parent_user_id = auth.uid())
+  and (about_teacher_id is null or app.teacher_school(about_teacher_id) = school_id)
+);
+create policy contact_update on contact_requests for update to authenticated using (
+  app.manages_school(school_id)
+) with check (
+  app.manages_school(school_id)
+  and school_id = app.student_school(contact_requests.student_id)
+  and (forwarded_to is null or app.teacher_school(forwarded_to) = school_id)
+);
 
 -- ---- notifications ----
 create policy notifications_self on notifications
@@ -1241,8 +1568,9 @@ create policy prefs_self on notification_preferences
 -- notification_outbox: NO policy → authenticated sees/writes nothing (FIX #3).
 
 -- ---- audit log ----
+-- V3: rows without a school are platform-level and hidden (were visible to all).
 create policy audit_select on audit_log for select to authenticated using (
-  app.manages_school(school_id) or school_id is null
+  school_id is not null and app.is_school_admin(school_id)
 );
 -- audit_log writes: triggers only (security definer). No write policy.
 
@@ -1259,7 +1587,7 @@ create trigger touch_summary before update on student_term_summary
 
 -- FIX #4: summary maintained as a real table, recomputed per affected row.
 create or replace function app.refresh_student_summary()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_student uuid; v_term uuid; v_subject smallint;
 begin
@@ -1289,7 +1617,7 @@ create trigger grades_summary after insert or update or delete on grades
 
 -- FIX #7: audit trail for grade changes.
 create or replace function app.audit_grade()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into audit_log (user_id, school_id, table_name, row_id, action, old_value, new_value)
   values (
@@ -1308,7 +1636,7 @@ create trigger grades_audit after insert or update or delete on grades
 
 -- Grade posted → outbox (never send push in the request path).
 create or replace function app.on_grade_posted()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_recipient uuid; v_subject text;
 begin
@@ -1334,7 +1662,7 @@ create trigger grade_posted_notify after insert on grades
 
 -- FIX #9: absence alerts fire on INSERT and on UPDATE (e.g. present → absent).
 create or replace function app.on_absence_marked()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare v_recipient uuid;
 begin
   if new.status in ('absent','late')
@@ -1360,7 +1688,7 @@ create trigger absence_notify after insert or update on attendance_logs
 
 -- Gate check-in → instant parent alert (entry/exit only, no GPS).
 create or replace function app.on_gate_event()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare v_recipient uuid;
 begin
   for v_recipient in select parent_user_id from guardians
@@ -1378,7 +1706,7 @@ create trigger gate_event_notify after insert on gate_events
 
 -- Skipped lesson detected (service job writes the event) → alert parent + class teacher.
 create or replace function app.on_skipped_lesson()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_recipient uuid; v_teacher_user uuid;
 begin
@@ -1402,6 +1730,21 @@ end $$;
 create trigger skipped_lesson_notify after insert on skipped_lesson_events
   for each row execute function app.on_skipped_lesson();
 
+-- V3: parent wrote to the school office → alert school admins/director/zavuch.
+create or replace function app.on_contact_request()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into notification_outbox (recipient_id, payload)
+  select distinct r.user_id, jsonb_build_object('kind','parent_message',
+           'contact_request_id', new.id, 'student_id', new.student_id, 'topic', new.topic)
+  from user_school_roles r
+  where r.school_id = new.school_id and r.is_active
+    and r.role in ('school_admin','director','zavuch');
+  return new;
+end $$;
+create trigger contact_request_notify after insert on contact_requests
+  for each row execute function app.on_contact_request();
+
 -- ============================================================================
 -- GRANTS (FIX #6: grant writes to authenticated; RLS is the guard)
 -- ============================================================================
@@ -1411,6 +1754,18 @@ grant usage, select on all sequences in schema public to authenticated;
 grant usage on schema app to authenticated;
 grant execute on all functions in schema app to authenticated;
 
--- Keep future tables safe by default: RLS must be enabled + granted explicitly.
+-- V3 (hole A11): v2 ended with "alter default privileges ... grant ... to
+-- authenticated", which made every FUTURE table open to all logged-in users.
+-- Removed. A new table is now closed until a developer explicitly enables RLS,
+-- writes policies and grants access. test_rls.sql also fails if any public
+-- table has RLS switched off.
 alter default privileges in schema public
-  grant select, insert, update, delete on tables to authenticated;
+  revoke select, insert, update, delete on tables from authenticated;
+-- The public login page (not logged in) may only call school_window().
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke execute on all functions in schema app from public, anon;
+    grant usage on schema app to anon;
+    grant execute on function app.school_window(text) to anon;
+  end if;
+end $$;

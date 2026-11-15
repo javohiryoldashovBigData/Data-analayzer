@@ -14,8 +14,10 @@
 --     actually applies).
 --   * Service-role operations (outbox, audit, gate scanner) run as the table
 --     owner — exactly how the real workers would.
---   * Every scenario prints PASS; the first failure aborts with FAIL.
---   * Sessions run with ON_ERROR_STOP so nothing is silently skipped.
+--   * V3: every scenario prints PASS or FAIL and the script KEEPS GOING, so
+--     you see all failures at once. At the end it prints a summary and, if
+--     anything failed, raises an error (non-zero exit with ON_ERROR_STOP).
+--     (v2 printed "ALL SCENARIOS PASSED" even after failures.)
 --
 -- Covers every problem from brief §9 plus the role matrix:
 --   T1  FIX #1  cross-school leak
@@ -30,6 +32,11 @@
 --   T10–T12    grade authority (no assignment / other school / parent)
 --   T13–T20    role matrix: student, parent, absence reports, gate events,
 --              problems, lesson cards, class roster, weekly tests
+--   V3 additions:
+--   A1–A11     the 11 attack scenarios from the joint review (holes in v2)
+--   W1–W8      one window per school (branding, isolation, government numbers only)
+--   P1–P5      parents see teacher NAMES only; contact goes through the office
+--   X1–X4      escalation: zavuch→admin, super admin data access, library, meta
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -64,14 +71,30 @@ exception when others then
   return true;
 end $$;
 
+select set_config('test.passed', '0', false), set_config('test.failed', '0', false);
+
 create or replace function test.check(p_name text, p_ok boolean)
 returns void language plpgsql as $$
 begin
-  if p_ok then
+  if coalesce(p_ok, false) then
+    perform set_config('test.passed', (current_setting('test.passed')::int + 1)::text, false);
     raise notice 'PASS  %', p_name;
   else
-    raise exception 'FAIL  %', p_name;
+    perform set_config('test.failed', (current_setting('test.failed')::int + 1)::text, false);
+    raise warning 'FAIL  %', p_name;
   end if;
+end $$;
+
+-- true → the statement changed at least one row (it was ALLOWED)
+create or replace function test.rows(p_sql text)
+returns boolean language plpgsql as $$
+declare n bigint;
+begin
+  execute p_sql;
+  get diagnostics n = row_count;
+  return n > 0;
+exception when others then
+  return false;
 end $$;
 
 grant usage on schema test to authenticated;
@@ -116,8 +139,9 @@ select test.check('T1c FIX#1  school B admin sees own students (1)',
 select test.asuser('aaaa0000-0000-4000-8000-00000000a005');  -- parentA
 select test.check('T2a FIX#2  parent cannot read another school''s admin profile',
   test.count('select count(*) from profiles where user_id = ''aaaa0000-0000-4000-8000-00000000b001''') = 0);
-select test.check('T2b FIX#2  parent can read own school teacher''s profile (contact)',
-  test.count('select count(*) from profiles where user_id = ''aaaa0000-0000-4000-8000-00000000a004''') = 1);
+-- V3 decision (project owner): parents see the teacher's NAME only, never the phone.
+select test.check('T2b V3     parent CANNOT read the teacher''s profile (phone stays private)',
+  test.count('select count(*) from profiles where user_id = ''aaaa0000-0000-4000-8000-00000000a004''') = 0);
 select test.check('T2c FIX#2  parent reads own profile',
   test.count('select count(*) from profiles where user_id = ''aaaa0000-0000-4000-8000-00000000a005''') = 1);
 
@@ -188,8 +212,12 @@ set role authenticated;
 
 -- ---- T8: FIX #8 district admin scope ------------------------------------
 select test.asuser('aaaa0000-0000-4000-8000-00000000a007');  -- dadminA (district 101)
-select test.check('T8a FIX#8  district admin sees schools in own district',
-  test.count('select count(*) from students where school_id = ''bbbb0000-0000-4000-8000-00000000a001''') = 2);
+-- V3: government admins get numbers only, never names (brief §3), and a
+-- private school shares even numbers only if it opted in.
+select test.check('T8a V3     district admin sees NO student names, even in own district',
+  test.count('select count(*) from students where school_id = ''bbbb0000-0000-4000-8000-00000000a001''') = 0);
+select test.check('T8c V3     district admin gets no numbers from a PRIVATE school that did not opt in',
+  test.error($q$ select * from app.school_stats('bbbb0000-0000-4000-8000-00000000a001') $q$));
 select test.check('T8b FIX#8  district admin CANNOT see other district''s school',
   test.count('select count(*) from students where school_id = ''bbbb0000-0000-4000-8000-00000000b001''') = 0);
 
@@ -228,8 +256,8 @@ update parent_absence_reports set status = 'accepted', reviewed_by = 'aaaa0000-0
 select test.check('T15b zavuch accepts the absence report', true);
 
 select test.asuser('aaaa0000-0000-4000-8000-00000000b002');  -- teachB
-select test.check('T15c teacher from another school cannot accept it',
-  test.error($q$ update parent_absence_reports set status = 'rejected'
+select test.check('T15c teacher from another school cannot change it (0 rows changed)',
+  not test.rows($q$ update parent_absence_reports set status = 'rejected'
               where student_id = 'eeee0000-0000-4000-8000-00000000a001' $q$));
 
 -- ---- T16b: gate events visibility ----------------------------------------
@@ -277,9 +305,14 @@ insert into weekly_tests (school_id, class_id, subject_id, teacher_id, term_id, 
 values ('bbbb0000-0000-4000-8000-00000000a001', 'dddd0000-0000-4000-8000-00000000a001', 1,
         'cccc0000-0000-4000-8000-00000000a001', 'ffff0000-0000-4000-8000-00000000a001',
         current_date + 3, 'Kasrlar', 'published');
-insert into test_questions (test_id, question_text, options, correct_index, points, position)
-select id, '1/2 + 1/4 = ?', '["3/4","2/4","1/2","1/6"]', 0, 1, 1 from weekly_tests
+insert into test_questions (id, test_id, question_text, options, points, position)
+select '99990000-0000-4000-8000-0000000000e1'::uuid, id, '1/2 + 1/4 = ?', '["3/4","2/4","1/2","1/6"]', 1, 1 from weekly_tests
  where topic = 'Kasrlar' and school_id = 'bbbb0000-0000-4000-8000-00000000a001';
+insert into test_questions (id, test_id, question_text, options, points, position)
+select '99990000-0000-4000-8000-0000000000e2'::uuid, id, '2/3 - 1/3 = ?', '["1/3","1/6","1","0"]', 1, 2 from weekly_tests
+ where topic = 'Kasrlar' and school_id = 'bbbb0000-0000-4000-8000-00000000a001';
+insert into test_answer_keys (question_id, correct_index) values
+ ('99990000-0000-4000-8000-0000000000e1', 0), ('99990000-0000-4000-8000-0000000000e2', 0);
 select test.check('T20a teacher publishes weekly test', true);
 
 select test.asuser('aaaa0000-0000-4000-8000-00000000a006');  -- studA1
@@ -292,6 +325,15 @@ select test.check('T20c student cannot start an attempt for another student',
     select id, 'eeee0000-0000-4000-8000-00000000a002', 'online' from weekly_tests
     where topic = 'Kasrlar' and school_id = 'bbbb0000-0000-4000-8000-00000000a001' $q$));
 
+\ir test_v3.sql
+
 -- ---------------------------------------------------------------------------
 reset role;
-select test.check('ALL SCENARIOS PASSED', true);
+do $$
+declare p int := current_setting('test.passed')::int; f int := current_setting('test.failed')::int;
+begin
+  if f > 0 then
+    raise exception 'RESULT: % passed, % FAILED', p, f;
+  end if;
+  raise notice 'RESULT: all % scenarios passed', p;
+end $$;

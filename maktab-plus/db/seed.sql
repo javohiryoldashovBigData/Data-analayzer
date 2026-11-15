@@ -15,6 +15,7 @@
 --   School B (district 202, region 2): class 5-B with student sB1
 --     staff:  adminB, teacher teachB (MATH + class teacher of 5-B)
 --   dadminA — district admin of district 101 (covers School A, not B)
+--   V3: superU (platform super admin), methodU (Library methodologist)
 -- ============================================================================
 
 -- ---- geography ----
@@ -34,12 +35,14 @@ insert into auth.users (id, email) values
  ('aaaa0000-0000-4000-8000-00000000a006', 'studA1@maktab.test'),
  ('aaaa0000-0000-4000-8000-00000000a007', 'dadminA@maktab.test'),
  ('aaaa0000-0000-4000-8000-00000000b001', 'adminB@maktab.test'),
- ('aaaa0000-0000-4000-8000-00000000b002', 'teachB@maktab.test');
+ ('aaaa0000-0000-4000-8000-00000000b002', 'teachB@maktab.test'),
+ ('aaaa0000-0000-4000-8000-00000000c001', 'super@maktab.test'),        -- V3: platform super admin
+ ('aaaa0000-0000-4000-8000-00000000c002', 'method@maktab.test');       -- V3: methodologist
 
 -- ---- schools ----
-insert into schools (id, district_id, name, mode) values
- ('bbbb0000-0000-4000-8000-00000000a001', 101, '1-maktab (A)', 'private'),
- ('bbbb0000-0000-4000-8000-00000000b001', 202, '2-maktab (B)', 'government');
+insert into schools (id, district_id, name, mode, slug, brand_color) values
+ ('bbbb0000-0000-4000-8000-00000000a001', 101, '1-maktab (A)', 'private',    'school-a', '#0f766e'),
+ ('bbbb0000-0000-4000-8000-00000000b001', 202, '2-maktab (B)', 'government', 'school-b', '#7c3aed');
 
 -- ---- roles ----
 insert into user_school_roles (user_id, role, school_id, district_id, region_id) values
@@ -53,7 +56,9 @@ insert into user_school_roles (user_id, role, school_id, district_id, region_id)
  ('aaaa0000-0000-4000-8000-00000000b001', 'school_admin', 'bbbb0000-0000-4000-8000-00000000b001', null, null),
  ('aaaa0000-0000-4000-8000-00000000b002', 'teacher',      'bbbb0000-0000-4000-8000-00000000b001', null, null);
 insert into user_school_roles (user_id, role, school_id, district_id, region_id) values
- ('aaaa0000-0000-4000-8000-00000000a007', 'district_admin', null, 101, null);
+ ('aaaa0000-0000-4000-8000-00000000a007', 'district_admin', null, 101, null),
+ ('aaaa0000-0000-4000-8000-00000000c001', 'super_admin',    null, null, null),
+ ('aaaa0000-0000-4000-8000-00000000c002', 'methodologist',  null, null, null);
 
 -- ---- profiles ----
 insert into profiles (user_id, first_name, last_name, phone) values
