@@ -1,8 +1,9 @@
 -- ============================================================================
--- MAKTAB+ — Phase 1 "teacher's day" API layer (DRAFT, Perplexity, 15 Nov 2026)
+-- MAKTAB+ — Phase 1 "teacher's day" API layer
+-- Designed by Perplexity (15 Nov 2026); wired to v3 and TESTED by Claude
+-- (changes marked "V3.1:"; tests in test_api.sql).
 --
--- Load AFTER schema.sql. Written against v2 table names; uses app.ai_check()
--- from v3 (not present in v2). Parse-checked with pglast, NOT RUN.
+-- Load AFTER schema.sql (and seed.sql for tests).
 --
 -- Principle: the client calls these RPCs through PostgREST with the user's
 -- JWT. Functions in schema `api` are SECURITY INVOKER, so every read/write
@@ -159,6 +160,48 @@ language sql stable security invoker set search_path = public, pg_temp as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- "Who to ask first" (V3.1: moved above my_day, which calls it) — our own code, no AI (rule 7). Private to the teacher:
+-- runs as invoker, so only a teacher of the class gets rows back.
+-- Score (estimate weights — tune in pilot):
+--   +3 didn't get last exit check   +2 each absence last 14 days (max 6)
+--   +2 average of last 3 grades < 3.5   +1 no grade in this subject for 14 days
+-- ---------------------------------------------------------------------------
+create or replace function api.ask_first(p_class_id uuid, p_subject_id smallint, p_n int default 3)
+returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
+  with roster as (
+    select cm.student_id from class_members cm
+    where cm.class_id = p_class_id and cm.status = 'active'
+      and (app.teaches_class(p_class_id, p_subject_id) or app.is_class_teacher_of_class(p_class_id))
+  ),
+  last_exit as (
+    select ec.not_got from exit_checks ec join lesson_cards lc on lc.id = ec.card_id
+    where lc.class_id = p_class_id and lc.subject_id = p_subject_id and ec.recorded_at is not null
+    order by ec.recorded_at desc limit 1
+  ),
+  scored as (
+    select r.student_id,
+      (case when r.student_id = any (coalesce((select not_got from last_exit), '{}')) then 3 else 0 end)
+      + least(6, 2 * (select count(*) from attendance_logs a
+                      where a.student_id = r.student_id and a.status = 'absent'
+                        and a.date >= current_date - 14))
+      + (case when (select avg(g.value) from (select g2.value from grades g2
+                     where g2.student_id = r.student_id and g2.subject_id = p_subject_id
+                       and g2.deleted_at is null order by g2.created_at desc limit 3) g) < 3.5
+              then 2 else 0 end)
+      + (case when not exists (select 1 from grades g3 where g3.student_id = r.student_id
+                               and g3.subject_id = p_subject_id and g3.deleted_at is null
+                               and g3.created_at >= now() - interval '14 days') then 1 else 0 end)
+      as score
+    from roster r
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('student_id', s.student_id,
+                     'name', st.first_name || ' ' || left(st.last_name, 1) || '.',
+                     'score', s.score) order by s.score desc), '[]'::jsonb)
+  from (select * from scored where score > 0 order by score desc limit p_n) s
+  join students st on st.id = s.student_id
+$$;
+
+-- ---------------------------------------------------------------------------
 -- 1. "My day"  —  GET /rest/v1/rpc/my_day?p_date=2026-11-16
 -- One round trip for the whole screen (fast on a weak school network).
 -- ---------------------------------------------------------------------------
@@ -204,48 +247,6 @@ returns jsonb language sql stable security invoker set search_path = public, pg_
     'closed', exists (select 1 from teacher_day_closures d
                       where d.teacher_id = app.my_teacher_id() and d.day = p_date)
   )
-$$;
-
--- ---------------------------------------------------------------------------
--- "Who to ask first" — our own code, no AI (rule 7). Private to the teacher:
--- runs as invoker, so only a teacher of the class gets rows back.
--- Score (estimate weights — tune in pilot):
---   +3 didn't get last exit check   +2 each absence last 14 days (max 6)
---   +2 average of last 3 grades < 3.5   +1 no grade in this subject for 14 days
--- ---------------------------------------------------------------------------
-create or replace function api.ask_first(p_class_id uuid, p_subject_id smallint, p_n int default 3)
-returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
-  with roster as (
-    select cm.student_id from class_members cm
-    where cm.class_id = p_class_id and cm.status = 'active'
-      and (app.teaches_class(p_class_id, p_subject_id) or app.is_class_teacher_of_class(p_class_id))
-  ),
-  last_exit as (
-    select ec.not_got from exit_checks ec join lesson_cards lc on lc.id = ec.card_id
-    where lc.class_id = p_class_id and lc.subject_id = p_subject_id and ec.recorded_at is not null
-    order by ec.recorded_at desc limit 1
-  ),
-  scored as (
-    select r.student_id,
-      (case when r.student_id = any (coalesce((select not_got from last_exit), '{}')) then 3 else 0 end)
-      + least(6, 2 * (select count(*) from attendance_logs a
-                      where a.student_id = r.student_id and a.status = 'absent'
-                        and a.date >= current_date - 14))
-      + (case when (select avg(g.value) from (select g2.value from grades g2
-                     where g2.student_id = r.student_id and g2.subject_id = p_subject_id
-                       and g2.deleted_at is null order by g2.created_at desc limit 3) g) < 3.5
-              then 2 else 0 end)
-      + (case when not exists (select 1 from grades g3 where g3.student_id = r.student_id
-                               and g3.subject_id = p_subject_id and g3.deleted_at is null
-                               and g3.created_at >= now() - interval '14 days') then 1 else 0 end)
-      as score
-    from roster r
-  )
-  select coalesce(jsonb_agg(jsonb_build_object('student_id', s.student_id,
-                     'name', st.first_name || ' ' || left(st.last_name, 1) || '.',
-                     'score', s.score) order by s.score desc), '[]'::jsonb)
-  from (select * from scored where score > 0 order by score desc limit p_n) s
-  join students st on st.id = s.student_id
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -346,11 +347,15 @@ begin
   if p->'homework'->>'description' is not null then
     insert into homework (class_id, subject_id, teacher_id, assigned_at, due_date, description)
     values (v_card.class_id, v_card.subject_id, v_card.teacher_id, v_card.lesson_date,
-            (p->'homework'->>'due_date')::date, p->'homework'->>'description');
+            coalesce((p->'homework'->>'due_date')::date, v_card.lesson_date + 1),  -- V3.1: default next day
+            p->'homework'->>'description');
   end if;
 
   select t.id into v_term from terms t join classes c on c.academic_year_id = t.academic_year_id
    where c.id = v_card.class_id and v_card.lesson_date between t.start_date and t.end_date;
+  if v_term is null and jsonb_array_length(coalesce(p->'grades','[]')) > 0 then   -- V3.1: clear error
+    raise exception 'no_term_for_date' using errcode = '22023';
+  end if;
   for g in select * from jsonb_array_elements(coalesce(p->'grades','[]')) loop
     insert into grades (student_id, subject_id, term_id, grade_type, value, teacher_id, comment, created_by)
     values ((g->>'student_id')::uuid, v_card.subject_id, v_term, 'current',
@@ -450,14 +455,16 @@ returns jsonb language sql stable security invoker set search_path = public, pg_
         order by l.lesson_date, l.period)
       from lessons l join classes c on c.id = l.class_id), '[]'::jsonb),
     -- mastery gaps: topics where the class average on the last weekly tests < 80%
+    -- V3.1: aggregate in a subquery first (nested aggregates are not allowed)
     'gaps', coalesce((select jsonb_agg(jsonb_build_object(
-        'class_id', wt.class_id, 'subject_id', wt.subject_id, 'topic', wt.topic,
-        'mastered_pct', round(avg(ta.score)::numeric, 0)))
-      from weekly_tests wt join test_attempts ta on ta.test_id = wt.id
-      where wt.teacher_id = app.my_teacher_id() and wt.test_date >= p_week_start - 28
-        and ta.score is not null
-      group by wt.class_id, wt.subject_id, wt.topic
-      having avg(ta.score) < 80), '[]'::jsonb)
+        'class_id', g.class_id, 'subject_id', g.subject_id, 'topic', g.topic,
+        'mastered_pct', g.pct))
+      from (select wt.class_id, wt.subject_id, wt.topic, round(avg(ta.score)::numeric, 0) as pct
+            from weekly_tests wt join test_attempts ta on ta.test_id = wt.id
+            where wt.teacher_id = app.my_teacher_id() and wt.test_date >= p_week_start - 28
+              and ta.score is not null
+            group by wt.class_id, wt.subject_id, wt.topic
+            having avg(ta.score) < 80) g), '[]'::jsonb)
   )
 $$;
 
@@ -476,32 +483,29 @@ $$;
 -- (attack A15d): the advisory lock serialises reservations per school+user.
 -- ---------------------------------------------------------------------------
 
--- Placeholder: wire to v3 ai_plan_rules (monthly limit per role/feature/plan).
-create or replace function app.ai_limit_cents(p_school_id uuid, p_feature text)
-returns numeric language sql stable security definer set search_path = public, pg_temp as $$
-  select coalesce((select q.monthly_limit_cents from ai_quotas q where q.user_id = auth.uid()), 500)
-$$;
+-- V3.1: the limit comes from v3 app.ai_check() (plan + role + feature,
+-- ai_plan_rules, per-user override in ai_quotas). The placeholder
+-- app.ai_limit_cents() is no longer needed.
 
 create or replace function app.ai_reserve(p_school_id uuid, p_feature text, p_est_cents numeric, p_payload jsonb default null)
 returns uuid language plpgsql volatile security definer set search_path = public, pg_temp as $$
-declare v_used numeric; v_id uuid;
+declare v_chk record; v_pending numeric; v_id uuid;
 begin
   if auth.uid() is null then raise exception 'not_authenticated' using errcode = '42501'; end if;
   if p_est_cents is null or p_est_cents < 0 then raise exception 'bad_estimate' using errcode = '22023'; end if;
   if not app.member_at(p_school_id) then          -- belt and braces (attack A15b)
     raise exception 'not_member' using errcode = '42501';
   end if;
-  if not coalesce(app.ai_check(p_school_id, p_feature), false) then
-    raise exception 'plan_not_allowed' using errcode = 'P0001', hint = 'try_library';
-  end if;
+  -- V3.1: lock FIRST, then check, so two parallel calls can't both pass (A15d).
   perform pg_advisory_xact_lock(hashtextextended(p_school_id::text || ':' || auth.uid()::text, 0));
-
-  select coalesce(sum(u.cost_cents), 0) into v_used from ai_usage_log u
-   where u.user_id = auth.uid() and u.created_at >= date_trunc('month', now());
-  v_used := v_used + coalesce((select sum(r.est_cents) from ai_reservations r
-                               where r.user_id = auth.uid() and r.status = 'pending'
-                                 and r.expires_at > now()), 0);
-  if v_used + p_est_cents > app.ai_limit_cents(p_school_id, p_feature) then
+  select * into v_chk from app.ai_check(p_school_id, p_feature);
+  if not v_chk.allowed and v_chk.reason <> 'limit_reached' then
+    raise exception 'plan_not_allowed' using errcode = 'P0001', hint = 'try_library', detail = v_chk.reason;
+  end if;
+  select coalesce(sum(r.est_cents), 0) into v_pending from ai_reservations r
+   where r.user_id = auth.uid() and r.school_id = p_school_id and r.feature = p_feature
+     and r.status = 'pending' and r.expires_at > now();
+  if not v_chk.allowed or v_pending + p_est_cents > v_chk.remaining_cents then
     raise exception 'limit_reached' using errcode = 'P0001', hint = 'try_library';
   end if;
 
@@ -570,7 +574,7 @@ grant execute on function api.my_day(date), api.my_lessons(date), api.ask_first(
   to authenticated;
 
 revoke execute on function app.ai_reserve(uuid, text, numeric, jsonb), app.ai_commit(uuid, text, int, int, numeric),
-  app.ai_release(uuid), app.ai_store_lesson_cards(uuid, jsonb), app.ai_limit_cents(uuid, text)
+  app.ai_release(uuid), app.ai_store_lesson_cards(uuid, jsonb), app.fill_school_from_card()
   from public, authenticated;
 grant execute on function app.ai_reserve(uuid, text, numeric, jsonb) to authenticated;
 -- ai_commit / ai_release / ai_store_lesson_cards: service_role only (table owner / Supabase service key).

@@ -37,22 +37,19 @@ Maktab+ is a school platform for Uzbekistan: an electronic diary and gradebook l
 - **Maktab+ Yordamchi:** one helper box. Rule: **Library first, AI second.**
 - **Parent → school office messages:** the office answers or forwards to the teacher.
 
-## 5. Methods from the world's top school systems (our main selling point)
+## 5. Research-backed teaching methods (our main selling point)
 
-Pitch: "methods used by top school systems, built into Maktab+". **Never promise their results**; after the pilot we show our own numbers.
+Pitch: **"Research-backed teaching methods, built into the teacher's day"**, with a one-page source list. **No country labels, and never promise results**; after the pilot we show our own numbers. *(Updated after Perplexity's research check, docs/06 §2.)*
 
-| Method | Source | In Maktab+ |
+| Method | Evidence (short) | In Maktab+ |
 |---|---|---|
-| **Formative assessment** | Finland, UK (Dylan Wiliam) | A 3-question "exit check" at the end of the lesson (show of hands, or on the teacher's tablet); feeds "who to ask first" |
-| **Mastery learning** | Singapore, Bloom | Weekly tests show topics the class hasn't mastered; the next lesson card suggests a 10-minute review |
-| **Spaced repetition / retrieval practice** | Cognitive-science research | Each weekly test adds 1–2 questions from older topics |
-| **Feedback, not only grades** | Research on feedback | A short "what to improve" comment with grades; weekly summary for parents |
-| Concrete → Pictorial → Abstract | Singapore Math | Library animations follow these 3 steps |
-| Lesson Study | Japan | Teachers rate and reuse each other's lesson cards; the best go to the Library |
-| Less, better homework | Finland | Homework time limit on the lesson card; director sees daily homework load |
-| Project-based learning | IB / Cambridge | Optional project weeks (later) |
-
-**Pilot uses the first 4** (bold) so teachers are not overloaded. Please check the research behind each and mark anything uncertain.
+| **Retrieval practice and spaced repetition** (headline) | Strongest: rated "high utility" (Dunlosky et al. 2013) | Each weekly test adds 1–2 low-stakes questions from older topics (our own code, no AI) |
+| **Formative assessment (exit check)** | Real but smaller than often quoted (≈0.2); works only if the teacher acts on it | 3 questions at the end of the lesson, answered by a show of hands. Results change tomorrow's card and "who to ask first" |
+| **Mastery-inspired review** | Mixed evidence; works best with a high bar | A topic is "not mastered" below 80% of the class, giving a review in the next card and re-check questions in the next weekly test |
+| **Feedback about the task** | Powerful, but feedback about the person can hurt | 1-tap comment templates: task plus one next step ("Check the common denominator"). Weekly tests show topics and comments, not ranks. **No rankings anywhere** |
+| Interleaving | "Moderate utility" | "Mix topics" option in the weekly test |
+| Sharing best lesson cards (from Lesson Study) | Saves time; no proven effect on results | Teachers rate and reuse cards; the best go to the Library |
+| Homework time limit | Workload feature | Limit on the lesson card; director sees the daily load |
 
 ## 6. Plans: Standard and Pro
 
@@ -68,13 +65,15 @@ Pitch: "methods used by top school systems, built into Maktab+". **Never promise
 - **Most "smart" features are our own code and free**, so Standard still feels smart for everyone: who to ask first, risk alerts, copy signals, forecasts, attendance alerts, charts, the Library.
 - **Pilot:** the first school gets Standard plus a **free 1–2 month Pro trial**. We measure real usage and cost, then set prices.
 - **Later:** add-ons (e.g. exam checking only) for Standard schools.
+- **Agreed next (after pilot data):** a school AI **pool** plus a soft cap per person; show limits as **actions** ("4 weekly preparations"), not money.
+- **Pricing hypothesis (estimate, test in pilot):** about 15,000 UZS (Standard) / 30,000 UZS (Pro) per student per month, billed to the school, with a minimum per school; offer the pilot two price points.
 - **Already in the database (v3):** `schools.plan`, `schools.pro_trial_until`, `ai_plan_rules` (which role gets which AI feature in which plan, with a monthly limit), and `app.ai_check(school, feature)`. The server calls it before every AI request and logs usage after. The limits are **placeholder estimates** until the pilot.
 
 ### Ways to keep AI cost low
 1. **Our own code first, Library second, AI third.**
 2. **Cheap models for simple jobs**, strong models only for hard jobs (e.g. reading exam photos).
 3. **Monthly limit per person.** When it's reached: "Limit reached, try the Library".
-4. **Batch work:** weekly lesson preparation runs once a week, not on every click.
+4. **Batch work:** weekly lesson preparation runs once a week through the **Batch API** (cheaper, not urgent), not on every click.
 5. **Prompt caching** for the parts that repeat (curriculum, instructions).
 6. **Send the AI only what's needed,** without names ("Student A").
 7. **Good AI results go to the Library** after review, so the next teacher gets them free.
@@ -88,18 +87,9 @@ React + TypeScript web app (installable PWA, mobile apps later); self-hosted Sup
 ## 8. Current state
 
 - **Prototype (Phase 0):** a working React demo with sample data covering 4 roles, gradebook, diary, live attendance and gate simulation, skipped-lesson alerts, absence reports, who to ask first, AI exam checking, lesson studio, chemistry lab, weekly tests, assistant, 3 languages, dark mode, phone layout.
-- **Database v3** (`db/`): Perplexity's v2 structure plus joint fixes. **133 test scenarios, all passing**, on PostgreSQL 16. See `db/CHANGES_V3.md`:
-  - one window per school;
-  - parents see teachers' names only;
-  - 10 security holes fixed;
-  - Standard/Pro AI plans;
-  - honest test runner that fails loudly.
-
-  How to run:
-  ```
-  psql -v ON_ERROR_STOP=1 -f local_compat.sql -f schema.sql -f seed.sql
-  psql -v ON_ERROR_STOP=1 -f test_rls.sql      # ends with "RESULT: all 133 scenarios passed"
-  ```
+- **Database v3.1** (`db/`): Perplexity's structure + joint fixes from two review rounds.
+- **Phase 1 API** (`db/api_phase1.sql`): designed by Perplexity, wired and tested by Claude. It covers My day, the lesson card with exit check, After lesson (one idempotent call, offline-safe), Finished for today, and AI budget reserve → commit.
+- **All tests green** on PostgreSQL 16: `db/run_all_tests.sh` (133 role/plan scenarios + 35 Perplexity attacks + 30 API scenarios + a 2-connection race test). Round 2 results: `docs/08-reply-to-perplexity.md`.
 
 ## 9. Decisions made (please keep them)
 
@@ -107,7 +97,8 @@ React + TypeScript web app (installable PWA, mobile apps later); self-hosted Sup
 2. **One window per school**; government sees numbers only; the platform super admin can't read children's data.
 3. **Final grades** are confirmed by the zavuch or director; teachers enter current, exam and quarter grades.
 4. **Standard** = AI for teaching only; **Pro** = AI for everyone; the pilot gets a Pro trial.
-5. Pilot methods: formative assessment, mastery learning, spaced repetition, feedback comments.
+5. Pilot methods: spaced repetition, exit check, mastery-inspired review, task feedback. No rankings.
+6. Attendance outside the timetable is allowed (authority still checked), so teachers are never blocked.
 
 ## 10. Open questions
 
@@ -118,16 +109,10 @@ React + TypeScript web app (installable PWA, mobile apps later); self-hosted Sup
 
 ## 11. What we need from you, Perplexity
 
-1. **Review database v3 and try to break it.** Add every new attack as a test in `db/test_v3.sql`, in the same style. Tell us what you changed and why.
-2. **Check section 5:** is the research behind each method solid? What would you add or remove? Mark anything uncertain.
-3. **Check section 6:** are the plan split, the cost-saving ideas and the placeholder limits sensible? Suggest a simple pricing model for Uzbek private schools (per student per month?), and label estimates as estimates.
-4. **Next build step:** design the server API (Supabase Edge Functions or Node.js) for **Phase 1, the teacher's day**:
-   - "My day";
-   - the lesson card with the exit check;
-   - the "after lesson" screen;
-   - "Finished for today";
-   - weekly lesson preparation, calling `app.ai_check` before AI.
+See **docs/08-reply-to-perplexity.md §6** (round 3):
+1. Should a school admin be blocked from granting themselves director?
+2. Real code for the Edge Functions `ai-weekly-prep` and `ai-collect`.
+3. A weekly test generator with spaced repetition and interleaving.
+4. The quiet-hours rule for the outbox worker.
 
-   All permission logic stays in the database.
-
-When you answer: list your assumptions, mark anything you are unsure about, and do not invent laws or statistics. Say "check with a lawyer" or "estimate" where needed.
+When you answer: list your assumptions, mark anything you are unsure about, and do not invent laws or statistics. Say "check with a lawyer" or "estimate" where needed. Send SQL as files; Claude runs everything.

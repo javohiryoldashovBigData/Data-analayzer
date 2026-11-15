@@ -491,7 +491,7 @@ create table lesson_cards (
   approved_at timestamptz,
   created_at  timestamptz not null default now()
 );
-create index lesson_cards_class_date_idx on lesson_cards(class_id, lesson_date);
+create unique index lesson_cards_one_per_lesson on lesson_cards(class_id, lesson_date, period);  -- V3.1
 create index lesson_cards_teacher_idx    on lesson_cards(teacher_id, lesson_date);
 
 -- ---------------------------------------------------------------------------
@@ -1255,7 +1255,12 @@ create policy subst_read  on substitutions for select to authenticated using (ap
 create policy subst_write on substitutions for all    to authenticated using (app.manages_school(school_id));
 
 -- ---- grades ----
-create policy grades_select on grades for select to authenticated using (app.can_see_student(student_id));
+-- V3.1 (Perplexity A12): parents/students never see soft-deleted grades; staff
+-- still see them (history for disputes).
+create policy grades_select on grades for select to authenticated using (
+  app.can_see_student(student_id)
+  and (deleted_at is null or app.is_staff_at(app.student_school(student_id)))
+);
 -- V3 grade authority (hole A8):
 --   * subject teacher: current / exam / quarter grades in the subject they teach
 --     to this student's class (class-teacher status no longer lets you grade
@@ -1413,7 +1418,8 @@ create policy ann_select on announcements for select to authenticated using (
 create policy ann_write on announcements for all to authenticated using (
   app.manages_school(school_id) or author_id = auth.uid()
 ) with check (
-  (class_id is null or school_id = app.class_school(class_id))
+  author_id = auth.uid()                 -- V3.1 (Perplexity A13): nobody posts in someone else's name
+  and (class_id is null or school_id = app.class_school(class_id))
   and ( app.manages_school(school_id)
      or ( author_id = auth.uid() and class_id is not null
           and ( app.teaches_class(class_id, null) or app.is_class_teacher_of_class(class_id) ) ) )
@@ -1830,6 +1836,9 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant usage, select on all sequences in schema public to authenticated;
 grant usage on schema app to authenticated;
 grant execute on all functions in schema app to authenticated;
+-- V3.1 (Perplexity hardening #2): functions added LATER are not callable by
+-- anyone until granted explicitly (PostgreSQL's default is EXECUTE to PUBLIC).
+alter default privileges in schema app revoke execute on functions from public;
 
 -- V3 (hole A11): v2 ended with "alter default privileges ... grant ... to
 -- authenticated", which made every FUTURE table open to all logged-in users.

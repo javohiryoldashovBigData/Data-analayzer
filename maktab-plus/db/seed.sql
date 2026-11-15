@@ -120,5 +120,5 @@ insert into bell_periods (school_id, number, start_time, end_time) values
  ('bbbb0000-0000-4000-8000-00000000a001', 2, '08:55', '09:40');
 insert into rooms (school_id, name) values
  ('bbbb0000-0000-4000-8000-00000000a001', '204-xona');
-insert into timetable_slots (class_id, day_of_week, period, subject_id, teacher_id) values
- ('dddd0000-0000-4000-8000-00000000a001', 1, 1, 1, 'cccc0000-0000-4000-8000-00000000a001');  -- Mon, lesson 1, MATH, teachA
+insert into timetable_slots (class_id, day_of_week, period, subject_id, teacher_id, effective_from) values
+ ('dddd0000-0000-4000-8000-00000000a001', 1, 1, 1, 'cccc0000-0000-4000-8000-00000000a001', '2026-09-01');  -- Mon, lesson 1, MATH, teachA (V3.1: valid from start of year)

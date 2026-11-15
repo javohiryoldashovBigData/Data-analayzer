@@ -9,7 +9,7 @@ psql -v ON_ERROR_STOP=1 -f local_compat.sql -f schema.sql -f seed.sql   # (skip 
 psql -v ON_ERROR_STOP=1 -f test_rls.sql                                  # includes test_v3.sql
 ```
 
-The last line printed is `RESULT: all 133 scenarios passed`. If any scenario fails, every failure is listed and the script exits with an error. (v2 printed "ALL SCENARIOS PASSED" even when tests had failed.)
+The last line printed is `RESULT: all 133 scenarios passed (plus test_perplexity.sql: 35 attacks, test_api.sql: 30, race test — run db/run_all_tests.sh)`. If any scenario fails, every failure is listed and the script exits with an error. (v2 printed "ALL SCENARIOS PASSED" even when tests had failed.)
 
 ## 1. One window per school
 

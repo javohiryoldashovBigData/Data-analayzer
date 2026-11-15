@@ -1,10 +1,10 @@
 -- ============================================================================
 -- MAKTAB+ — test_v3.sql : ATTACK tests (Perplexity review, brief v2 §11.1)
 --
--- STATUS: DRAFT. Written against the v2 schema + seed fixtures (UUID pattern
--- aaaa0000-…), because the v3 db/ folder was not attached. Table and column
--- names may need small edits for v3. NOT RUN YET — no PostgreSQL in the
--- reviewer's sandbox. Run it, then fix every FAIL in schema.sql.
+-- STATUS: written by Perplexity against v2; ADAPTED TO V3 by Claude (marked
+-- "V3-ADAPT"): super admin = seed user c001, answer key lives in
+-- test_answer_keys, app.ai_check returns a row (allowed, reason, …).
+-- Run AFTER test_rls.sql on the same database.
 --
 -- Usage (after the normal suite):
 --   psql -v ON_ERROR_STOP=1 -f local_compat.sql -f schema.sql -f seed.sql \
@@ -87,14 +87,13 @@ grant execute on all functions in schema test to authenticated;
 -- ---------------------------------------------------------------------------
 -- Extra fixtures (owner / service role)
 -- ---------------------------------------------------------------------------
+-- V3-ADAPT: the super admin already exists in the v3 seed (c001).
 insert into auth.users (id, email) values
- ('aaaa0000-0000-4000-8000-00000000a0ff', 'super@maktab.test'),
  ('aaaa0000-0000-4000-8000-00000000b0dd', 'dadminB@maktab.test'),
  ('aaaa0000-0000-4000-8000-00000000b005', 'parentB@maktab.test')
 on conflict do nothing;
 
 insert into user_school_roles (user_id, role, school_id, district_id, region_id) values
- ('aaaa0000-0000-4000-8000-00000000a0ff', 'super_admin',    null, null, null),
  ('aaaa0000-0000-4000-8000-00000000b0dd', 'district_admin', null, 202,  null),   -- gov school B's district
  ('aaaa0000-0000-4000-8000-00000000b005', 'parent', 'bbbb0000-0000-4000-8000-00000000b001', null, null);
 
@@ -113,13 +112,14 @@ insert into weekly_tests (id, school_id, class_id, subject_id, teacher_id, term_
   'dddd0000-0000-4000-8000-00000000b001', 1, 'cccc0000-0000-4000-8000-00000000b001',
   'ffff0000-0000-4000-8000-00000000a001', current_date, 'Kasrlar B', 'published');
 
-insert into test_questions (id, test_id, question_text, options, correct_index, points, position) values
+insert into test_questions (id, test_id, question_text, options, points, position) values
  ('78880000-0000-4000-8000-00000000a001', '77770000-0000-4000-8000-00000000a001',
-  '1/2 + 1/4 = ?', '["3/4","2/6","1/8","1"]', 0, 1, 1);
+  '1/2 + 1/4 = ?', '["3/4","2/6","1/8","1"]', 1, 1);
+insert into test_answer_keys (question_id, correct_index) values ('78880000-0000-4000-8000-00000000a001', 0);  -- V3-ADAPT
 
-insert into library_items (id, subject_id, grade_level, topic, kind, title, status, author_user_id) values
+insert into library_items (id, subject_id, grade_level, topic, kind, title, status, author_user_id, origin_school_id) values
  ('79990000-0000-4000-8000-00000000a001', 1, 5, 'Kasrlar', 'quiz', 'AI quiz', 'ai_made',
-  'aaaa0000-0000-4000-8000-00000000b002');   -- authored in school B
+  'aaaa0000-0000-4000-8000-00000000b002', 'bbbb0000-0000-4000-8000-00000000b001');   -- authored in school B
 
 -- a current grade by teachA that will be soft-deleted (A12)
 insert into grades (student_id, subject_id, term_id, grade_type, value, teacher_id, created_by, deleted_at)
@@ -168,8 +168,13 @@ select test.attack('A2a teacher cannot move own attendance row onto school B stu
                    where marked_by = 'aaaa0000-0000-4000-8000-00000000a004'
                      and date = current_date and period = 5 $q$),
   'v2: WITH CHECK accepts marked_by = me for any new student → fake absence alert to a stranger');
-select test.attack('A2b teacher cannot mark a lesson that is not theirs in the timetable',
-  test.blocked($q$ insert into attendance_logs (student_id, class_id, date, period, subject_id, teacher_id, status, marked_by)
+-- V3 TEAM DECISION (Claude): NOT enforced. Timetables change and substitutions
+-- are often entered late; blocking the teacher would break rule 3 ("work ends
+-- at school"). Authority is still checked (teaches this class + subject), and
+-- every mark is in attendance_logs with marked_by for the zavuch.
+-- The test therefore checks the mark is ALLOWED. Perplexity: object if you disagree.
+select test.attack('A2b DECISION: teacher of the class may mark a period outside the timetable',
+  not test.blocked($q$ insert into attendance_logs (student_id, class_id, date, period, subject_id, teacher_id, status, marked_by)
     values ('eeee0000-0000-4000-8000-00000000a002', 'dddd0000-0000-4000-8000-00000000a001',
             current_date, 7, 1, 'cccc0000-0000-4000-8000-00000000a001', 'absent',
             'aaaa0000-0000-4000-8000-00000000a004') $q$),
@@ -199,7 +204,8 @@ select test.attack('A10 teacher cannot create lesson card with school_id of anot
 -- ---- A3 / A4 student vs. weekly test -------------------------------------------
 select test.asuser('aaaa0000-0000-4000-8000-00000000a006');  -- studA1
 select test.attack('A3  student cannot read answer key (correct_index)',
-  test.zero_or_denied($q$ select count(correct_index) from test_questions $q$),
+  -- V3-ADAPT: only the key of THIS published test; keys of CLOSED tests are visible by design ("see answers")
+  test.zero_or_denied($q$ select count(*) from test_answer_keys where question_id = '78880000-0000-4000-8000-00000000a001' $q$),
   'serve questions through a view/RPC without correct_index; revoke column');
 select test.attack('A4a student cannot create an attempt with a score already set',
   test.blocked($q$ insert into test_attempts (test_id, student_id, score, submitted_at)
@@ -256,7 +262,7 @@ select test.attack('A13 zavuch cannot publish an announcement as the director',
             'Ertaga dars yo''q', 'spoof') $q$));
 
 -- ---- A8 super admin vs. children's data (decision §9.2) -------------------------
-select test.asuser('aaaa0000-0000-4000-8000-00000000a0ff');  -- super admin
+select test.asuser('aaaa0000-0000-4000-8000-00000000c001');  -- super admin
 select test.attack('A8a super admin cannot read students',
   test.zero_or_denied($q$ select count(*) from students $q$),
   'v2 manages_school() includes super_admin');
@@ -313,13 +319,13 @@ begin
   -- student of school A (Standard plan assumed in v3 seed) asks for the tutor
   perform test.asuser('aaaa0000-0000-4000-8000-00000000a006');
   perform test.attack('A15a Standard plan: student AI feature is refused',
-    not coalesce((select app.ai_check('bbbb0000-0000-4000-8000-00000000a001'::uuid, 'student_tutor')), false));
+    not coalesce((select allowed from app.ai_check('bbbb0000-0000-4000-8000-00000000a001'::uuid, 'tutor')), false));
   -- teacher of school A asks on behalf of school B
   perform test.asuser('aaaa0000-0000-4000-8000-00000000a004');
   perform test.attack('A15b ai_check for a school you are not a member of is refused',
-    not coalesce((select app.ai_check('bbbb0000-0000-4000-8000-00000000b001'::uuid, 'lesson_prep')), false));
+    not coalesce((select allowed from app.ai_check('bbbb0000-0000-4000-8000-00000000b001'::uuid, 'lesson_prep')), false));
   perform test.attack('A15c unknown feature name is refused (default deny)',
-    not coalesce((select app.ai_check('bbbb0000-0000-4000-8000-00000000a001'::uuid, 'no_such_feature')), false));
+    not coalesce((select allowed from app.ai_check('bbbb0000-0000-4000-8000-00000000a001'::uuid, 'no_such_feature')), false));
 end $$;
 -- NOT testable in one session, must be a separate 2-connection test:
 --   A15d two parallel ai_check calls at quota-1 must not BOTH pass
