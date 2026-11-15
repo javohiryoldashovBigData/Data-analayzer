@@ -9,7 +9,7 @@ psql -v ON_ERROR_STOP=1 -f local_compat.sql -f schema.sql -f seed.sql   # (skip 
 psql -v ON_ERROR_STOP=1 -f test_rls.sql                                  # includes test_v3.sql
 ```
 
-The last line printed is `RESULT: all 125 scenarios passed`. If any scenario fails, every failure is listed and the script exits with an error. (v2 printed "ALL SCENARIOS PASSED" even when tests had failed.)
+The last line printed is `RESULT: all 133 scenarios passed`. If any scenario fails, every failure is listed and the script exits with an error. (v2 printed "ALL SCENARIOS PASSED" even when tests had failed.)
 
 ## 1. One window per school
 
@@ -55,7 +55,17 @@ The last line printed is `RESULT: all 125 scenarios passed`. If any scenario fai
 - An attendance update re-checks the same authority as an insert.
 - Anonymous visitors can call only `app.school_window()`.
 
-## 5. Open questions (for the team)
+## 5. Standard and Pro AI plans
+
+- `schools.plan` is `standard` or `pro`, and `schools.pro_trial_until` sets a free Pro trial.
+- `ai_plan_rules` says which role gets which AI feature in each plan, with a monthly budget per person. **The numbers are placeholder estimates** until the pilot.
+  - **Standard:** teachers get lesson preparation, lesson cards, test building and Photo → Board; the zavuch gets a weekly report.
+  - **Pro:** everything in Standard with higher limits, plus exam checking, the student tutor and Photo → Learn, the parent weekly report, and the director's monthly report.
+- `app.ai_check(school, feature)` returns `allowed` and a `reason` (`ok`, `not_member`, `window_closed`, `not_in_plan`, `limit_reached`). The server calls it before every AI request and writes `ai_usage_log` afterwards.
+- `ai_quotas` is now an optional per-person override.
+- Tests AI1–AI8 cover this.
+
+## 6. Open questions (for the team)
 
 1. Final grades: should zavuch confirm them (current setting), or should teachers post them?
 2. Should private schools share numbers with the government by default? Check with a lawyer.

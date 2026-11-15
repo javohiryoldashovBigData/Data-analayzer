@@ -379,3 +379,42 @@ select test.check('X3  student CANNOT see a DRAFT test or its questions',
 select test.check('X4  student CANNOT raise a staff problem',
   not test.rows($q$ insert into problems (school_id, raised_by, category, severity, description)
      values ('bbbb0000-0000-4000-8000-00000000a001','aaaa0000-0000-4000-8000-00000000a006','x','small','x') $q$));
+
+-- ===========================================================================
+-- AI: Standard = AI for teaching only; Pro = AI for everyone (with limits)
+-- ===========================================================================
+set role authenticated;
+select test.asuser('aaaa0000-0000-4000-8000-00000000a004');  -- teachA (school A is on Standard)
+select test.check('AI1 Standard: teacher CAN use AI for lesson preparation',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','lesson_prep') where allowed $q$) = 1);
+select test.check('AI2 Standard: teacher CANNOT use AI exam checking (Pro feature)',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','exam_check')
+               where not allowed and reason = 'not_in_plan' $q$) = 1);
+select test.asuser('aaaa0000-0000-4000-8000-00000000a006');  -- studA1
+select test.check('AI3 Standard: student has NO AI tutor (Library + tests only)',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','tutor')
+               where reason = 'not_in_plan' $q$) = 1);
+select test.asuser('aaaa0000-0000-4000-8000-00000000a005');  -- parentA
+select test.check('AI4 Standard: parent has NO AI report',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','weekly_report')
+               where reason = 'not_in_plan' $q$) = 1);
+select test.asuser('aaaa0000-0000-4000-8000-00000000b002');  -- teachB
+select test.check('AI5 a teacher of school B CANNOT spend school A''s AI budget',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','lesson_prep')
+               where reason = 'not_member' $q$) = 1);
+reset role;
+update schools set pro_trial_until = current_date + 30 where slug = 'school-a';
+set role authenticated;
+select test.asuser('aaaa0000-0000-4000-8000-00000000a006');  -- studA1
+select test.check('AI6 Pro trial: student NOW has the AI tutor',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','tutor')
+               where allowed and plan = 'pro' $q$) = 1);
+reset role;
+insert into ai_usage_log (user_id, school_id, feature, model, cost_cents)
+values ('aaaa0000-0000-4000-8000-00000000a006','bbbb0000-0000-4000-8000-00000000a001','tutor','small-model', 60);
+set role authenticated;
+select test.check('AI7 monthly limit reached → AI stops ("use the Library")',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','tutor')
+               where reason = 'limit_reached' $q$) = 1);
+select test.check('AI8 student CANNOT write their own usage log (only the server does)',
+  not test.rows($q$ delete from ai_usage_log $q$));

@@ -1,93 +1,133 @@
-# Maktab+ — Project Brief
+# Maktab+ — Project Brief (v2, for our team: Javohir + Claude + Perplexity)
 
-*Paste this whole document into an AI assistant (e.g. Perplexity) before asking it to design or build any part of Maktab+.*
+*Paste this whole document into Perplexity together with the `maktab-plus/db/` folder. We work as one team: each of us finds problems, fixes them and checks the other's work. Nothing is accepted until it is tested.*
 
 ## 1. The goal in one paragraph
 
-Maktab+ is a school platform for Uzbekistan: an electronic diary and gradebook like Kundalik, but faster, more flexible, and with AI built in for every role. Its main promises are: **parents always know whether their child is at school**, **teachers finish their work at school instead of at home**, and **students get help that teaches instead of giving answers**. It starts with private schools (fast decisions, they pay) and later serves government schools and the Ministry from the same platform.
+Maktab+ is a school platform for Uzbekistan: an electronic diary and gradebook like Kundalik, but faster, more flexible, with **teaching methods from the world's top school systems built in**, and AI where it truly helps. Its main promises are: **parents always know whether their child is at school**, **teachers finish their work at school instead of at home**, and **students learn with proven methods**. We start with **private schools** (fast decisions, they pay), then serve government schools from the same platform.
 
 ## 2. Rules every design must follow
 
-1. **AI suggests, people decide.** AI never gives a final grade or punishes anyone on its own. Every AI result is a suggestion a teacher approves.
-2. **No phones in the lesson.** Uzbek schools don't allow student phones in class. The platform works before and after the lesson; during the lesson the teacher teaches normally.
+1. **AI suggests, people decide.** AI never gives a final grade or punishes anyone on its own.
+2. **No phones in the lesson.** Students don't use phones in class. The teacher uses a tablet or phone as little as possible.
 3. **Work ends when school ends.** Every teacher feature must save time, not add work.
-4. **Privacy first.** Each person sees only what they are allowed to see. No GPS tracking of children — only school entry and exit are recorded. Personal data of Uzbek citizens must be stored on servers inside Uzbekistan.
+4. **Privacy first.** Each person sees only what they are allowed to see. No GPS, only school entry and exit. Data of Uzbek citizens is stored in Uzbekistan (check with a lawyer).
 5. **Simple.** Uzbek (Latin) first, also Russian and English. Big buttons, few steps.
+6. **One window per school.** Each school has its own address, look, people and data. No other school can see its window. *(new)*
+7. **AI costs stay low.** Use our own code first, the Library second and AI third. *(new)*
 
-## 3. Roles and what each one does
+## 3. Roles
 
-| Role | What they do in Maktab+ |
+| Role | What they do |
 |---|---|
-| **Teacher** | "My day" screen; one-page lesson card per lesson (plan, who to ask first, questions, homework); AI prepares next week's lessons; 1–2 minute "after lesson" screen (attendance, grades, homework); photo checking of written work; weekly tests; "Finished for today" checklist; quiet hours (no parent messages after 18:00) |
-| **Zavuch** (deputy director) | Checks every day that teachers entered grades, topics, homework and lesson plans; problem inbox (small problems solved here, serious ones sent to the director); timetable; substitutions when a teacher is sick; approves lesson plans; weekly report to the director |
-| **Director** | Sees only escalated problems plus key numbers (attendance, grades, students at risk); monthly AI report; staff and school settings |
-| **Student** | Diary, grades, homework, weekly test results; AI tutor at home that explains step by step and does not hand over homework answers; Photo → Learn |
-| **Parent** | Live alerts: arrived, late, left school, skipped a lesson while in the building; report an absence in advance; grades and diary; weekly AI report; alerts via app, Telegram or SMS; in private schools also fee payments |
-| **Government** (later) | District, region and Ministry dashboards with numbers only (no names); automatic reports; OneID login |
+| **Teacher** | "My day" screen; one-page lesson card per lesson (plan, who to ask first, questions, homework); weekly lesson preparation; 1–2 minute "after lesson" screen; weekly tests; "Finished for today" checklist; quiet hours after 18:00 |
+| **Zavuch** | Checks daily that grades, topics, homework and plans are entered; problem inbox (serious problems go to the director); timetable and substitutions; approves lesson plans; **confirms final (yearly) grades**; shares the best lesson cards (Lesson Study) |
+| **Director / school admin** | Escalated problems and key numbers; staff, roles, school settings, logo and colours; payments (private schools) |
+| **Student** | Diary, grades, homework, weekly tests, Library; AI tutor in Pro only |
+| **Parent** | Live alerts (arrived, late, left, skipped a lesson); reports an absence in advance; grades and diary; fee payments (private); sees teachers' **names only** and contacts teachers **through the school office** |
+| **Methodologist** | Platform-level expert who checks Library items before they become "checked" |
+| **Government** (later) | Numbers only, never names. Private schools share numbers only if they agree |
 
 ## 4. Key features
 
-**Shared attendance.** Students check in at the school gate with a QR or NFC card. Parents get an instant Telegram/app message. If a student is in the building but marked absent in a lesson, parent and homeroom teacher are alerted ("skipped lesson"). Parents can report an absence in advance; the homeroom teacher accepts it and the day is marked excused.
+- **Shared attendance:** QR/NFC at the school gate; instant parent alert; "skipped lesson" alert when the student is in the building but absent from a lesson; absence reports in advance.
+- **Who to ask first:** a private list for the teacher only, made by our own code (missing homework, falling grades, missed lessons, weak weekly test, not asked for a long time).
+- **Weekly tests:** different question and option order per student; the answer key is hidden and scoring happens on the server; independent-work signals (similar answers, big level jump, very fast answers, pasted text, leaving the window) go to the teacher only, and the teacher decides.
+- **The Library (core idea):** made once, checked by a methodologist, used by everyone: 1-minute animations, Photo → Board (exact graphs on the projector), Photo → Learn, lesson cards, worksheets, tests. AI-made items are labelled "AI-made, not yet checked".
+- **Maktab+ Yordamchi:** one helper box. Rule: **Library first, AI second.**
+- **Parent → school office messages:** the office answers or forwards to the teacher.
 
-**Teacher AI.**
-- *Exam checking:* the teacher photographs answer sheets; AI reads them, suggests points and a grade with a confidence level; the teacher approves before anything reaches the gradebook.
-- *Who to ask first:* a private list ranking students likely not ready (missing homework, falling grades, missed last lesson, weak weekly test) plus students not asked for a long time, for fair rotation.
-- *Weekly lesson preparation:* AI drafts next week's lesson cards from the timetable and curriculum; the teacher only checks.
+## 5. Methods from the world's top school systems (our main selling point)
 
-**Weekly tests.** AI builds a short weekly test from the topics actually taught. Each student gets a different question and option order. Tests can be on paper (photo-checked) or at home. Independent-work signals for the teacher: nearly identical written answers, identical wrong choices, a big jump above the student's usual level, implausibly fast answers, pasted text, leaving the test window, and a follow-up question where the student must explain their own answer. These are flags only; the teacher decides.
+Pitch: "methods used by top school systems, built into Maktab+". **Never promise their results**; after the pilot we show our own numbers.
 
-**The Library (core idea).** Content made once, checked by a methodologist (experienced teacher), shared by every teacher and student:
-1. *Animations:* ready 1-minute animated explanations of hard topics (English tenses, chemical reactions, photosynthesis, forces, graphs).
-2. *Photo → Board:* a teacher photographs a textbook exercise; AI reads it and our own code draws an exact graph or diagram for the projector.
-3. *Photo → Learn:* a student photographs a topic at home; the matching Library animation plays, or the AI tutor explains with practice questions.
-4. *Lesson materials:* lesson cards, worksheets, tests.
+| Method | Source | In Maktab+ |
+|---|---|---|
+| **Formative assessment** | Finland, UK (Dylan Wiliam) | A 3-question "exit check" at the end of the lesson (show of hands, or on the teacher's tablet); feeds "who to ask first" |
+| **Mastery learning** | Singapore, Bloom | Weekly tests show topics the class hasn't mastered; the next lesson card suggests a 10-minute review |
+| **Spaced repetition / retrieval practice** | Cognitive-science research | Each weekly test adds 1–2 questions from older topics |
+| **Feedback, not only grades** | Research on feedback | A short "what to improve" comment with grades; weekly summary for parents |
+| Concrete → Pictorial → Abstract | Singapore Math | Library animations follow these 3 steps |
+| Lesson Study | Japan | Teachers rate and reuse each other's lesson cards; the best go to the Library |
+| Less, better homework | Finland | Homework time limit on the lesson card; director sees daily homework load |
+| Project-based learning | IB / Cambridge | Optional project weeks (later) |
 
-**Maktab+ Yordamchi (one AI helper).** One box on every screen. Ask by text, photo or voice (Uzbek, Russian, English). It returns the best format: animation, graph, virtual experiment, step-by-step explanation, slides, quiz or lesson card. Rule: **Library first, AI second.** AI-made items are labelled "AI-made, not yet checked"; popular ones go to the methodologist and then into the Library.
+**Pilot uses the first 4** (bold) so teachers are not overloaded. Please check the research behind each and mark anything uncertain.
 
-## 5. One platform, two modes
+## 6. Plans: Standard and Pro
 
-The core (everything above) is the same for all schools. A school is set up as one of two modes:
-- **Private school mode** adds: fee payments (Click, Payme) with reminders, online admission (application, test, interview), school branding, parent ratings, teacher performance, paid clubs, optional school-bus alerts. The school pays a subscription.
-- **Government school mode** adds: full reporting to district, region and Ministry. Paid by a government contract.
+| | **Standard** | **Pro** |
+|---|---|---|
+| AI for | **Teachers only** (plus a small amount for the zavuch) | Teachers, zavuch, director, students, parents |
+| Teacher AI | Lesson preparation, lesson cards, weekly test creation, Photo → Board, all with monthly limits | Same with higher limits, **plus AI exam checking** from photos |
+| Students | No AI: Library, weekly tests, results | AI tutor at home (explains, never hands over answers), Photo → Learn |
+| Parents | No AI: live alerts, grades, simple weekly summary made by our own code | Weekly AI report |
+| Director | Numbers and charts from our own code | Monthly AI report |
+| Price | Lower | Higher |
 
-Each school sees only its own data.
+- **Most "smart" features are our own code and free**, so Standard still feels smart for everyone: who to ask first, risk alerts, copy signals, forecasts, attendance alerts, charts, the Library.
+- **Pilot:** the first school gets Standard plus a **free 1–2 month Pro trial**. We measure real usage and cost, then set prices.
+- **Later:** add-ons (e.g. exam checking only) for Standard schools.
+- **Already in the database (v3):** `schools.plan`, `schools.pro_trial_until`, `ai_plan_rules` (which role gets which AI feature in which plan, with a monthly limit), and `app.ai_check(school, feature)`. The server calls it before every AI request and logs usage after. The limits are **placeholder estimates** until the pilot.
 
-## 6. AI approach and cost
+### Ways to keep AI cost low
+1. **Our own code first, Library second, AI third.**
+2. **Cheap models for simple jobs**, strong models only for hard jobs (e.g. reading exam photos).
+3. **Monthly limit per person.** When it's reached: "Limit reached, try the Library".
+4. **Batch work:** weekly lesson preparation runs once a week, not on every click.
+5. **Prompt caching** for the parts that repeat (curriculum, instructions).
+6. **Send the AI only what's needed,** without names ("Student A").
+7. **Good AI results go to the Library** after review, so the next teacher gets them free.
 
-- AI is **Claude (Anthropic) via the API**, called **only from our server** (keys never in the browser). Pro/Max personal plans cannot be used for an app.
-- Many "smart" features use **our own code, not AI** (free): who to ask first, risk detection, copy signals, grade forecasts, attendance alerts, exact graph drawing.
-- Cost control: Library first; cheap models (Haiku) for simple tasks, Sonnet for most, Opus only for hard ones (e.g. reading exam photos); prompt caching; monthly limits per user.
-- Send the AI only what is needed, without names where possible (e.g. "Student A").
-- Rough estimate for 10 schools (200 teachers, 2,000 students): about **$300–650 per month** for AI, to be measured during the pilot.
+Rough estimate before these savings: about $300–650 per month for 10 schools with AI for everyone. Standard (teachers only) should cost much less. **Estimate only; measure in the pilot.**
 
-## 7. Technology (target)
+## 7. Technology
 
-React + TypeScript web app (installable PWA, mobile apps later); Node.js or Supabase backend with PostgreSQL; Telegram bot, SMS and push for alerts; Click/Payme; QR/NFC scanner app on a tablet at the gate; hosting **in Uzbekistan** (Supabase self-hosted is acceptable, Supabase cloud is not for real student data). Offline-first attendance for teachers.
+React + TypeScript web app (installable PWA, mobile apps later); self-hosted Supabase/PostgreSQL **in Uzbekistan**; all permission rules in the database (row-level security); AI (Claude via the API) called **only from our server**; Telegram bot, SMS and push for alerts; Click/Payme; QR/NFC scanner app on a tablet at the gate; offline-first attendance.
 
 ## 8. Current state
 
-- **Done:** a working Phase 0 prototype (React + TypeScript, sample data in the browser): 4 roles, gradebook, diary, live attendance with gate scanner simulation and parent alerts, skipped-lesson detection, absence reports, who to ask first, AI exam checking, AI lesson studio, virtual chemistry lab, weekly tests with independence checks, AI assistant, Uzbek/Russian/English, dark mode, phone layout.
-- **Draft database design** (`schema.sql` + docs, produced earlier by Perplexity): good structure, but testing it in a real PostgreSQL database found problems that must be fixed before use (section 9).
+- **Prototype (Phase 0):** a working React demo with sample data covering 4 roles, gradebook, diary, live attendance and gate simulation, skipped-lesson alerts, absence reports, who to ask first, AI exam checking, lesson studio, chemistry lab, weekly tests, assistant, 3 languages, dark mode, phone layout.
+- **Database v3** (`db/`): Perplexity's v2 structure plus joint fixes. **133 test scenarios, all passing**, on PostgreSQL 16. See `db/CHANGES_V3.md`:
+  - one window per school;
+  - parents see teachers' names only;
+  - 10 security holes fixed;
+  - Standard/Pro AI plans;
+  - honest test runner that fails loudly.
 
-## 9. Problems found in the draft `schema.sql` (tested in PostgreSQL 16)
+  How to run:
+  ```
+  psql -v ON_ERROR_STOP=1 -f local_compat.sql -f schema.sql -f seed.sql
+  psql -v ON_ERROR_STOP=1 -f test_rls.sql      # ends with "RESULT: all 133 scenarios passed"
+  ```
 
-1. **Cross-school data leak (critical):** `app.role(school_id uuid)` and `app.visible_students(school_id uuid)` name their parameter the same as a column, so `r.school_id = school_id` compares the column with itself. Result: an admin of one school is treated as admin of every school and can read other schools' students, grades and attendance. Fix: rename parameters (e.g. `p_school_id`).
-2. **Profiles visible to everyone (critical):** policy `profiles_admin` ends with `or true`, so any teacher or admin anywhere can read all names and phone numbers.
-3. **13 tables have no row-level security** but are readable by every logged-in user: `student_term_summary` (everyone's averages), `notification_outbox`, `audit_log`, `teacher_assignments`, `notification_preferences`, `terms`, `bell_periods`, `rooms`, and others.
-4. **Grade inserts always fail:** triggers `INSERT ... ON CONFLICT` into the materialized view `student_term_summary`, which PostgreSQL does not allow. Use a normal table maintained by triggers, or refresh the view on a schedule.
-5. **`notifications` cannot be created:** primary key on `id` alone on a table partitioned by `recipient_id`. The key must include `recipient_id`.
-6. **Teachers cannot write at all:** the final `revoke insert, update, delete ... from authenticated` removes table privileges, so the RLS write policies never apply. Grant writes and let RLS restrict them.
-7. **Audit log is never written:** no triggers populate `audit_log`.
-8. **Region and district admins are not implemented** in the access functions.
-9. **Absence alerts only on insert:** changing a mark from present to absent through an upsert sends no alert.
-Also: grade insert policy doesn't check grade type, academic year or that `teacher_id` is the caller; attendance write policy lets any teacher of a class mark any lesson.
+## 9. Decisions made (please keep them)
 
-## 10. What we need from you
+1. Parents see teachers' **names only**; contact goes through the school office.
+2. **One window per school**; government sees numbers only; the platform super admin can't read children's data.
+3. **Final grades** are confirmed by the zavuch or director; teachers enter current, exam and quarter grades.
+4. **Standard** = AI for teaching only; **Pro** = AI for everyone; the pilot gets a Pro trial.
+5. Pilot methods: formative assessment, mastery learning, spaced repetition, feedback comments.
 
-Please design (or correct) the following, and **follow the rules in section 2**:
+## 10. Open questions
 
-1. A **corrected `schema.sql`** that fixes every problem in section 9, with a short test script showing each role (teacher, parent, student, school admin, admin of another school) sees and writes only what it should.
-2. **New tables** for the Maktab+-specific features: gate check-in events, parent absence reports (pending/accepted), skipped-lesson alerts, zavuch role and problem inbox, lesson cards and weekly preparation, weekly tests with per-student question order and integrity flags, the Library (animations, Photo → Board visuals, materials, review status "AI-made / checked"), AI usage limits per user, private-school payments and admissions, school mode (private/government).
-3. Keep it **multi-tenant by school**, self-hostable in Uzbekistan, and Uzbek-first.
+1. Should methodologists be platform staff (current) or does each school have its own?
+2. A teacher working in two schools: currently one school per teacher.
+3. Must private schools share numbers with the government? (lawyer)
+4. Real AI limits per plan: measure in the pilot.
 
-When you answer, please: list your assumptions, mark anything you are unsure about, and do not invent laws or statistics — say "check with a lawyer" or "estimate" where needed.
+## 11. What we need from you, Perplexity
+
+1. **Review database v3 and try to break it.** Add every new attack as a test in `db/test_v3.sql`, in the same style. Tell us what you changed and why.
+2. **Check section 5:** is the research behind each method solid? What would you add or remove? Mark anything uncertain.
+3. **Check section 6:** are the plan split, the cost-saving ideas and the placeholder limits sensible? Suggest a simple pricing model for Uzbek private schools (per student per month?), and label estimates as estimates.
+4. **Next build step:** design the server API (Supabase Edge Functions or Node.js) for **Phase 1, the teacher's day**:
+   - "My day";
+   - the lesson card with the exit check;
+   - the "after lesson" screen;
+   - "Finished for today";
+   - weekly lesson preparation, calling `app.ai_check` before AI.
+
+   All permission logic stays in the database.
+
+When you answer: list your assumptions, mark anything you are unsure about, and do not invent laws or statistics. Say "check with a lawyer" or "estimate" where needed.

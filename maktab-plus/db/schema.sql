@@ -56,6 +56,7 @@ create type attempt_mode      as enum ('paper','online');
 create type flag_kind         as enum ('similar_answers','identical_wrong','level_jump','fast_answers','pasted_text','left_window');
 create type flag_decision     as enum ('pending','dismissed','talked_to_student');   -- V3: teacher decides
 create type contact_status    as enum ('open','forwarded','answered','closed');      -- V3: parent → school office
+create type school_plan       as enum ('standard','pro');                             -- V3: AI plans
 create type invoice_status    as enum ('issued','paid','overdue','cancelled');
 create type pay_provider      as enum ('click','payme','cash');
 create type pay_status        as enum ('pending','completed','failed');
@@ -95,6 +96,8 @@ create table schools (
   brand_color text not null default '#1d6fd8' check (brand_color ~ '^#[0-9a-fA-F]{6}$'),
   is_active   boolean not null default true,                -- false = window closed (unpaid, etc.)
   share_stats_with_government boolean not null default false, -- private schools opt in; check with a lawyer
+  plan        school_plan not null default 'standard',      -- V3: Standard = AI for teachers; Pro = AI for everyone
+  pro_trial_until date,                                     -- V3: free Pro trial (e.g. pilot school)
   created_at  timestamptz not null default now()
 );
 create index schools_district_idx on schools(district_id);
@@ -629,11 +632,42 @@ create table ai_usage_log (
 );
 create index ai_usage_log_user_idx on ai_usage_log(user_id, created_at desc);
 
-create table ai_quotas (
+create table ai_quotas (                                  -- V3: optional per-user OVERRIDE of the plan limit
   user_id             uuid primary key references auth.users(id) on delete cascade,
   monthly_limit_cents numeric(10,2) not null default 500,
   note                text
 );
+
+-- V3: which AI features each plan gives to each role, and the monthly budget
+-- per person. The server calls app.ai_check() BEFORE every AI request and
+-- writes ai_usage_log AFTER it. Product settings, not school data.
+-- LIMITS ARE PLACEHOLDER ESTIMATES (US cents / person / month) — set real
+-- numbers after measuring the pilot.
+create table ai_plan_rules (
+  plan                school_plan not null,
+  role                user_role   not null,
+  feature             text        not null,
+  monthly_limit_cents numeric(10,2) not null,
+  primary key (plan, role, feature)
+);
+insert into ai_plan_rules (plan, role, feature, monthly_limit_cents) values
+  -- STANDARD: AI for teaching only. Everyone else uses free features made by our own code.
+  ('standard','teacher','lesson_prep',    200),   -- weekly lesson-card drafts (batched once a week)
+  ('standard','teacher','lesson_card',    200),   -- edit / improve one card
+  ('standard','teacher','test_build',     200),   -- weekly test from topics taught
+  ('standard','teacher','photo_board',    100),   -- textbook photo → exact graph on the projector
+  ('standard','zavuch', 'weekly_report',  100),
+  -- PRO: everything in Standard with higher limits, plus AI for everyone.
+  ('pro','teacher','lesson_prep',   400),
+  ('pro','teacher','lesson_card',   400),
+  ('pro','teacher','test_build',    400),
+  ('pro','teacher','photo_board',   200),
+  ('pro','teacher','exam_check',    600),         -- reading exam photos (strongest model)
+  ('pro','zavuch', 'weekly_report', 200),
+  ('pro','director','monthly_report',200),
+  ('pro','student','tutor',          60),         -- AI tutor at home (explains, never hands over answers)
+  ('pro','student','photo_learn',    40),
+  ('pro','parent', 'weekly_report',  10);
 
 -- ---------------------------------------------------------------------------
 -- 13. PRIVATE-SCHOOL PAYMENTS & ADMISSIONS
@@ -1511,6 +1545,49 @@ create policy library_delete on library_items for delete to authenticated using 
 -- ---- AI quotas ----
 create policy quotas_select on ai_quotas for select to authenticated using (user_id = auth.uid());
 create policy quotas_write  on ai_quotas for all    to authenticated using (app.is_super());
+create policy plan_rules_read on ai_plan_rules for select to authenticated using (true);
+create policy usage_select on ai_usage_log for select to authenticated using (
+  user_id = auth.uid() or (school_id is not null and app.is_school_admin(school_id)));
+
+-- V3: may the caller use this AI feature in this school right now?
+-- Returns allowed + reason ('ok' | 'not_member' | 'window_closed' |
+-- 'not_in_plan' | 'limit_reached') + budget left this month.
+-- Effective plan = 'pro' if the school is on Pro or inside its Pro trial.
+create or replace function app.ai_check(p_school_id uuid, p_feature text)
+returns table (allowed boolean, reason text, plan school_plan, remaining_cents numeric)
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_school schools%rowtype; v_plan school_plan; v_limit numeric; v_used numeric;
+begin
+  select * into v_school from schools where id = p_school_id;
+  if not found or not exists (select 1 from user_school_roles r
+                              where r.user_id = auth.uid() and r.is_active and r.school_id = p_school_id) then
+    return query select false, 'not_member', null::school_plan, 0::numeric; return;
+  end if;
+  if not v_school.is_active then
+    return query select false, 'window_closed', null::school_plan, 0::numeric; return;
+  end if;
+  v_plan := case when v_school.plan = 'pro' or v_school.pro_trial_until >= current_date
+                 then 'pro'::school_plan else 'standard'::school_plan end;
+  select max(pr.monthly_limit_cents) into v_limit
+    from ai_plan_rules pr
+    join user_school_roles r on r.role = pr.role
+   where r.user_id = auth.uid() and r.is_active and r.school_id = p_school_id
+     and pr.plan = v_plan and pr.feature = p_feature;
+  if v_limit is null then
+    return query select false, 'not_in_plan', v_plan, 0::numeric; return;
+  end if;
+  select coalesce(q.monthly_limit_cents, v_limit) into v_limit
+    from (select 1) one left join ai_quotas q on q.user_id = auth.uid();
+  select coalesce(sum(u.cost_cents), 0) into v_used
+    from ai_usage_log u
+   where u.user_id = auth.uid() and u.school_id = p_school_id and u.feature = p_feature
+     and u.created_at >= date_trunc('month', now());
+  if v_used >= v_limit then
+    return query select false, 'limit_reached', v_plan, 0::numeric; return;
+  end if;
+  return query select true, 'ok', v_plan, v_limit - v_used;
+end $$;
 
 -- ---- payments & admissions ----
 create policy invoices_select on fee_invoices for select to authenticated using (
