@@ -31,7 +31,7 @@ drop policy if exists cur_read on curriculum_topics;
 create policy cur_read on curriculum_topics for select to authenticated using (app.is_staff_anywhere());
 drop policy if exists cur_write on curriculum_topics;
 create policy cur_write on curriculum_topics for all to authenticated
-  using (app.can_edit_library()) with check (app.can_edit_library());   -- V3-ADAPT: methodologist role
+  using (app.is_methodologist()) with check (app.is_methodologist());   -- V3-ADAPT: methodologist role
 grant select, insert, update, delete on curriculum_topics to authenticated;
 
 -- Whole programme for a subject+grade (the cached prompt block). Stable text order.

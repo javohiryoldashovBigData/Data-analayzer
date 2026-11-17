@@ -79,34 +79,34 @@ drop policy if exists qb_select on question_bank;
 create policy qb_select on question_bank for select to authenticated using (
   (question_bank.school_id is not null and app.is_staff_at(question_bank.school_id))
   or (question_bank.school_id is null and question_bank.status = 'checked' and app.is_staff_anywhere())
-  or (question_bank.school_id is null and app.can_edit_library())
+  or (question_bank.school_id is null and app.is_methodologist())
 );
 drop policy if exists qb_write on question_bank;
 drop policy if exists qb_insert on question_bank;
 create policy qb_insert on question_bank for insert to authenticated with check (
   question_bank.created_by = auth.uid()
   and ((question_bank.school_id is not null and app.is_staff_at(question_bank.school_id))
-       or (question_bank.school_id is null and app.can_edit_library())));
+       or (question_bank.school_id is null and app.is_methodologist())));
 drop policy if exists qb_update on question_bank;
 create policy qb_update on question_bank for update to authenticated
   using (
     (question_bank.school_id is not null and app.is_staff_at(question_bank.school_id))
-    or (question_bank.school_id is null and app.can_edit_library()))
+    or (question_bank.school_id is null and app.is_methodologist()))
   with check (
     (question_bank.school_id is not null and app.is_staff_at(question_bank.school_id))
-    or (question_bank.school_id is null and app.can_edit_library()));
+    or (question_bank.school_id is null and app.is_methodologist()));
 drop policy if exists qb_delete on question_bank;
 create policy qb_delete on question_bank for delete to authenticated using (
   (question_bank.school_id is not null and app.is_staff_at(question_bank.school_id)
      and question_bank.created_by = auth.uid())
-  or (question_bank.school_id is null and app.can_edit_library()));
+  or (question_bank.school_id is null and app.is_methodologist()));
 
 drop policy if exists qbk_rw on question_bank_keys;
 create policy qbk_rw on question_bank_keys for all to authenticated
   using (exists (select 1 from question_bank q where q.id = question_bank_keys.question_id))  -- RLS of q applies
   with check (exists (select 1 from question_bank q where q.id = question_bank_keys.question_id
                       and ((q.school_id is not null and app.is_staff_at(q.school_id))
-                           or (q.school_id is null and app.can_edit_library()))));
+                           or (q.school_id is null and app.is_methodologist()))));
 
 grant select, insert, update, delete on question_bank, question_bank_keys to authenticated;
 
