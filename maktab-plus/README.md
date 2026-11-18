@@ -58,3 +58,22 @@ src/
 
 ## Next (Phase 1)
 Real backend (NestJS + PostgreSQL) hosted in Uzbekistan, OneID login, a Telegram bot and SMS gateway for alerts, a real QR/NFC scanner app for the gate tablet, AI calls through the server, and a pilot school.
+
+## Live demo (step 1): real database + API server
+
+The real app (`live.html`) talks to PostgreSQL through a small API server (`server/index.mjs`).
+The server holds **no permission logic**: every request runs inside the database as the logged-in
+user (`authenticated` + user id) or as a visitor (`anon`), so the tested row-level-security rules
+decide what each person sees. It connects as `authenticator`, which can read nothing by itself.
+
+```
+PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
+# open http://localhost:5173/live.html   (demo school "Maktab+ Namuna maktabi")
+```
+
+- `db/demo_seed.sql`: the public demo school (3 classes, 36 students, 6 teachers, director, zavuch, a
+  parent with two children). All people are invented; dates are relative to today.
+- `db/demo_login.sql`: the `authenticator` role and one-tap login that works **only** for the demo
+  school. Real schools will log in through Supabase Auth / phone code (later step).
+- Each school opens in its own window: `school-a.maktabplus.uz` or `?school=school-a`.
+- Database tests: `db/run_all_tests.sh` (all suites green).

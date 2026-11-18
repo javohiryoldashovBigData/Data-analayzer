@@ -367,3 +367,9 @@ table.table { border-collapse: separate; border-spacing: 0; width: 100%; font-si
   .shell { display: block; }
   .card { box-shadow: none; break-inside: avoid; }
 }
+
+/* live app: keep the phone top bar readable */
+@media (max-width: 520px) {
+  .hide-narrow { display: none !important; }
+  .topbar .select { max-width: 92px; }
+}
