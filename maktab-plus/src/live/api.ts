@@ -51,6 +51,7 @@ export type Home = {
   me: { first_name: string; last_name: string };
   school: { school_id: string; slug: string; name: string } | null;
   roles: string[];
+  role: string;
   day?: { date: string; lessons: Lesson[]; absence_reports_pending: number; closed: boolean };
   kids?: Kid[];
   gateToday?: { student_id: string; direction: "in" | "out"; scanned_at: string }[];

@@ -21,8 +21,23 @@ pg.types.setTypeParser(1082, (v) => v);
 pg.types.setTypeParser(20, (v) => Number(v));
 pg.types.setTypeParser(1700, (v) => Number(v));
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
-const ROLES = ["director", "zavuch", "school_admin", "teacher", "parent", "student"];
 const SESSION_HOURS = 12;
+const LEADER = ["director", "zavuch", "school_admin"];
+
+// ---- brute-force protection: 5 wrong passwords per login (or 20 per IP)
+// within 10 minutes → that login/IP waits 1 minute. In memory for now; move to
+// the database or Redis when we run more than one server.
+const fails = new Map();
+const WINDOW = 10 * 60e3, BLOCK = 60e3;
+function blocked(key, limit) {
+  const f = fails.get(key);
+  return f && f.count >= limit && Date.now() - f.last < BLOCK;
+}
+function fail(key) {
+  const f = fails.get(key);
+  if (!f || Date.now() - f.first > WINDOW) fails.set(key, { count: 1, first: Date.now(), last: Date.now() });
+  else { f.count++; f.last = Date.now(); }
+}
 
 // ---- session token: base64url(payload).hmac — small, no extra library -------
 const b64 = (s) => Buffer.from(s).toString("base64url");
@@ -91,7 +106,6 @@ const Q = {
   absenceReports: `select r.id, r.student_id, r.absence_date, r.reason, r.status from parent_absence_reports r
                    order by r.absence_date desc limit 10`,
   // leaders
-  schoolId: `select school_id from app.my_schools() limit 1`,
   counts: `select (select count(*) from classes) as classes,
                   (select count(*) from teachers) as teachers,
                   (select count(*) from problems where status = 'open') as problems_open,
@@ -106,22 +120,28 @@ const Q = {
                     where a.date >= current_date - 30 group by c.grade_level, c.letter order by c.grade_level`,
 };
 
-async function home(user) {
+// `wanted` = the role the person picked in the chooser. It only selects WHICH
+// screen to build; it must be one of their real roles in this school (from the
+// database), and RLS still filters every row.
+async function home(user, wanted) {
   return asRole(user, async (q) => {
     const [me] = await q(Q.me);
     const schools = await q(Q.mySchools);
-    const roles = schools[0]?.roles ?? [];
-    const out = { me, school: schools[0] ?? null, roles };
-    if (roles.includes("teacher")) out.day = (await q(Q.myDay))[0].day;
-    if (roles.includes("parent") || roles.includes("student")) {
+    const school = schools.find((x) => x.slug === user.school) ?? null;
+    const roles = school?.roles ?? [];
+    if (!roles.length) { const e = new Error("no_role"); e.code = "42501"; throw e; }
+    const role = roles.includes(wanted) ? wanted : roles[0];
+    const out = { me, school, roles, role };
+    if (role === "teacher") out.day = (await q(Q.myDay))[0].day;
+    if (role === "parent" || role === "student") {
       Object.assign(out, {
         kids: await q(Q.kids), gateToday: await q(Q.gateToday), grades: await q(Q.grades),
         attendance: await q(Q.attendance30), homework: await q(Q.homework),
         teachers: await q(Q.teachers), absenceReports: await q(Q.absenceReports),
       });
     }
-    if (roles.some((r) => ["director", "zavuch", "school_admin"].includes(r))) {
-      const sid = (await q(Q.schoolId))[0]?.school_id;
+    if (LEADER.includes(role)) {
+      const sid = school.school_id;
       Object.assign(out, {
         stats: (await q("select * from app.school_stats($1)", [sid]))[0],
         counts: (await q(Q.counts))[0], problems: await q(Q.problems),
@@ -153,19 +173,25 @@ const server = http.createServer(async (req, res) => {
       const rows = await asRole(null, (q) => q("select * from app.school_window($1)", [m[1]]));
       return rows.length ? send(res, 200, rows[0]) : send(res, 404, { error: "school_not_found" });
     }
-    // public: one-tap login, DEMO school only
-    if (url.pathname === "/api/login/demo" && req.method === "POST") {
-      const { slug, role } = await readJson(req);
-      if (!ROLES.includes(role)) return send(res, 400, { error: "bad_role" });
-      const rows = await asRole(null, (q) => q("select * from app.demo_login_user($1, $2)", [slug, role]));
-      if (!rows.length) return send(res, 403, { error: "demo_only" });
-      const token = sign({ sub: rows[0].user_id, role, exp: Date.now() + SESSION_HOURS * 3600e3 });
-      return send(res, 200, { token, user: rows[0] });
+    // public: log in to ONE school window with login + password
+    if (url.pathname === "/api/login" && req.method === "POST") {
+      const { slug, login, password } = await readJson(req);
+      if (typeof slug !== "string" || typeof login !== "string" || typeof password !== "string"
+          || !login.trim() || !password || password.length > 200) return send(res, 400, { error: "bad_request" });
+      const ip = req.socket.remoteAddress ?? "?";
+      const key = `${slug}|${login.replace(/[^0-9a-z.+]/gi, "").toLowerCase()}`;
+      if (blocked(key, 5) || blocked(ip, 20)) return send(res, 429, { error: "too_many_attempts" });
+      const rows = await asRole(null, (q) => q("select * from app.password_login($1, $2, $3)", [slug, login, password]));
+      if (!rows.length) { fail(key); fail(ip); return send(res, 401, { error: "bad_credentials" }); }
+      fails.delete(key);
+      const u = rows[0];
+      const token = sign({ sub: u.user_id, school: slug.toLowerCase(), exp: Date.now() + SESSION_HOURS * 3600e3 });
+      return send(res, 200, { token, user: { first_name: u.first_name, last_name: u.last_name }, roles: u.roles });
     }
     // logged in
     if (url.pathname === "/api/home" && req.method === "GET") {
       if (!user) return send(res, 401, { error: "login_required" });
-      return send(res, 200, await home(user));
+      return send(res, 200, await home(user, url.searchParams.get("role")));
     }
     if (url.pathname === "/api/health") return send(res, 200, { ok: true });
     send(res, 404, { error: "not_found" });

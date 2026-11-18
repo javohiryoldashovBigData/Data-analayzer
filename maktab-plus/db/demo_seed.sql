@@ -223,3 +223,15 @@ insert into library_items (subject_id, grade_level, topic, kind, title, status, 
 
 -- refresh last-touch so the outbox from the seed does not look like live alerts
 update notification_outbox set status = 'sent', processed_at = now();
+
+-- ---- demo logins (needs auth_local.sql loaded first) -------------------------
+-- Same demo password for everyone: maktab2026. Shown on the demo login page.
+-- Kamola (English teacher) is ALSO the mother of Madina (5-A): she sees the
+-- "who are you today?" chooser after login.
+insert into user_school_roles (user_id, role, school_id) values
+ ('d1000000-0000-4000-8000-000000000012', 'parent', 'd5000000-0000-4000-8000-000000000001');
+insert into guardians (parent_user_id, student_id, relation, is_primary) values
+ ('d1000000-0000-4000-8000-000000000012', 'd4000000-0000-4000-8000-000000000502', 'mother', true);
+
+select app.set_password(id, coalesce(phone, 'sardor.r'), 'maktab2026')
+from demo_people where tag in ('director','zavuch','admin','t1','t2','t3','t4','t5','t6','parent','student');

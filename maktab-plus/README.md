@@ -73,7 +73,11 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
 
 - `db/demo_seed.sql`: the public demo school (3 classes, 36 students, 6 teachers, director, zavuch, a
   parent with two children). All people are invented; dates are relative to today.
-- `db/demo_login.sql`: the `authenticator` role and one-tap login that works **only** for the demo
-  school. Real schools will log in through Supabase Auth / phone code (later step).
+- `db/auth_local.sql`: the `authenticator` role and **login with phone number (or a short login for
+  children) + password**. Passwords are bcrypt hashes nobody can read; the only door is
+  `app.password_login()`, which only lets you into a school where you have a role. Your roles come
+  from the database; the "who are you today?" chooser appears only when you have more than one
+  (e.g. a teacher who is also a parent). 5 wrong passwords → that login waits 1 minute.
+- Demo logins (password `maktab2026`) are listed on the demo school's login page only.
 - Each school opens in its own window: `school-a.maktabplus.uz` or `?school=school-a`.
 - Database tests: `db/run_all_tests.sh` (all suites green).
