@@ -105,7 +105,32 @@ const Q = {
   teachers: `select t.*, sub.name_uz as subject from app.my_teachers() t left join subjects sub on sub.id = t.subject_id`,
   absenceReports: `select r.id, r.student_id, r.absence_date, r.reason, r.status from parent_absence_reports r
                    order by r.absence_date desc limit 10`,
+  myMessages: `select cr.id, cr.student_id, cr.topic, cr.body, cr.status, cr.reply, cr.created_at, cr.answered_at
+               from contact_requests cr where cr.parent_user_id = auth.uid() order by cr.created_at desc limit 20`,
+  // class teacher: parents' absence reports waiting for a decision
+  absenceToReview: `select r.id, r.student_id, r.absence_date, r.reason, s.first_name, s.last_name,
+                      c.grade_level || '-' || c.letter as class
+                    from parent_absence_reports r join students s on s.id = r.student_id
+                    join class_members cm on cm.student_id = s.id and cm.status = 'active'
+                    join classes c on c.id = cm.class_id
+                    where r.status = 'pending' and app.is_class_teacher_of(r.student_id)
+                    order by r.absence_date`,
+  forwardedToMe: `select cr.id, cr.topic, cr.body, cr.status, cr.created_at, s.first_name || ' ' || s.last_name as student
+                  from contact_requests cr join students s on s.id = cr.student_id
+                  where cr.forwarded_to = app.my_teacher_id() order by cr.created_at desc limit 10`,
   // leaders
+  inbox: `select cr.id, cr.topic, cr.body, cr.status, cr.reply, cr.created_at, cr.forwarded_to,
+                 s.first_name || ' ' || s.last_name as student, c.grade_level || '-' || c.letter as class,
+                 p.first_name || ' ' || p.last_name as parent,
+                 (select tp.first_name || ' ' || tp.last_name from teachers t join profiles tp on tp.user_id = t.user_id
+                   where t.id = cr.about_teacher_id) as about_teacher
+          from contact_requests cr join students s on s.id = cr.student_id
+          left join class_members cm on cm.student_id = s.id and cm.status = 'active'
+          left join classes c on c.id = cm.class_id
+          left join profiles p on p.user_id = cr.parent_user_id
+          order by (cr.status = 'open') desc, cr.created_at desc limit 20`,
+  staffTeachers: `select t.id, p.first_name || ' ' || p.last_name as name from teachers t
+                  join profiles p on p.user_id = t.user_id where t.status = 'active' order by p.last_name`,
   counts: `select (select count(*) from classes) as classes,
                   (select count(*) from teachers) as teachers,
                   (select count(*) from problems where status = 'open') as problems_open,
@@ -132,12 +157,17 @@ async function home(user, wanted) {
     if (!roles.length) { const e = new Error("no_role"); e.code = "42501"; throw e; }
     const role = roles.includes(wanted) ? wanted : roles[0];
     const out = { me, school, roles, role };
-    if (role === "teacher") out.day = (await q(Q.myDay))[0].day;
+    if (role === "teacher") {
+      out.day = (await q(Q.myDay))[0].day;
+      out.absenceToReview = await q(Q.absenceToReview);
+      out.forwarded = await q(Q.forwardedToMe);
+    }
     if (role === "parent" || role === "student") {
       Object.assign(out, {
         kids: await q(Q.kids), gateToday: await q(Q.gateToday), grades: await q(Q.grades),
         attendance: await q(Q.attendance30), homework: await q(Q.homework),
         teachers: await q(Q.teachers), absenceReports: await q(Q.absenceReports),
+        messages: role === "parent" ? await q(Q.myMessages) : [],
       });
     }
     if (LEADER.includes(role)) {
@@ -146,6 +176,7 @@ async function home(user, wanted) {
         stats: (await q("select * from app.school_stats($1)", [sid]))[0],
         counts: (await q(Q.counts))[0], problems: await q(Q.problems),
         classAttendance: await q(Q.classAttendance),
+        inbox: await q(Q.inbox), staffTeachers: await q(Q.staffTeachers),
       });
     }
     return out;
@@ -213,6 +244,58 @@ const teacher = {
   },
 };
 
+// ---- parents & students (step 3) ----------------------------------------------
+const one = (rows) => rows[0] ?? null;
+const family = {
+  // parent reports an absence in advance (RLS: own child, not in the past)
+  absence: (user, b) => {
+    if (!UUID.test(b.student_id) || !DATE.test(b.date) || typeof b.reason !== "string" || b.reason.length > 500) throw bad("bad_request");
+    return asRole(user, async (q) => one(await q(
+      `insert into parent_absence_reports (school_id, student_id, parent_user_id, absence_date, reason)
+       values (app.student_school($1), $1, auth.uid(), $2, $3) returning id, status`, [b.student_id, b.date, b.reason.trim()])));
+  },
+  // parent writes to the school office (never straight to a teacher)
+  message: (user, b) => {
+    if (!UUID.test(b.student_id) || typeof b.topic !== "string" || typeof b.body !== "string"
+        || !b.topic.trim() || !b.body.trim() || b.topic.length > 120 || b.body.length > 2000
+        || (b.about_teacher_id && !UUID.test(b.about_teacher_id))) throw bad("bad_request");
+    return asRole(user, async (q) => one(await q(
+      `insert into contact_requests (school_id, student_id, parent_user_id, about_teacher_id, topic, body)
+       values (app.student_school($1), $1, auth.uid(), $2, $3, $4) returning id, status`,
+      [b.student_id, b.about_teacher_id || null, b.topic.trim(), b.body.trim()])));
+  },
+  week: (user, classId, start) => {
+    if (!UUID.test(classId) || !DATE.test(start)) throw bad("bad_request");
+    return asRole(user, async (q) => (await q("select api.class_week($1::uuid, $2::date) as r", [classId, start]))[0].r);
+  },
+};
+// class teacher decides on a parent's absence report (RLS: class teacher or leadership)
+async function decideAbsence(user, b) {
+  if (!UUID.test(b.id) || !["accepted", "rejected"].includes(b.status)) throw bad("bad_request");
+  return asRole(user, async (q) => {
+    const r = one(await q(`update parent_absence_reports set status = $2, reviewed_by = auth.uid(), reviewed_at = now(),
+                             review_note = $3 where id = $1 and status = 'pending' returning id, status`,
+                          [b.id, b.status, (b.note ?? "").slice(0, 500) || null]));
+    if (!r) { const e = new Error("not_found_or_denied"); e.code = "42501"; throw e; }
+    return r;
+  });
+}
+// school office answers or forwards a parent's message (RLS: leadership of that school)
+async function officeReply(user, b) {
+  if (!UUID.test(b.id) || (b.forward_to && !UUID.test(b.forward_to))
+      || (b.reply !== undefined && (typeof b.reply !== "string" || b.reply.length > 2000))) throw bad("bad_request");
+  const status = b.forward_to ? "forwarded" : b.reply?.trim() ? "answered" : b.close ? "closed" : null;
+  if (!status) throw bad("bad_request");
+  return asRole(user, async (q) => {
+    const r = one(await q(`update contact_requests set status = $2::contact_status, handled_by = auth.uid(),
+                             forwarded_to = coalesce($3::uuid, forwarded_to), reply = coalesce($4, reply),
+                             answered_at = case when $4 is not null then now() else answered_at end
+                           where id = $1 returning id, status`, [b.id, status, b.forward_to || null, b.reply?.trim() || null]));
+    if (!r) { const e = new Error("not_found_or_denied"); e.code = "42501"; throw e; }
+    return r;
+  });
+}
+
 // ---- http ------------------------------------------------------------------
 function send(res, code, body) {
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -263,6 +346,19 @@ const server = http.createServer(async (req, res) => {
       if (op === "checklist" && req.method === "GET") return send(res, 200, await teacher.checklist(user, url.searchParams.get("date") ?? ""));
       if (req.method === "POST" && ["open", "save", "finish", "close"].includes(op)) return send(res, 200, await teacher[op](user, await readJson(req)));
       return send(res, 405, { error: "method_not_allowed" });
+    }
+    if (url.pathname.startsWith("/api/family/") || url.pathname === "/api/teacher/absence" || url.pathname === "/api/office/reply") {
+      if (!user) return send(res, 401, { error: "login_required" });
+      const p = url.pathname;
+      if (p === "/api/family/week" && req.method === "GET")
+        return send(res, 200, await family.week(user, url.searchParams.get("class") ?? "", url.searchParams.get("start") ?? ""));
+      if (req.method !== "POST") return send(res, 405, { error: "method_not_allowed" });
+      const b = await readJson(req);
+      if (p === "/api/family/absence") return send(res, 200, await family.absence(user, b));
+      if (p === "/api/family/message") return send(res, 200, await family.message(user, b));
+      if (p === "/api/teacher/absence") return send(res, 200, await decideAbsence(user, b));
+      if (p === "/api/office/reply") return send(res, 200, await officeReply(user, b));
+      return send(res, 404, { error: "not_found" });
     }
     if (url.pathname === "/api/health") return send(res, 200, { ok: true });
     send(res, 404, { error: "not_found" });

@@ -39,7 +39,7 @@ export function TeacherHome({ i, home, reload }: { i: I18n; home: Home; reload: 
           <button className="btn btn-sm" onClick={() => flush().then(setQueued)}>{t("retry")}</button></div>
       )}
       {day.closed && <div className="callout callout-info"><Icon name="moon" /><div>{t("day_closed")}</div></div>}
-      {day.absence_reports_pending > 0 && <div className="callout callout-info"><Icon name="mail" /><div>{t("absence_banner", { n: day.absence_reports_pending })}</div></div>}
+      {(home.absenceToReview ?? []).length > 0 && <AbsenceReview i={i} list={home.absenceToReview!} reload={reload} />}
       <div className="grid grid-3">
         <Stat icon="calendar" label={t("lessons_today")} value={day.lessons.length} />
         <Stat icon="circle-check" label={t("lessons_done")} value={`${done} / ${day.lessons.length}`} />
@@ -54,6 +54,14 @@ export function TeacherHome({ i, home, reload }: { i: I18n; home: Home; reload: 
           ))}</div>
         )}
       </Card>
+      {(home.forwarded ?? []).length > 0 && (
+        <Card title={t("forwarded_title")} sub={t("forwarded_sub")}>
+          <div className="list">{home.forwarded!.map((m) => (
+            <div key={m.id} className="list-item" style={{ alignItems: "flex-start" }}><Icon name="message-2" />
+              <div className="grow"><b>{m.topic}</b> <span className="small muted">· {m.student} · {i.date(m.created_at)}</span><div className="small">{m.body}</div></div></div>
+          ))}</div>
+        </Card>
+      )}
       {day.lessons.length > 0 && (
         <Card title={t("finish_day")} sub={t("finish_day_sub")}>
           <button className="btn btn-primary" onClick={() => setView({ kind: "close" })}><Icon name="moon" />{t("check_and_finish")}</button>
@@ -376,5 +384,29 @@ function DayCloseView({ i, home, onBack }: { i: I18n; home: Home; onBack: () => 
         </Card>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------- class teacher: absence reports
+function AbsenceReview({ i, list, reload }: { i: I18n; list: NonNullable<Home["absenceToReview"]>; reload: () => void }) {
+  const { t } = i;
+  const [busy, setBusy] = useState("");
+  const decide = async (id: string, status: "accepted" | "rejected") => {
+    setBusy(id);
+    try { await api("/teacher/absence", { method: "POST", body: JSON.stringify({ id, status }) }); reload(); }
+    finally { setBusy(""); }
+  };
+  return (
+    <Card title={t("absence_review")} sub={t("absence_review_sub")}>
+      <div className="list">{list.map((r) => (
+        <div key={r.id} className="list-item" style={{ flexWrap: "wrap" }}>
+          <Icon name="calendar-x" />
+          <div className="grow" style={{ minWidth: 180 }}><b>{r.first_name} {r.last_name}</b> <span className="small muted">· {r.class} · {i.date(r.absence_date, true)}</span>
+            {r.reason && <div className="small">{r.reason}</div>}</div>
+          <button className="btn btn-primary btn-sm" disabled={busy === r.id} onClick={() => decide(r.id, "accepted")}><Icon name="check" />{t("accept")}</button>
+          <button className="btn btn-sm" disabled={busy === r.id} onClick={() => decide(r.id, "rejected")}><Icon name="x" />{t("reject")}</button>
+        </div>
+      ))}</div>
+    </Card>
   );
 }

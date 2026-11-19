@@ -96,3 +96,17 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
   cards); never blocks; after closing, work messages wait until morning (quiet hours).
 - Server tests: `API=http://localhost:8787 ./server/test_server.sh` (15 checks).
 
+## Step 3: parents and students
+
+- **Parent home**: arrived at school?, grades, attendance, homework, teachers (names only),
+  switch between children.
+- **Diary week** (`api.class_week`, `db/family_api.sql`): timetable, bell times, lesson topics,
+  homework and grades per day. Lesson cards stay private: the diary never contains the teacher's
+  "ask first" notes.
+- **Report an absence in advance**: the class teacher accepts or rejects it on their "My day".
+  An accepted report turns that day's "absent" into **excused** automatically, so the parent gets
+  no needless alert.
+- **Write to the school office**: parents never message teachers directly. The director, zavuch or
+  admin answers or forwards to a teacher; the parent sees the answer under "Messages".
+- Tests: `db/test_family.sql` (9), `server/test_server.sh` (27 incl. 12 for step 3).
+

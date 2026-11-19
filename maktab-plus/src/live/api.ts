@@ -64,4 +64,10 @@ export type Home = {
   counts?: { classes: number; teachers: number; problems_open: number; absence_pending: number; arrived_today: number };
   problems?: { id: string; category: string; severity: "small" | "serious"; description: string; status: string; created_at: string }[];
   classAttendance?: { class: string; rate: number }[];
+  messages?: { id: string; student_id: string; topic: string; body: string; status: string; reply: string | null; created_at: string; answered_at: string | null }[];
+  absenceToReview?: { id: string; student_id: string; absence_date: string; reason: string | null; first_name: string; last_name: string; class: string }[];
+  forwarded?: { id: string; topic: string; body: string; status: string; created_at: string; student: string }[];
+  inbox?: { id: string; topic: string; body: string; status: string; reply: string | null; created_at: string; forwarded_to: string | null; student: string; class: string | null; parent: string | null; about_teacher: string | null }[];
+  staffTeachers?: { id: string; name: string }[];
 };
+export type DiaryLesson = { date: string; period: number; subject_id: number; subject: string; start: string | null; end: string | null; topic: string | null };

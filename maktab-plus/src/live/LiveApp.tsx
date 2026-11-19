@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { api, ApiError, getToken, schoolSlug, setToken, type Home, type Kid, type SchoolWindow } from "./api";
+import { api, ApiError, getToken, schoolSlug, setToken, type Home, type SchoolWindow } from "./api";
 import { useLang, type I18n, type Lang } from "./i18n";
 import { TeacherHome } from "./Teacher";
-import { Avatar, Badge, Card, Empty, GradePill, Icon, PageHead, Progress, Segmented, Stat } from "../components/ui";
+import { FamilyHome } from "./Family";
+import { OfficeInbox } from "./Office";
+import { Avatar, Badge, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
   { id: "teacher", icon: "school", color: "#0f766e" },
@@ -238,105 +240,15 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
       </header>
       <main className="content">
         {home.day && <TeacherHome i={i} home={home} reload={onRefresh} />}
-        {home.kids && <FamilyHome i={i} home={home} />}
-        {home.stats && <LeaderHome i={i} home={home} />}
+        {home.kids && <FamilyHome i={i} home={home} reload={onRefresh} />}
+        {home.stats && <LeaderHome i={i} home={home} reload={onRefresh} />}
       </main>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- parent / student
-function FamilyHome({ i, home }: { i: I18n; home: Home }) {
-  const { t } = i;
-  const kids = home.kids ?? [];
-  const [kidId, setKidId] = useState(kids[0]?.id ?? "");
-  const kid = kids.find((k) => k.id === kidId) ?? kids[0];
-  if (!kid) return <Card><Empty>{t("nothing")}</Empty></Card>;
-  const isParent = home.roles.includes("parent");
-  return (
-    <>
-      <PageHead title={t("hello", { n: home.me.first_name })} sub={`${kid.first_name} ${kid.last_name} · ${kid.class}`}
-        right={kids.length > 1 ? <Segmented value={kid.id} onChange={setKidId} items={kids.map((k) => ({ id: k.id, label: `${k.first_name} · ${k.class}` }))} /> : undefined} />
-      <KidView i={i} home={home} kid={kid} isParent={isParent} />
-    </>
-  );
-}
-function KidView({ i, home, kid, isParent }: { i: I18n; home: Home; kid: Kid; isParent: boolean }) {
-  const { t } = i;
-  const gate = (home.gateToday ?? []).filter((g) => g.student_id === kid.id);
-  const last = gate[gate.length - 1];
-  const grades = (home.grades ?? []).filter((g) => g.student_id === kid.id);
-  const avg = grades.length ? grades.reduce((s, g) => s + g.value, 0) / grades.length : null;
-  const att = (home.attendance ?? []).find((a) => a.student_id === kid.id);
-  const rate = att && att.total ? Math.round((100 * att.present) / att.total) : null;
-  const hw = (home.homework ?? []).filter((h) => h.class_id === kid.class_id);
-  const teachers = dedupeTeachers((home.teachers ?? []).filter((x) => x.student_id === kid.id));
-  const reports = (home.absenceReports ?? []).filter((r) => r.student_id === kid.id);
-  return (
-    <>
-      <div className="grid grid-3">
-        <Card title={t("at_school_today")}>
-          <div className="row" style={{ gap: 14 }}>
-            <span className="role-icon" style={{ width: 52, height: 52, fontSize: 26, background: last ? "var(--good-soft)" : "var(--warn-soft)", color: last ? "var(--good)" : "var(--warn)" }}>
-              <Icon name={last ? (last.direction === "in" ? "door-enter" : "door-exit") : "clock"} />
-            </span>
-            <b style={{ fontSize: 17 }}>{last ? t(last.direction === "in" ? "arrived" : "left", { t: i.time(last.scanned_at) }) : t("not_arrived")}</b>
-          </div>
-          <p className="small muted" style={{ marginTop: 10 }}><Icon name="shield-lock" /> {t("gate_note")}</p>
-        </Card>
-        <Stat icon="star" label={t("avg_grade")} value={avg ? avg.toFixed(1) : "—"} />
-        <Stat icon="calendar-check" label={t("attendance30")} value={rate != null ? `${rate}%` : "—"} foot={att ? t("late_absent", { l: att.late, a: att.absent }) : undefined} />
-      </div>
-      <div className="grid grid-2">
-        <Card title={t("homework")}>
-          {hw.length === 0 ? <Empty icon="notebook">{t("nothing")}</Empty> : (
-            <div className="list">{hw.map((h, k) => (
-              <div key={k} className="list-item"><Icon name="notebook" /><div className="grow"><b>{h.subject}</b><div className="small">{h.description}</div></div>
-                <span className="small muted">{t("due", { d: i.date(h.due_date) })}</span></div>))}</div>
-          )}
-        </Card>
-        <Card title={t("recent_grades")}>
-          {grades.length === 0 ? <Empty icon="star">{t("nothing")}</Empty> : (
-            <div className="list">{grades.slice(0, 8).map((g, k) => (
-              <div key={k} className="list-item"><GradePill value={g.value} /><div className="grow"><b>{g.subject}</b>{g.comment && <div className="small muted">{g.comment}</div>}</div>
-                <span className="small muted">{i.date(g.created_at)}</span></div>))}</div>
-          )}
-        </Card>
-      </div>
-      <div className="grid grid-2">
-        <Card title={t("teachers")}>
-          <div className="list">{teachers.map((x) => (
-            <div key={x.teacher_id} className="list-item"><Avatar name={`${x.first_name} ${x.last_name}`} />
-              <div className="grow"><b>{x.first_name} {x.last_name}</b><div className="small muted">{x.subjects.join(", ")}</div></div>
-              {x.is_class_teacher && <Badge tone="brand">{t("class_teacher")}</Badge>}</div>))}</div>
-          <p className="small muted" style={{ marginTop: 10 }}><Icon name="building" /> {t("contact_office")}</p>
-        </Card>
-        {isParent && (
-          <Card title={t("absence_reports")}>
-            {reports.length === 0 ? <Empty icon="calendar-off">{t("nothing")}</Empty> : (
-              <div className="list">{reports.map((r) => (
-                <div key={r.id} className="list-item"><Icon name="calendar-off" /><div className="grow"><b>{i.date(r.absence_date, true)}</b><div className="small muted">{r.reason}</div></div>
-                  <Badge tone={r.status === "accepted" ? "good" : r.status === "rejected" ? "bad" : "warn"}>{t(`st_${r.status}`)}</Badge></div>))}</div>
-            )}
-          </Card>
-        )}
-      </div>
-    </>
-  );
-}
-function dedupeTeachers(rows: NonNullable<Home["teachers"]>) {
-  const m = new Map<string, { teacher_id: string; first_name: string; last_name: string; subjects: string[]; is_class_teacher: boolean }>();
-  for (const r of rows) {
-    const e = m.get(r.teacher_id) ?? { teacher_id: r.teacher_id, first_name: r.first_name, last_name: r.last_name, subjects: [], is_class_teacher: false };
-    if (r.subject && !e.subjects.includes(r.subject)) e.subjects.push(r.subject);
-    e.is_class_teacher ||= r.is_class_teacher;
-    m.set(r.teacher_id, e);
-  }
-  return [...m.values()].sort((a, b) => Number(b.is_class_teacher) - Number(a.is_class_teacher));
-}
-
 // ---------------------------------------------------------------- director / zavuch
-function LeaderHome({ i, home }: { i: I18n; home: Home }) {
+function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => void }) {
   const { t } = i;
   const s = home.stats!, c = home.counts!;
   return (
@@ -364,6 +276,7 @@ function LeaderHome({ i, home }: { i: I18n; home: Home }) {
           )}
         </Card>
       </div>
+      <OfficeInbox i={i} home={home} reload={reload} />
       <Card><div className="row between"><span><Icon name="mail" /> {t("absence_pending")}</span><b className="tnum">{c.absence_pending}</b></div></Card>
     </>
   );
