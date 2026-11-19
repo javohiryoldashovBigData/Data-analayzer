@@ -81,3 +81,18 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
 - Demo logins (password `maktab2026`) are listed on the demo school's login page only.
 - Each school opens in its own window: `school-a.maktabplus.uz` or `?school=school-a`.
 - Database tests: `db/run_all_tests.sh` (all suites green).
+
+## Step 2: the teacher's day
+
+- **My day**: today's lessons, "ask first" names, absence reports, lesson status.
+- **Lesson card**: topic, plan, homework, 3 exit-check questions; save or approve.
+- **After lesson** (1–2 minutes): attendance for the whole class (children the gate did not see
+  start as absent), optional grades with a task-focused comment, "didn't get it" taps from the
+  exit check, topic, homework, private note. One call to `api.finish_lesson`.
+- **Works offline**: without internet the save is kept on the device (`src/live/queue.ts`) and
+  sent when the connection returns; the database answers a repeated save with the first result,
+  so nothing is ever doubled (tested with two parallel connections in `db/test_api_race.sh`).
+- **Finished for today**: checklist (attendance, topic, after-lesson per lesson, tomorrow's
+  cards); never blocks; after closing, work messages wait until morning (quiet hours).
+- Server tests: `API=http://localhost:8787 ./server/test_server.sh` (15 checks).
+

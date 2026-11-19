@@ -152,6 +152,67 @@ async function home(user, wanted) {
   });
 }
 
+// ---- teacher's day (step 2): thin wrappers around the tested api.* functions.
+// Each runs as the logged-in teacher; the functions + RLS check authority.
+const UUID = /^[0-9a-f-]{36}$/i, DATE = /^\d{4}-\d{2}-\d{2}$/;
+function bad(msg) { const e = new Error(msg); e.code = "22023"; return e; }
+const teacher = {
+  async open(user, b) {
+    if (!UUID.test(b.class_id) || !DATE.test(b.date)) throw bad("bad_request");
+    return asRole(user, async (q) => (await q(
+      "select api.open_lesson_card($1::uuid, $2::smallint, $3::date, $4::smallint) as r",
+      [b.class_id, b.subject_id, b.date, b.period]))[0].r);
+  },
+  async save(user, b) {
+    if (!UUID.test(b.card_id)) throw bad("bad_request");
+    return asRole(user, async (q) => (await q(
+      "select api.save_lesson_card($1::uuid, $2::jsonb, $3::boolean) as r",
+      [b.card_id, JSON.stringify(b.patch ?? {}), !!b.approve]))[0].r);
+  },
+  // everything the "after lesson" screen needs in one call
+  async lesson(user, cardId) {
+    if (!UUID.test(cardId)) throw bad("bad_request");
+    return asRole(user, async (q) => {
+      const [card] = await q(`select lc.id, lc.class_id, lc.subject_id, lc.lesson_date, lc.period, lc.topic, lc.plan,
+                                     lc.homework, lc.status, lc.questions, c.grade_level || '-' || c.letter as class,
+                                     sub.name_uz as subject
+                              from lesson_cards lc join classes c on c.id = lc.class_id
+                              join subjects sub on sub.id = lc.subject_id
+                              where lc.id = $1 and lc.teacher_id = app.my_teacher_id()`, [cardId]);
+      if (!card) { const e = new Error("card_not_found_or_denied"); e.code = "42501"; throw e; }
+      const roster = await q(`select s.id, s.first_name, s.last_name,
+                                (select a.status from attendance_logs a where a.student_id = s.id
+                                  and a.date = $2 and a.period = $3) as status,
+                                (select array_agg(g.value order by g.created_at) from grades g where g.student_id = s.id
+                                  and g.subject_id = $4 and g.deleted_at is null
+                                  and g.created_at >= $2::date and g.created_at < $2::date + 1) as grades_today,
+                                exists (select 1 from gate_events ge where ge.student_id = s.id and ge.direction = 'in'
+                                  and ge.scanned_at >= ($2::date::timestamp at time zone 'Asia/Tashkent')
+                                  and ge.scanned_at <  ($2::date::timestamp at time zone 'Asia/Tashkent') + interval '1 day') as at_school
+                              from class_members cm join students s on s.id = cm.student_id
+                              where cm.class_id = $1 and cm.status = 'active'
+                              order by s.last_name, s.first_name`, [card.class_id, card.lesson_date, card.period, card.subject_id]);
+      const [exit] = await q("select questions, results, not_got, recorded_at from exit_checks where card_id = $1", [cardId]);
+      const [report] = await q("select note, completed_at from lesson_reports where card_id = $1", [cardId]);
+      const askFirst = (await q("select api.ask_first($1::uuid, $2::smallint, 3) as r", [card.class_id, card.subject_id]))[0].r;
+      return { card, roster, exit: exit ?? null, report: report ?? null, askFirst };
+    });
+  },
+  async finish(user, b) {
+    if (!UUID.test(b.card_id) || !b.payload || !UUID.test(b.payload.client_op_id ?? "")) throw bad("bad_request");
+    return asRole(user, async (q) => (await q("select api.finish_lesson($1::uuid, $2::jsonb) as r",
+      [b.card_id, JSON.stringify(b.payload)]))[0].r);
+  },
+  async checklist(user, date) {
+    if (!DATE.test(date)) throw bad("bad_request");
+    return asRole(user, async (q) => (await q("select api.day_checklist($1::date) as r", [date]))[0].r);
+  },
+  async close(user, b) {
+    if (!DATE.test(b.date)) throw bad("bad_request");
+    return asRole(user, async (q) => (await q("select api.close_day($1::date) as r", [b.date]))[0].r);
+  },
+};
+
 // ---- http ------------------------------------------------------------------
 function send(res, code, body) {
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -193,10 +254,23 @@ const server = http.createServer(async (req, res) => {
       if (!user) return send(res, 401, { error: "login_required" });
       return send(res, 200, await home(user, url.searchParams.get("role")));
     }
+    // teacher's day
+    m = url.pathname.match(/^\/api\/teacher\/(open|save|finish|close|checklist|lesson)$/);
+    if (m) {
+      if (!user) return send(res, 401, { error: "login_required" });
+      const op = m[1];
+      if (op === "lesson" && req.method === "GET") return send(res, 200, await teacher.lesson(user, url.searchParams.get("card") ?? ""));
+      if (op === "checklist" && req.method === "GET") return send(res, 200, await teacher.checklist(user, url.searchParams.get("date") ?? ""));
+      if (req.method === "POST" && ["open", "save", "finish", "close"].includes(op)) return send(res, 200, await teacher[op](user, await readJson(req)));
+      return send(res, 405, { error: "method_not_allowed" });
+    }
     if (url.pathname === "/api/health") return send(res, 200, { ok: true });
     send(res, 404, { error: "not_found" });
   } catch (e) {
     // database permission errors are 403; never leak SQL details to the browser
+    // input / data errors → 400 with the function's own short code (e.g. no_term_for_date)
+    if (["22023", "22P02", "22007", "22008", "23502", "23514", "P0001"].includes(e.code))
+      return send(res, 400, { error: /^[a-z_]+$/.test(e.message) ? e.message : "bad_request" });
     const code = e.code === "42501" ? 403 : 500;
     if (code === 500) console.error(e);
     send(res, code, { error: code === 403 ? "not_allowed" : "server_error" });

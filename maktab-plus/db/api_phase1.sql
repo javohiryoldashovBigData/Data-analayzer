@@ -320,6 +320,10 @@ declare
   g        jsonb;
 begin
   if v_op is null then raise exception 'client_op_id required' using errcode = '22023'; end if;
+  -- V3.2: two copies of the same save arriving at the same moment (offline
+  -- queue + reconnect) wait for each other; the second then returns the
+  -- first one's result instead of failing on the api_ops primary key.
+  perform pg_advisory_xact_lock(hashtextextended('finish_lesson:' || v_op::text, 0));
   select a.result into v_prev from api_ops a where a.client_op_id = v_op;
   if found then return v_prev; end if;           -- retry from offline queue
 

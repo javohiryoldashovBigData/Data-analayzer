@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { api, ApiError, getToken, schoolSlug, setToken, type Home, type Kid, type Lesson, type SchoolWindow } from "./api";
+import { api, ApiError, getToken, schoolSlug, setToken, type Home, type Kid, type SchoolWindow } from "./api";
 import { useLang, type I18n, type Lang } from "./i18n";
+import { TeacherHome } from "./Teacher";
 import { Avatar, Badge, Card, Empty, GradePill, Icon, PageHead, Progress, Segmented, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -63,7 +64,12 @@ export default function LiveApp() {
     try {
       const h = await api<Home>(`/home${role ? `?role=${encodeURIComponent(role)}` : ""}`);
       putRole(h.role); setHome(h); setRoles(null); window.scrollTo(0, 0);
-    } catch (e) { if ((e as ApiError).status !== 401) setErr(t("error")); setHome(null); }
+    } catch (e) {
+      // Only a real "session expired" (401) logs you out. With no internet we keep
+      // the screen you have, so offline-saved lessons can still sync later.
+      if (e instanceof ApiError && e.status === 401) setHome(null);
+      else setErr(t("error"));
+    }
     finally { setBusy(false); }
   };
   useEffect(() => { if (getToken()) open(getRole()); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -231,58 +237,10 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         <button className="btn" onClick={onLogout}><Icon name="logout" /><span className="user-text">{t("logout")}</span></button>
       </header>
       <main className="content">
-        {home.day && <TeacherHome i={i} home={home} />}
+        {home.day && <TeacherHome i={i} home={home} reload={onRefresh} />}
         {home.kids && <FamilyHome i={i} home={home} />}
         {home.stats && <LeaderHome i={i} home={home} />}
       </main>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- teacher
-function TeacherHome({ i, home }: { i: I18n; home: Home }) {
-  const { t } = i;
-  const day = home.day!;
-  const done = day.lessons.filter((l) => l.lesson_done).length;
-  return (
-    <>
-      <PageHead title={t("hello", { n: home.me.first_name })} sub={i.date(day.date, true)} />
-      <div className="grid grid-3">
-        <Stat icon="calendar" label={t("lessons_today")} value={day.lessons.length} />
-        <Stat icon="circle-check" label={t("lessons_done")} value={`${done} / ${day.lessons.length}`} />
-        <Stat icon="mail" label={t("absence_pending")} value={day.absence_reports_pending} />
-      </div>
-      <Card title={t("lessons_today")} sub={i.date(day.date, true)}>
-        {day.lessons.length === 0 ? <Empty icon="mug">{t("no_lessons")}</Empty> : (
-          <div className="list">{day.lessons.map((l) => <LessonRow key={l.period} i={i} l={l} />)}</div>
-        )}
-        <p className="small muted" style={{ marginTop: 10 }}><Icon name="info-circle" /> {t("next_step")}</p>
-      </Card>
-    </>
-  );
-}
-function LessonRow({ i, l }: { i: I18n; l: Lesson }) {
-  const { t } = i;
-  const card = l.card ? <Badge tone={l.card.status === "approved" ? "good" : "accent"}>{t(`card_${l.card.status}`)}</Badge> : <Badge>{t("card_none")}</Badge>;
-  return (
-    <div className="list-item" style={{ alignItems: "flex-start" }}>
-      <span className="period-no">{l.period}</span>
-      <div className="grow stack" style={{ gap: 6 }}>
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-          <b>{l.class} · {l.subject}</b>
-          <span className="small muted">{l.start?.slice(0, 5)}–{l.end?.slice(0, 5)}</span>
-          {l.substitution && <Badge tone="warn">{t("substitution")}</Badge>}
-          {card}
-          {l.attendance_done && <Badge tone="good">{t("att_done")}</Badge>}
-          {l.lesson_done && <Badge tone="good" icon="check">{t("lesson_done")}</Badge>}
-        </div>
-        {l.ask_first.length > 0 && (
-          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-            <span className="small muted"><Icon name="hand-finger" /> {t("ask_first")}:</span>
-            {l.ask_first.map((a) => <span key={a.student_id} className="badge">{a.name}</span>)}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
