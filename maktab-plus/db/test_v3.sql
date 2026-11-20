@@ -261,6 +261,10 @@ select test.check('W6a closed window: teacher of school A sees no students',
 select test.asuser('aaaa0000-0000-4000-8000-00000000a005');  -- parentA
 select test.check('W6b closed window: parent sees no grades',
   test.count('select count(*) from grades') = 0);
+select test.asuser('aaaa0000-0000-4000-8000-00000000a004');  -- teachA
+select test.check('W6c closed window: teacher sees no rosters, homework, teachers or substitutions',
+  test.count($q$ select (select count(*) from class_members) + (select count(*) from homework)
+                      + (select count(*) from teachers) + (select count(*) from substitutions) $q$) = 0);
 reset role;
 update schools set is_active = true where slug = 'school-a';
 set role authenticated;

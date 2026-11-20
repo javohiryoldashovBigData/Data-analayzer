@@ -61,12 +61,10 @@ alter table question_bank      enable row level security;
 alter table question_bank_keys enable row level security;
 
 -- staff = teacher or leader somewhere (definer: safe read of user_school_roles)
-create or replace function app.is_staff_at(p_school_id uuid)
-returns boolean language sql stable security definer set search_path = public, pg_temp as $$
-  select exists (select 1 from user_school_roles r
-                 where r.user_id = auth.uid() and r.is_active and r.school_id = p_school_id
-                   and r.role in ('teacher','zavuch','director','school_admin'))
-$$;
+-- V3.4 (Claude): app.is_staff_at() is NOT redefined here any more. The v3
+-- schema's version also checks that the school's window is open; redefining it
+-- without that check let staff of a CLOSED school keep reading rosters and
+-- homework. (Caught by test W6c.)
 create or replace function app.is_staff_anywhere()
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists (select 1 from user_school_roles r
