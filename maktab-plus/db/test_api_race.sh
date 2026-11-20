@@ -49,3 +49,23 @@ if ! grep -q ERROR /tmp/dup1.out /tmp/dup2.out && [ "$n" = 1 ]; then
 else
   echo "FAIL  RACE: duplicate save ($n grades)"; cat /tmp/dup1.out /tmp/dup2.out; exit 1
 fi
+
+# V3.3: two DIFFERENT teachers at the same moment can't both pass the school cap.
+psql -q -X -c "update schools set ai_monthly_cap_cents = 200 where slug = 'school-a';
+  update ai_reservations set status='released' where status='pending';
+  delete from ai_usage_log;
+  insert into user_school_roles (user_id, role, school_id) values ('aaaa0000-0000-4000-8000-00000000a008','teacher','bbbb0000-0000-4000-8000-00000000a001') on conflict do nothing;
+  insert into teacher_assignments (teacher_id, class_id, subject_id, academic_year_id) values ('cccc0000-0000-4000-8000-00000000a002','dddd0000-0000-4000-8000-00000000a001',2,2026) on conflict do nothing;" >/dev/null
+run_as() { psql -q -X -c "set role authenticated; select set_config('app.current_user_id','$1',false);
+begin; select app.ai_reserve('bbbb0000-0000-4000-8000-00000000a001','test_build',150); select pg_sleep(2); commit;" ; }
+run_as aaaa0000-0000-4000-8000-00000000a004 >/tmp/cap1.out 2>&1 &
+sleep 0.3
+run_as aaaa0000-0000-4000-8000-00000000a008 >/tmp/cap2.out 2>&1 &
+wait
+ok=$(grep -L "ERROR" /tmp/cap1.out /tmp/cap2.out | wc -l); capped=$(grep -l "school_budget_reached" /tmp/cap1.out /tmp/cap2.out | wc -l)
+psql -q -X -c "update schools set ai_monthly_cap_cents = 500 where slug = 'school-a'" >/dev/null
+if [ "$ok" = 1 ] && [ "$capped" = 1 ]; then
+  echo "PASS  RACE: two teachers × 150 cents at a 200-cent SCHOOL cap → exactly one passes"
+else
+  echo "FAIL  RACE: school cap ($ok passed, $capped capped)"; cat /tmp/cap1.out /tmp/cap2.out; exit 1
+fi

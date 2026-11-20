@@ -98,6 +98,11 @@ create table schools (
   share_stats_with_government boolean not null default false, -- private schools opt in; check with a lawyer
   plan        school_plan not null default 'standard',      -- V3: Standard = AI for teachers; Pro = AI for everyone
   pro_trial_until date,                                     -- V3: free Pro trial (e.g. pilot school)
+  -- V3.3: HARD monthly AI budget for the whole school (US cents). However
+  -- many people use AI, the school's AI spend can never pass this number.
+  -- Set it per contract (rule of thumb: <= 10% of what the school pays us).
+  -- Placeholder default: $5.00 / month.
+  ai_monthly_cap_cents numeric(10,2) not null default 500 check (ai_monthly_cap_cents >= 0),
   created_at  timestamptz not null default now()
 );
 create index schools_district_idx on schools(district_id);
@@ -1560,18 +1565,18 @@ create policy usage_select on ai_usage_log for select to authenticated using (
 -- 'not_in_plan' | 'limit_reached') + budget left this month.
 -- Effective plan = 'pro' if the school is on Pro or inside its Pro trial.
 create or replace function app.ai_check(p_school_id uuid, p_feature text)
-returns table (allowed boolean, reason text, plan school_plan, remaining_cents numeric)
+returns table (allowed boolean, reason text, plan school_plan, remaining_cents numeric, school_remaining_cents numeric)
 language plpgsql stable security definer set search_path = public as $$
 declare
-  v_school schools%rowtype; v_plan school_plan; v_limit numeric; v_used numeric;
+  v_school schools%rowtype; v_plan school_plan; v_limit numeric; v_used numeric; v_school_used numeric;
 begin
   select * into v_school from schools where id = p_school_id;
   if not found or not exists (select 1 from user_school_roles r
                               where r.user_id = auth.uid() and r.is_active and r.school_id = p_school_id) then
-    return query select false, 'not_member', null::school_plan, 0::numeric; return;
+    return query select false, 'not_member', null::school_plan, 0::numeric, 0::numeric; return;
   end if;
   if not v_school.is_active then
-    return query select false, 'window_closed', null::school_plan, 0::numeric; return;
+    return query select false, 'window_closed', null::school_plan, 0::numeric, 0::numeric; return;
   end if;
   v_plan := case when v_school.plan = 'pro' or v_school.pro_trial_until >= current_date
                  then 'pro'::school_plan else 'standard'::school_plan end;
@@ -1581,7 +1586,7 @@ begin
    where r.user_id = auth.uid() and r.is_active and r.school_id = p_school_id
      and pr.plan = v_plan and pr.feature = p_feature;
   if v_limit is null then
-    return query select false, 'not_in_plan', v_plan, 0::numeric; return;
+    return query select false, 'not_in_plan', v_plan, 0::numeric, 0::numeric; return;
   end if;
   select coalesce(q.monthly_limit_cents, v_limit) into v_limit
     from (select 1) one left join ai_quotas q on q.user_id = auth.uid();
@@ -1589,10 +1594,19 @@ begin
     from ai_usage_log u
    where u.user_id = auth.uid() and u.school_id = p_school_id and u.feature = p_feature
      and u.created_at >= date_trunc('month', now());
-  if v_used >= v_limit then
-    return query select false, 'limit_reached', v_plan, 0::numeric; return;
+  -- V3.3: the school's hard monthly cap, across all people and features
+  select coalesce(sum(u.cost_cents), 0) into v_school_used
+    from ai_usage_log u
+   where u.school_id = p_school_id and u.created_at >= date_trunc('month', now());
+  if v_school_used >= v_school.ai_monthly_cap_cents then
+    return query select false, 'school_budget_reached', v_plan, 0::numeric, 0::numeric; return;
   end if;
-  return query select true, 'ok', v_plan, v_limit - v_used;
+  if v_used >= v_limit then
+    return query select false, 'limit_reached', v_plan, 0::numeric, v_school.ai_monthly_cap_cents - v_school_used; return;
+  end if;
+  return query select true, 'ok', v_plan,
+    least(v_limit - v_used, v_school.ai_monthly_cap_cents - v_school_used),
+    v_school.ai_monthly_cap_cents - v_school_used;
 end $$;
 
 -- ---- payments & admissions ----

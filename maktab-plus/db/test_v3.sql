@@ -418,3 +418,20 @@ select test.check('AI7 monthly limit reached → AI stops ("use the Library")',
                where reason = 'limit_reached' $q$) = 1);
 select test.check('AI8 student CANNOT write their own usage log (only the server does)',
   not test.rows($q$ delete from ai_usage_log $q$));
+
+-- V3.3: the school's HARD monthly AI cap (all people, all features together)
+reset role;
+update schools set ai_monthly_cap_cents = 50 where slug = 'school-a';   -- 60 cents already spent (AI7)
+set role authenticated;
+select test.asuser('aaaa0000-0000-4000-8000-00000000a004');  -- teachA, own budget untouched
+select test.check('AI9 school cap reached → even a teacher with personal budget left gets no AI',
+  test.count($q$ select count(*) from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','lesson_prep')
+               where not allowed and reason = 'school_budget_reached' $q$) = 1);
+reset role;
+update schools set ai_monthly_cap_cents = 100 where slug = 'school-a';  -- 40 cents left
+set role authenticated;
+select test.check('AI10 personal budget is cut to what the school has left (40 of the teacher''s 200)',
+  test.count($q$ select remaining_cents::bigint from app.ai_check('bbbb0000-0000-4000-8000-00000000a001','lesson_prep') $q$) = 40);
+reset role;
+update schools set ai_monthly_cap_cents = 500 where slug = 'school-a';
+

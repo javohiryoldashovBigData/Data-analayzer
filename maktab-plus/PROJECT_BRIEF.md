@@ -69,6 +69,13 @@ Pitch: **"Research-backed teaching methods, built into the teacher's day"**, wit
 - **Pricing hypothesis (estimate, test in pilot):** about 15,000 UZS (Standard) / 30,000 UZS (Pro) per student per month, billed to the school, with a minimum per school; offer the pilot two price points.
 - **Already in the database (v3):** `schools.plan`, `schools.pro_trial_until`, `ai_plan_rules` (which role gets which AI feature in which plan, with a monthly limit), and `app.ai_check(school, feature)`. The server calls it before every AI request and logs usage after. The limits are **placeholder estimates** until the pilot.
 
+### Hard budget per school (decided 20 Nov 2026)
+- **Every school has a hard monthly AI cap** (`schools.ai_monthly_cap_cents`), enforced in the database for all people and features together. When it's reached, AI stops until next month and the app says "use the Library". **AI spend can never pass the cap**, so the worst case is known in advance.
+- **Rule of thumb:** cap ≤ **10% of what the school pays us**. Example: a school paying 3,000,000 so'm for 3 months pays 1,000,000 so'm/month (≈ $83 at ~12,000 so'm/$, estimate), so the cap is about **$8/month (≈ 100,000 so'm)**.
+- **Standard uses Haiku 5.5** ($0.10 / $0.50 per MTok) for lesson-card drafts and topic reviews, through overnight batch (−50%). Estimate: ≈ $0.002 per lesson card, so $8 covers roughly 4,000 cards a month. Sonnet only in Pro.
+- **AI runs only when a person asks** (the teacher presses "Prepare next week"); nothing runs automatically per student.
+- **"Mavzuni takrorlash" (topic review):** when the teacher marks "didn't get it" or a class scores < 80% on a topic, one short AI explanation is made **per class and topic** overnight (not per student), shared by every student who needs it, then reused from the Library. The personal tutor chat is Pro only.
+
 ### Ways to keep AI cost low
 1. **Our own code first, Library second, AI third.**
 2. **Cheap models for simple jobs**, strong models only for hard jobs (e.g. reading exam photos).

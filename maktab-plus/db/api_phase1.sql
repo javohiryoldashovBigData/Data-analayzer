@@ -501,8 +501,12 @@ begin
     raise exception 'not_member' using errcode = '42501';
   end if;
   -- V3.1: lock FIRST, then check, so two parallel calls can't both pass (A15d).
-  perform pg_advisory_xact_lock(hashtextextended(p_school_id::text || ':' || auth.uid()::text, 0));
+  -- V3.3: one lock per SCHOOL, because the school cap is shared by everyone.
+  perform pg_advisory_xact_lock(hashtextextended('ai_budget:' || p_school_id::text, 0));
   select * into v_chk from app.ai_check(p_school_id, p_feature);
+  if v_chk.reason = 'school_budget_reached' then
+    raise exception 'school_budget_reached' using errcode = 'P0001', hint = 'try_library';
+  end if;
   if not v_chk.allowed and v_chk.reason <> 'limit_reached' then
     raise exception 'plan_not_allowed' using errcode = 'P0001', hint = 'try_library', detail = v_chk.reason;
   end if;
@@ -511,6 +515,11 @@ begin
      and r.status = 'pending' and r.expires_at > now();
   if not v_chk.allowed or v_pending + p_est_cents > v_chk.remaining_cents then
     raise exception 'limit_reached' using errcode = 'P0001', hint = 'try_library';
+  end if;
+  if (select coalesce(sum(r.est_cents), 0) from ai_reservations r
+       where r.school_id = p_school_id and r.status = 'pending' and r.expires_at > now())
+     + p_est_cents > v_chk.school_remaining_cents then
+    raise exception 'school_budget_reached' using errcode = 'P0001', hint = 'try_library';
   end if;
 
   insert into ai_reservations (school_id, user_id, feature, est_cents, payload)
