@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { api, ApiError, getToken, schoolSlug, setToken, type Home, type SchoolWindow } from "./api";
 import { useLang, type I18n, type Lang } from "./i18n";
-import { TeacherHome } from "./Teacher";
 import { FamilyHome } from "./Family";
 import { OfficeInbox } from "./Office";
-import { Avatar, Badge, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
+import { DayCheck, ProblemsCard, TeacherArea } from "./Step4";
+import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
   { id: "teacher", icon: "school", color: "#0f766e" },
@@ -239,7 +239,7 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         <button className="btn" onClick={onLogout}><Icon name="logout" /><span className="user-text">{t("logout")}</span></button>
       </header>
       <main className="content">
-        {home.day && <TeacherHome i={i} home={home} reload={onRefresh} />}
+        {home.day && <TeacherArea i={i} home={home} reload={onRefresh} />}
         {home.kids && <FamilyHome i={i} home={home} reload={onRefresh} />}
         {home.stats && <LeaderHome i={i} home={home} reload={onRefresh} />}
       </main>
@@ -266,16 +266,9 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
             <div key={r.class}><div className="row between small"><b>{r.class}</b><span className="tnum">{r.rate}%</span></div><Progress value={r.rate} /></div>))}</div>
           <p className="small muted" style={{ marginTop: 12 }}><Icon name="scale" /> {t("no_ranking")}</p>
         </Card>
-        <Card title={t("problems")} right={<Badge tone="warn">{c.problems_open}</Badge>}>
-          {(home.problems ?? []).length === 0 ? <Empty icon="mood-happy">{t("nothing")}</Empty> : (
-            <div className="list">{home.problems!.map((p) => (
-              <div key={p.id} className="list-item" style={{ alignItems: "flex-start" }}>
-                <Badge tone={p.severity === "serious" ? "bad" : "warn"}>{t(p.severity)}</Badge>
-                <div className="grow small">{p.description}</div>
-                <span className="small muted">{i.date(p.created_at)}</span></div>))}</div>
-          )}
-        </Card>
+        <ProblemsCard i={i} home={home} reload={reload} />
       </div>
+      <DayCheck i={i} />
       <OfficeInbox i={i} home={home} reload={reload} />
       <Card><div className="row between"><span><Icon name="mail" /> {t("absence_pending")}</span><b className="tnum">{c.absence_pending}</b></div></Card>
     </>

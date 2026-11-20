@@ -69,5 +69,7 @@ export type Home = {
   forwarded?: { id: string; topic: string; body: string; status: string; created_at: string; student: string }[];
   inbox?: { id: string; topic: string; body: string; status: string; reply: string | null; created_at: string; forwarded_to: string | null; student: string; class: string | null; parent: string | null; about_teacher: string | null }[];
   staffTeachers?: { id: string; name: string }[];
+  isClassTeacher?: boolean;
+  assignments?: { class_id: string; class: string; subject_id: number; subject: string }[];
 };
 export type DiaryLesson = { date: string; period: number; subject_id: number; subject: string; start: string | null; end: string | null; topic: string | null };

@@ -235,3 +235,90 @@ insert into guardians (parent_user_id, student_id, relation, is_primary) values
 
 select app.set_password(id, coalesce(phone, 'sardor.r'), 'maktab2026')
 from demo_people where tag in ('director','zavuch','admin','t1','t2','t3','t4','t5','t6','parent','student');
+
+-- ---- weekly tests (step 4) -------------------------------------------------
+-- The school's own question bank (checked by the teacher who wrote them).
+create temp table demo_q (grade int, topic text, q text, opts jsonb);
+insert into demo_q values
+ (7,'Chiziqli tenglamalar','2x + 4 = 10 bo''lsa, x = ?','["3","7","2","5"]'),
+ (7,'Chiziqli tenglamalar','3x − 6 = 0 bo''lsa, x = ?','["2","−2","6","3"]'),
+ (7,'Chiziqli tenglamalar','x/2 = 5 bo''lsa, x = ?','["10","2.5","7","3"]'),
+ (7,'Chiziqli tenglamalar','5x = 3x + 8 bo''lsa, x = ?','["4","8","2","1"]'),
+ (7,'Chiziqli tenglamalar','Tenglamaning ildizi nima?','["Tenglikni to''g''ri qiladigan son","Eng katta son","Koeffitsient","Ozod had"]'),
+ (7,'Chiziqli tenglamalar','7 − x = 2 bo''lsa, x = ?','["5","9","−5","2"]'),
+ (7,'Kasrlar','1/2 + 1/4 = ?','["3/4","2/6","1/8","1"]'),
+ (7,'Kasrlar','2/3 − 1/3 = ?','["1/3","1","0","2/3"]'),
+ (7,'Kasrlar','3/4 · 2 = ?','["3/2","6/8","3/8","5/4"]'),
+ (7,'Kasrlar','5/6 va 2/3 dan qaysi biri katta?','["5/6","2/3","Teng","Aniqlab bo''lmaydi"]'),
+ (7,'Foizlar','200 ning 10% i = ?','["20","10","2","200"]'),
+ (7,'Foizlar','50 ning 50% i = ?','["25","50","5","100"]'),
+ (7,'Foizlar','80 ni 25% ga oshirsak?','["100","105","60","85"]'),
+ (8,'Kvadrat ildizlar','√49 = ?','["7","49","24.5","−49"]'),
+ (8,'Kvadrat ildizlar','√16 + √9 = ?','["7","5","25","12"]'),
+ (8,'Kvadrat ildizlar','√(25 · 4) = ?','["10","20","100","29"]'),
+ (8,'Kvadrat ildizlar','√81 − √36 = ?','["3","45","9","15"]'),
+ (8,'Kvadrat ildizlar','(√5)² = ?','["5","25","√5","10"]');
+-- the right answer is always written first above; shuffle each question's options deterministically
+create temp table demo_q2 as
+select dq.*, (select jsonb_agg(o.v order by md5(dq.q || o.v::text)) from jsonb_array_elements(dq.opts) o(v)) as shuffled
+from demo_q dq;
+with ins as (
+  insert into question_bank (school_id, subject_id, grade_level, topic, language, question_text, options, status, source, created_by, checked_by)
+  select 'd5000000-0000-4000-8000-000000000001', 1, grade, topic, 'uz', q, shuffled, 'checked', 'teacher',
+         'd1000000-0000-4000-8000-000000000011', 'd1000000-0000-4000-8000-000000000011'
+  from demo_q2 returning id, question_text, options)
+insert into question_bank_keys (question_id, correct_index)
+select ins.id, (select (o.i - 1)::smallint from jsonb_array_elements(ins.options) with ordinality o(v, i)
+                where o.v = (select dq.opts->0 from demo_q2 dq where dq.q = ins.question_text limit 1))
+from ins;
+
+-- A past 7-A test on "Kasrlar" 3 weeks ago (class got ~60%), so the generator
+-- brings fractions back as a REVIEW topic in this week's test.
+insert into weekly_tests (id, school_id, class_id, subject_id, teacher_id, term_id, test_date, topic, status)
+values ('d6000000-0000-4000-8000-000000000001','d5000000-0000-4000-8000-000000000001','d3000000-0000-4000-8000-000000000007',1,
+        'd2000000-0000-4000-8000-000000000001',
+        coalesce((select id from terms where current_date - 21 between start_date and end_date), 'd7000000-0000-4000-8000-000000000002'),
+        current_date - 21, 'Kasrlar', 'closed');
+with qs as (
+  insert into test_questions (test_id, question_text, options, points, position, topic, bank_question_id)
+  select 'd6000000-0000-4000-8000-000000000001', qb.question_text, qb.options, 1, row_number() over (order by qb.question_text), qb.topic, qb.id
+  from question_bank qb where qb.topic = 'Kasrlar' returning id, bank_question_id)
+insert into test_answer_keys (question_id, correct_index)
+select qs.id, k.correct_index from qs join question_bank_keys k on k.question_id = qs.bank_question_id;
+insert into test_attempts (test_id, student_id, mode, started_at, submitted_at)
+select 'd6000000-0000-4000-8000-000000000001', cm.student_id, 'online', now() - interval '21 days', now() - interval '21 days'
+from class_members cm where cm.class_id = 'd3000000-0000-4000-8000-000000000007';
+insert into attempt_answers (attempt_id, question_id, position, answer, is_correct)
+select ta.id, q.id, q.position,
+       to_jsonb(case when pg_temp.rnd(ta.student_id::text || q.id) % 10 < 6 then k.correct_index else (k.correct_index + 1) % 4 end),
+       pg_temp.rnd(ta.student_id::text || q.id) % 10 < 6
+from test_attempts ta join test_questions q on q.test_id = ta.test_id join test_answer_keys k on k.question_id = q.id
+where ta.test_id = 'd6000000-0000-4000-8000-000000000001';
+update test_attempts ta set score = (select round(100.0 * count(*) filter (where aa.is_correct) / count(*), 2)
+                                     from attempt_answers aa where aa.attempt_id = ta.id)
+where ta.test_id = 'd6000000-0000-4000-8000-000000000001';
+
+-- A PUBLISHED 8-A test this week on "Kvadrat ildizlar" for Sardor to take.
+insert into weekly_tests (id, school_id, class_id, subject_id, teacher_id, term_id, test_date, topic, status)
+values ('d6000000-0000-4000-8000-000000000002','d5000000-0000-4000-8000-000000000001','d3000000-0000-4000-8000-000000000008',1,
+        'd2000000-0000-4000-8000-000000000001','d7000000-0000-4000-8000-000000000002', current_date, 'Kvadrat ildizlar', 'published');
+with qs as (
+  insert into test_questions (test_id, question_text, options, points, position, topic, bank_question_id)
+  select 'd6000000-0000-4000-8000-000000000002', qb.question_text, qb.options, 1, row_number() over (order by qb.question_text), qb.topic, qb.id
+  from question_bank qb where qb.topic = 'Kvadrat ildizlar' returning id, bank_question_id)
+insert into test_answer_keys (question_id, correct_index)
+select qs.id, k.correct_index from qs join question_bank_keys k on k.question_id = qs.bank_question_id;
+-- some classmates have already finished it
+insert into test_attempts (test_id, student_id, mode, submitted_at)
+select 'd6000000-0000-4000-8000-000000000002', cm.student_id, 'online', now() - interval '2 hours'
+from class_members cm where cm.class_id = 'd3000000-0000-4000-8000-000000000008'
+  and cm.student_id <> 'd4000000-0000-4000-8000-000000000801' and pg_temp.rnd(cm.student_id::text) % 3 > 0;
+insert into attempt_answers (attempt_id, question_id, position, answer, is_correct)
+select ta.id, q.id, q.position,
+       to_jsonb(case when pg_temp.rnd(ta.student_id::text || q.id) % 10 < 7 then k.correct_index else (k.correct_index + 1) % 4 end),
+       pg_temp.rnd(ta.student_id::text || q.id) % 10 < 7
+from test_attempts ta join test_questions q on q.test_id = ta.test_id join test_answer_keys k on k.question_id = q.id
+where ta.test_id = 'd6000000-0000-4000-8000-000000000002';
+update test_attempts ta set score = (select round(100.0 * count(*) filter (where aa.is_correct) / count(*), 2)
+                                     from attempt_answers aa where aa.attempt_id = ta.id)
+where ta.test_id = 'd6000000-0000-4000-8000-000000000002';

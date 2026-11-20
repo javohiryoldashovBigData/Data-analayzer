@@ -161,6 +161,10 @@ async function home(user, wanted) {
       out.day = (await q(Q.myDay))[0].day;
       out.absenceToReview = await q(Q.absenceToReview);
       out.forwarded = await q(Q.forwardedToMe);
+      out.isClassTeacher = (await q("select exists (select 1 from classes where class_teacher_id = app.my_teacher_id()) as r"))[0].r;
+      out.assignments = await q(`select ta.class_id, c.grade_level || '-' || c.letter as class, ta.subject_id, sub.name_uz as subject
+                                 from teacher_assignments ta join classes c on c.id = ta.class_id join subjects sub on sub.id = ta.subject_id
+                                 where ta.teacher_id = app.my_teacher_id() order by c.grade_level, sub.name_uz`);
     }
     if (role === "parent" || role === "student") {
       Object.assign(out, {
@@ -296,6 +300,64 @@ async function officeReply(user, b) {
   });
 }
 
+// ---- step 4: weekly tests, My class, zavuch check ------------------------------
+const val = (user, sql, params) => asRole(user, async (q) => (await q(sql, params))[0]?.r ?? null);
+const step4 = {
+  // teacher
+  "GET /api/teacher/tests": (u) => val(u, "select api.teacher_tests() as r"),
+  "GET /api/teacher/myclass": (u) => val(u, "select api.my_class_overview() as r"),
+  "GET /api/teacher/bank-topics": (u, b, url) => {
+    const cls = url.searchParams.get("class") ?? "", subj = url.searchParams.get("subject") ?? "";
+    if (!UUID.test(cls) || !/^\d+$/.test(subj)) throw bad("bad_request");
+    return asRole(u, (q) => q(`select qb.topic, count(*)::int as questions from question_bank qb
+                               where qb.subject_id = $2 and qb.status = 'checked'
+                                 and qb.grade_level = (select grade_level from classes where id = $1)
+                               group by qb.topic order by qb.topic`, [cls, subj]));
+  },
+  "POST /api/teacher/tests/generate": (u, b) => {
+    if (!UUID.test(b.class_id) || !DATE.test(b.test_date) || typeof b.topic !== "string" || !b.topic.trim()) throw bad("bad_request");
+    return val(u, "select api.generate_weekly_test($1::uuid, $2::smallint, $3, $4::date, $5, $6, $7, 'uz') as r",
+      [b.class_id, b.subject_id, b.topic.trim(), b.test_date, Math.min(Math.max(+b.n_new || 8, 1), 20),
+       Math.min(Math.max(+b.n_review || 0, 0), 10), b.mix !== false]);
+  },
+  "POST /api/teacher/tests/status": (u, b) => {
+    if (!UUID.test(b.test_id) || !["published", "closed"].includes(b.status)) throw bad("bad_request");
+    return asRole(u, async (q) => {
+      const r = (await q("update weekly_tests set status = $2::test_status where id = $1 returning id, status", [b.test_id, b.status]))[0];
+      if (!r) { const e = new Error("not_found_or_denied"); e.code = "42501"; throw e; }
+      return r;
+    });
+  },
+  "GET /api/teacher/tests/results": (u, b, url) => {
+    const id = url.searchParams.get("test") ?? ""; if (!UUID.test(id)) throw bad("bad_request");
+    return val(u, "select api.test_results($1::uuid) as r", [id]);
+  },
+  // student
+  "GET /api/student/tests": (u) => val(u, "select api.my_tests() as r"),
+  "POST /api/student/tests/start": (u, b) => { if (!UUID.test(b.test_id)) throw bad("bad_request"); return val(u, "select api.start_test($1::uuid) as r", [b.test_id]); },
+  "POST /api/student/tests/answer": (u, b) => {
+    if (!UUID.test(b.attempt_id) || !UUID.test(b.question_id) || !Number.isInteger(b.choice) || b.choice < 0 || b.choice > 5) throw bad("bad_request");
+    return asRole(u, (q) => q("select api.save_answer($1::uuid, $2::uuid, $3)", [b.attempt_id, b.question_id, b.choice])).then(() => ({ ok: true }));
+  },
+  "POST /api/student/tests/submit": (u, b) => { if (!UUID.test(b.attempt_id)) throw bad("bad_request"); return val(u, "select app.submit_attempt($1::uuid) as r", [b.attempt_id]).then((score) => ({ score })); },
+  // leaders
+  "GET /api/office/daycheck": (u, b, url) => {
+    const d = url.searchParams.get("date") ?? ""; if (!DATE.test(d)) throw bad("bad_request");
+    return val(u, "select api.school_day_check($1::date) as r", [d]);
+  },
+  "POST /api/office/problem": (u, b) => {
+    if (!UUID.test(b.id) || !["handled", "escalated"].includes(b.status)) throw bad("bad_request");
+    return asRole(u, async (q) => {
+      const r = (await q(`update problems set status = $2::problem_status, resolution = coalesce($3, resolution),
+                            assigned_to = coalesce(assigned_to, auth.uid()),
+                            resolved_at = case when $2 = 'handled' then now() else resolved_at end
+                          where id = $1 returning id, status`, [b.id, b.status, (b.note ?? "").slice(0, 1000) || null]))[0];
+      if (!r) { const e = new Error("not_found_or_denied"); e.code = "42501"; throw e; }
+      return r;
+    });
+  },
+};
+
 // ---- http ------------------------------------------------------------------
 function send(res, code, body) {
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -346,6 +408,11 @@ const server = http.createServer(async (req, res) => {
       if (op === "checklist" && req.method === "GET") return send(res, 200, await teacher.checklist(user, url.searchParams.get("date") ?? ""));
       if (req.method === "POST" && ["open", "save", "finish", "close"].includes(op)) return send(res, 200, await teacher[op](user, await readJson(req)));
       return send(res, 405, { error: "method_not_allowed" });
+    }
+    const s4 = step4[`${req.method} ${url.pathname}`];
+    if (s4) {
+      if (!user) return send(res, 401, { error: "login_required" });
+      return send(res, 200, await s4(user, req.method === "POST" ? await readJson(req) : {}, url));
     }
     if (url.pathname.startsWith("/api/family/") || url.pathname === "/api/teacher/absence" || url.pathname === "/api/office/reply") {
       if (!user) return send(res, 401, { error: "login_required" });

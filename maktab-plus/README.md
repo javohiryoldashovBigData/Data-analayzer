@@ -110,3 +110,17 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
   admin answers or forwards to a teacher; the parent sees the answer under "Messages".
 - Tests: `db/test_family.sql` (9), `server/test_server.sh` (27 incl. 12 for step 3).
 
+## Step 4: zavuch, director, class teacher, weekly tests
+
+- **Weekly tests** (`db/school_api.sql` + Perplexity's generator): the teacher picks class, subject
+  and this week's topic; questions come from the school's own checked question bank (no AI), and
+  old topics the class handled below 80% come back as review questions (spaced repetition).
+  The teacher publishes; students take it online in their own question order; the server scores
+  it; answer keys never reach the browser and are shown only after the teacher closes the test.
+  Results show class mastery per topic and each student's score. No journal grade, no ranking.
+- **My class** (class teacher): attendance, absences in 14 days, grade trend, and simple signals
+  (attendance, grades falling) as prompts for a conversation. Payment data never appears here.
+- **Zavuch's daily check**: per teacher, "after lesson" done, topics written, tomorrow's cards
+  ready, day closed. **Problem inbox actions**: handled, or escalate to the director.
+- Tests: `db/test_school.sql` (17), `server/test_server.sh` (41).
+

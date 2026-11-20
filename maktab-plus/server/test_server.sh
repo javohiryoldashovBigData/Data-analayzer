@@ -51,6 +51,33 @@ ok "P10 a teacher cannot answer office messages"  "$(curl -s -X POST $API/api/of
 ok "P11 the zavuch answers the parent"            "$(curl -s -X POST $API/api/office/reply -H "authorization: Bearer $(tok 900000102)" -d "{\"id\":\"$MID\",\"reply\":\"Ertaga ustoz bilan gaplashamiz\"}" | J "d['status']")" answered
 ok "P12 the parent sees the answer"               "$(curl -s $API/api/home -H "$PH" | J "[m for m in d['messages'] if m['id']=='$MID'][0]['reply'] is not None")" True
 
+# ---- step 4: weekly tests online, My class, zavuch check
+SH="authorization: Bearer $(tok sardor.r)"
+TID=$(curl -s $API/api/student/tests -H "$SH" | J "[t for t in d if t['status']=='published'][0]['test_id']")
+START=$(curl -s -X POST $API/api/student/tests/start -H "$SH" -d "{\"test_id\":\"$TID\"}")
+ok "W1 student starts the published test (5 questions)" "$(echo "$START" | J "len(d['questions'])")" 5
+ok "W2 no answer keys are sent to the student"           "$(echo "$START" | grep -c -i correct)" 0
+AID=$(echo "$START" | J "d['attempt_id']")
+for QID in $(echo "$START" | J "' '.join(q['id'] for q in d['questions'])"); do
+  curl -s -X POST $API/api/student/tests/answer -H "$SH" -d "{\"attempt_id\":\"$AID\",\"question_id\":\"$QID\",\"choice\":0}" >/dev/null; done
+ok "W3 the server scores it (a number 0–100)"            "$(curl -s -X POST $API/api/student/tests/submit -H "$SH" -d "{\"attempt_id\":\"$AID\"}" | J "0 <= d['score'] <= 100")" True
+ok "W4 a second submit is refused"                      "$(curl -s -X POST $API/api/student/tests/submit -H "$SH" -d "{\"attempt_id\":\"$AID\"}" | J "d['error']")" not_allowed
+ok "W5 a parent cannot take the child's test"           "$(curl -s -X POST $API/api/student/tests/start -H "$PH" -d "{\"test_id\":\"$TID\"}" | J "d['error']")" not_allowed
+AZ="authorization: Bearer $(tok 900000111)"
+ok "W6 teacher sees results incl. Sardor's attempt"     "$(curl -s "$API/api/teacher/tests/results?test=$TID" -H "$AZ" | J "len([s for s in d['students'] if s['submitted_at']]) >= 1")" True
+NEW=$(curl -s -X POST $API/api/teacher/tests/generate -H "$AZ" -d "{\"class_id\":\"$CLS7\",\"subject_id\":1,\"topic\":\"Chiziqli tenglamalar\",\"test_date\":\"$TODAY\",\"n_new\":6,\"n_review\":3}")
+ok "W7 generator brings back an old topic for review"   "$(echo "$NEW" | J "'Kasrlar' in d['review_topics']")" True
+NTID=$(echo "$NEW" | J "d['test_id']")
+ok "W8 another teacher cannot publish Aziza's test"     "$(curl -s -X POST $API/api/teacher/tests/status -H "authorization: Bearer $(tok 900000114)" -d "{\"test_id\":\"$NTID\",\"status\":\"published\"}" | J "d['error']")" not_allowed
+ok "W9 Aziza publishes it"                              "$(curl -s -X POST $API/api/teacher/tests/status -H "$AZ" -d "{\"test_id\":\"$NTID\",\"status\":\"published\"}" | J "d['status']")" published
+ok "W10 My class: Aziza sees 7-A, Bekzod has signals"   "$(curl -s $API/api/teacher/myclass -H "$AZ" | J "d['class']+':'+str(len([s for s in d['students'] if s['last_name']=='Tursunov' and s['signals']]))")" 7-A:1
+ZV="authorization: Bearer $(tok 900000102)"
+ok "W11 zavuch's daily check lists all 6 teachers"      "$(curl -s "$API/api/office/daycheck?date=$TODAY" -H "$ZV" | J "len(d)")" 6
+ok "W12 a teacher cannot open the zavuch check"         "$(curl -s "$API/api/office/daycheck?date=$TODAY" -H "$AZ" | J "d['error']")" not_allowed
+PRB=$(curl -s $API/api/home -H "$ZV" | J "d['problems'][0]['id']")
+ok "W13 a teacher cannot handle problems"               "$(curl -s -X POST $API/api/office/problem -H "$AZ" -d "{\"id\":\"$PRB\",\"status\":\"handled\"}" | J "d['error']")" not_allowed
+ok "W14 zavuch escalates a problem to the director"     "$(curl -s -X POST $API/api/office/problem -H "$ZV" -d "{\"id\":\"$PRB\",\"status\":\"escalated\",\"note\":\"Ota-ona bilan uchrashuv\"}" | J "d['status']")" escalated
+
 for k in 1 2 3 4 5; do login demo 900000116 bad$k >/dev/null; done
 ok "S7 6th try after 5 wrong passwords is paused" "$(login demo 900000116 maktab2026 | J "d['error']")" too_many_attempts
 echo "RESULT: $P passed, $F failed"; [ $F = 0 ]
