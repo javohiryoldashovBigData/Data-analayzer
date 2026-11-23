@@ -5,6 +5,7 @@ import { api, ApiError, type Home, type Lesson } from "./api";
 import type { I18n } from "./i18n";
 import { flush, newOpId, pending, saveLesson } from "./queue";
 import { Badge, Card, Empty, Icon, PageHead, Stat } from "../components/ui";
+import { PrepWeekCard } from "./Step5";
 
 type View = { kind: "home" } | { kind: "card"; lesson: Lesson } | { kind: "after"; lesson: Lesson } | { kind: "close" };
 type Ask = { student_id: string; name: string; score: number };
@@ -54,6 +55,7 @@ export function TeacherHome({ i, home, reload }: { i: I18n; home: Home; reload: 
           ))}</div>
         )}
       </Card>
+      <PrepWeekCard i={i} home={home} />
       {(home.forwarded ?? []).length > 0 && (
         <Card title={t("forwarded_title")} sub={t("forwarded_sub")}>
           <div className="list">{home.forwarded!.map((m) => (

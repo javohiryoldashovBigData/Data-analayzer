@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError, type DiaryLesson, type Home, type Kid } from "./api";
 import type { I18n } from "./i18n";
 import { StudentTests } from "./Step4";
+import { ReviewCards } from "./Step5";
 import { Avatar, Badge, Card, Empty, GradePill, Icon, PageHead, Segmented, Stat, Tabs } from "../components/ui";
 
 type Tab = "home" | "diary" | "messages" | "tests";
@@ -55,6 +56,7 @@ export function FamilyHome({ i, home, reload }: { i: I18n; home: Home; reload: (
 
 // ---------------------------------------------------------------- home tab
 function KidView({ i, home, kid, isParent }: { i: I18n; home: Home; kid: Kid; isParent: boolean }) {
+  // topic reviews (AI, only for children who didn't get a topic) are shown first
   const { t } = i;
   const gate = (home.gateToday ?? []).filter((g) => g.student_id === kid.id);
   const last = gate[gate.length - 1];
@@ -67,6 +69,7 @@ function KidView({ i, home, kid, isParent }: { i: I18n; home: Home; kid: Kid; is
   const reports = (home.absenceReports ?? []).filter((r) => r.student_id === kid.id);
   return (
     <>
+      <ReviewCards i={i} home={home} kid={kid} />
       <div className="grid grid-3">
         <Card title={t("at_school_today")}>
           <div className="row" style={{ gap: 14 }}>

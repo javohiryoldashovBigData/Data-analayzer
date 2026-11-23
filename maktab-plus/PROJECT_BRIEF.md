@@ -25,6 +25,8 @@ Maktab+ is a school platform for Uzbekistan: an electronic diary and gradebook l
 | **Director / school admin** | Escalated problems and key numbers; staff, roles, school settings, logo and colours; payments (private schools) |
 | **Student** | Diary, grades, homework, weekly tests, Library; AI tutor in Pro only |
 | **Parent** | Live alerts (arrived, late, left, skipped a lesson); reports an absence in advance; grades and diary; fee payments (private); sees teachers' **names only** and contacts teachers **through the school office** |
+| **Accountant** (planned, finance step) | Fees, payments and debts; **sees money, never grades** |
+| **Owner** (planned, later) | For schools with several branches: numbers across branches, no children's names by default |
 | **Methodologist** | Platform-level expert who checks Library items before they become "checked" |
 | **Government** (later) | Numbers only, never names. Private schools share numbers only if they agree |
 
@@ -96,6 +98,7 @@ React + TypeScript web app (installable PWA, mobile apps later); self-hosted Sup
 - **Prototype (Phase 0):** a working React demo with sample data covering 4 roles, gradebook, diary, live attendance and gate simulation, skipped-lesson alerts, absence reports, who to ask first, AI exam checking, lesson studio, chemistry lab, weekly tests, assistant, 3 languages, dark mode, phone layout.
 - **Database v3.1** (`db/`): Perplexity's structure + joint fixes from two review rounds.
 - **Phase 1 API** (`db/api_phase1.sql`): designed by Perplexity, wired and tested by Claude. It covers My day, the lesson card with exit check, After lesson (one idempotent call, offline-safe), Finished for today, and AI budget reserve → commit.
+- **Live app steps 1–5** (`server/`, `src/live/`): login per school window, teacher's day, parents and students, zavuch/class teacher/weekly tests, and **AI with a hard budget** (prepare next week, topic review, spend vs cap).
 - **All tests green** on PostgreSQL 16: `db/run_all_tests.sh` (133 role/plan scenarios + 35 Perplexity attacks + 30 API scenarios + a 2-connection race test). Round 2 results: `docs/08-reply-to-perplexity.md`.
 
 ## 9. Decisions made (please keep them)
@@ -106,6 +109,8 @@ React + TypeScript web app (installable PWA, mobile apps later); self-hosted Sup
 4. **Standard** = AI for teaching only; **Pro** = AI for everyone; the pilot gets a Pro trial.
 5. Pilot methods: spaced repetition, exit check, mastery-inspired review, task feedback. No rankings.
 6. Attendance outside the timetable is allowed (authority still checked), so teachers are never blocked.
+7. **Payments** are seen by the director, school admin and (planned) accountant — not by the zavuch or teachers. Children are **never blocked at the gate** over debt.
+8. **AI**: hard monthly cap per school (≤10% of its fee); Standard uses Haiku; AI runs only when a person asks or at night in one Batch; Library first; topic review once per class + topic, only for students who didn't get it.
 
 ## 10. Open questions
 

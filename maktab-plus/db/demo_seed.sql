@@ -51,9 +51,11 @@ insert into subjects (id, name_uz, name_ru, code) values
 on conflict do nothing;
 
 -- ---- the school window ----------------------------------------------------
-insert into schools (id, district_id, name, mode, slug, brand_color, plan, pro_trial_until) values
+-- Standard plan (AI for teachers only, Haiku), hard AI cap $8/month (~10% of a
+-- 1,000,000 so'm monthly fee — estimate). No Pro trial in the demo.
+insert into schools (id, district_id, name, mode, slug, brand_color, plan, pro_trial_until, ai_monthly_cap_cents) values
  ('d5000000-0000-4000-8000-000000000001', 101, 'Maktab+ Namuna maktabi', 'private', 'demo', '#0f766e',
-  'standard', current_date + 30);
+  'standard', null, 800);
 
 -- ---- people with logins ---------------------------------------------------
 create temp table demo_people (id uuid, first text, last text, phone text, role user_role, tag text);
@@ -322,3 +324,42 @@ where ta.test_id = 'd6000000-0000-4000-8000-000000000002';
 update test_attempts ta set score = (select round(100.0 * count(*) filter (where aa.is_correct) / count(*), 2)
                                      from attempt_answers aa where aa.attempt_id = ta.id)
 where ta.test_id = 'd6000000-0000-4000-8000-000000000002';
+
+-- ---- curriculum + past approved lesson cards (step 5) ------------------------
+-- Our own code (api.next_topics) picks the next topic from the programme; the
+-- AI only writes the plan. Sample programme, not the official one.
+insert into curriculum_topics (subject_id, grade_level, language, seq, term_no, hours, topic, objectives) values
+ (1,5,'uz',1,2,3,'Natural sonlar','Natural sonlarni taqqoslash va yaxlitlash'),
+ (1,5,'uz',2,2,4,'Kasrlar','Oddiy kasrlarni qo''shish va ayirish'),
+ (1,5,'uz',3,2,4,'O''nli kasrlar','O''nli kasrlarni yozish va taqqoslash'),
+ (1,7,'uz',1,2,3,'Ratsional sonlar','Ratsional sonlar ustida amallar'),
+ (1,7,'uz',2,2,3,'Kasrlar','Kasrlarni qo''shish, ayirish, ko''paytirish'),
+ (1,7,'uz',3,2,2,'Foizlar','Sonning foizini topish'),
+ (1,7,'uz',4,2,4,'Chiziqli tenglamalar','ax + b = 0 ko''rinishidagi tenglamalarni yechish'),
+ (1,7,'uz',5,2,3,'Tengsizliklar','Chiziqli tengsizliklarni yechish'),
+ (1,8,'uz',1,2,3,'Ko''phadlar','Ko''phadlarni qo''shish va ko''paytirish'),
+ (1,8,'uz',2,2,3,'Ko''paytuvchilarga ajratish','Umumiy ko''paytuvchini qavsdan chiqarish'),
+ (1,8,'uz',3,2,4,'Kvadrat ildizlar','Kvadrat ildiz xossalari va hisoblash'),
+ (1,8,'uz',4,2,4,'Kvadrat tenglamalar','To''liq kvadrat tenglamalarni yechish');
+
+-- the most recent past maths lessons of each class get approved cards with the
+-- programme's earlier topics, so "next topic" continues from there
+insert into lesson_cards (school_id, class_id, subject_id, teacher_id, lesson_date, period, topic, status, approved_by, approved_at)
+select 'd5000000-0000-4000-8000-000000000001', x.class_id, 1, x.teacher_id, x.lesson_date, x.period, p.topic, 'approved',
+       'd1000000-0000-4000-8000-000000000011', x.lesson_date + time '07:30'
+from (select l.*, c.grade_level, row_number() over (partition by l.class_id order by l.lesson_date desc, l.period desc) as back
+      from demo_lessons l join classes c on c.id = l.class_id where l.subject_id = 1) x
+join (select ct.grade_level, ct.topic, row_number() over (partition by ct.grade_level order by ct.seq desc, g.i desc) as back
+      from curriculum_topics ct cross join lateral generate_series(1, ct.hours) g(i)
+      where ct.subject_id = 1 and ((ct.grade_level = 5 and ct.seq <= 1) or (ct.grade_level = 7 and ct.seq <= 3)
+                                   or (ct.grade_level = 8 and ct.seq <= 2))) p
+  on p.grade_level = x.grade_level and p.back = x.back
+on conflict do nothing;
+
+-- Library first: a CHECKED lesson card for 8th-grade "Kvadrat ildizlar" — used
+-- with no AI cost when 8-A reaches that topic.
+insert into library_items (subject_id, grade_level, topic, kind, title, status, language, content, methodologist_id) values
+ (1, 8, 'Kvadrat ildizlar', 'lesson_card', 'Kvadrat ildizlar — dars kartasi (tekshirilgan)', 'checked', 'uz',
+  '{"plan":"1) Takrorlash: kvadratga ko''tarish (5 daq)\n2) Yangi mavzu: √a — kvadrati a ga teng bo''lgan son; maydon misoli (15 daq)\n3) Juftlikda mashq: √16, √49, √(25·4) (15 daq)\n4) Xatolar ustida ishlash (5 daq)\n5) Chiqish savollari (5 daq)",
+    "homework":"52-bet, 1–6-misollar",
+    "exit_questions":["√64 = ?","√9 + √16 = ?","Nega √(−4) haqiqiy son emas?"]}', null);

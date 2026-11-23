@@ -71,5 +71,7 @@ export type Home = {
   staffTeachers?: { id: string; name: string }[];
   isClassTeacher?: boolean;
   assignments?: { class_id: string; class: string; subject_id: number; subject: string }[];
+  reviews?: import("./Step5").Review[];
+  aiBudget?: import("./Step5").AiBudget;
 };
 export type DiaryLesson = { date: string; period: number; subject_id: number; subject: string; start: string | null; end: string | null; topic: string | null };

@@ -172,6 +172,7 @@ async function home(user, wanted) {
         attendance: await q(Q.attendance30), homework: await q(Q.homework),
         teachers: await q(Q.teachers), absenceReports: await q(Q.absenceReports),
         messages: role === "parent" ? await q(Q.myMessages) : [],
+        reviews: (await q("select api.my_reviews() as r"))[0].r,
       });
     }
     if (LEADER.includes(role)) {
@@ -181,6 +182,7 @@ async function home(user, wanted) {
         counts: (await q(Q.counts))[0], problems: await q(Q.problems),
         classAttendance: await q(Q.classAttendance),
         inbox: await q(Q.inbox), staffTeachers: await q(Q.staffTeachers),
+        aiBudget: (await q("select api.ai_budget('lesson_prep') as r"))[0].r,
       });
     }
     return out;
@@ -340,6 +342,9 @@ const step4 = {
     return asRole(u, (q) => q("select api.save_answer($1::uuid, $2::uuid, $3)", [b.attempt_id, b.question_id, b.choice])).then(() => ({ ok: true }));
   },
   "POST /api/student/tests/submit": (u, b) => { if (!UUID.test(b.attempt_id)) throw bad("bad_request"); return val(u, "select app.submit_attempt($1::uuid) as r", [b.attempt_id]).then((score) => ({ score })); },
+  // AI (step 5)
+  "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
+  "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),
   // leaders
   "GET /api/office/daycheck": (u, b, url) => {
     const d = url.searchParams.get("date") ?? ""; if (!DATE.test(d)) throw bad("bad_request");
@@ -357,6 +362,68 @@ const step4 = {
     });
   },
 };
+
+// ---- step 5: AI — "prepare next week" (Library first, then a budgeted AI job) --
+// This server never calls the AI and never holds the API key. It decides the
+// topics with our own code, uses checked Library cards for free, and RESERVES
+// budget for the rest. The night worker (server/ai-worker.mjs) sends one Batch.
+const MODEL_BY_PLAN = { standard: "claude-haiku-5-5", pro: "claude-sonnet-5-5" };
+const EST_CENTS_PER_LESSON = 0.5;   // upper-bound estimate for one draft card (Haiku, batch)
+async function prepareWeek(user, b) {
+  if (!DATE.test(b.week_start)) throw bad("bad_request");
+  return asRole(user, async (q) => {
+    const ctx = (await q("select api.weekly_prep_context($1::date) as r", [b.week_start]))[0].r;
+    const school = (await q("select school_id from app.my_schools() limit 1"))[0]?.school_id;
+    // lessons already waiting in one of my AI jobs are not queued twice
+    const queued = new Set((await q(`select jsonb_array_elements(payload->'lessons') as l from ai_reservations
+                                     where status = 'pending' and feature = 'lesson_prep'`)).map((r) => `${r.l.class_id}|${r.l.date}|${r.l.period}`));
+    const todo = ctx.lessons.filter((l) => !l.has_card && !queued.has(`${l.class_id}|${l.date}|${l.period}`));
+    const out = { lessons: ctx.lessons.length, already_ready: ctx.lessons.length - todo.length, from_library: 0, ai_queued: 0, no_topic: 0 };
+    const groups = new Map();
+    for (const l of todo) { const k = `${l.class_id}|${l.subject_id}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(l); }
+    const forAI = [];
+    for (const [k, ls] of groups) {
+      const [classId, subjectId] = k.split("|");
+      const topics = await q("select topic, objectives from api.next_topics($1::uuid, $2::smallint, $3)", [classId, subjectId, ls.length]);
+      const subject = (await q("select name_uz from subjects where id = $1", [subjectId]))[0]?.name_uz;
+      for (const [n, l] of ls.entries()) {
+        const tp = topics[n];
+        if (!tp) { out.no_topic++; continue; }                         // no programme row: the teacher writes it
+        const lib = (await q("select content from api.library_cards($1::smallint, $2::smallint, $3)", [subjectId, l.grade_level, tp.topic]))[0];
+        if (lib?.content?.plan) {                                        // Library first: free
+          const card = (await q("select api.open_lesson_card($1::uuid, $2::smallint, $3::date, $4::smallint) as r",
+                                [classId, subjectId, l.date, l.period]))[0].r.card;
+          await q("select api.save_lesson_card($1::uuid, $2::jsonb, false)", [card.id, JSON.stringify({
+            topic: tp.topic, plan: lib.content.plan, homework: lib.content.homework ?? "", exit_questions: lib.content.exit_questions ?? [] })]);
+          out.from_library++;
+        } else {
+          const gap = (ctx.gaps ?? []).filter((g) => g.class_id === classId && String(g.subject_id) === subjectId)
+                        .map((g) => ({ topic: g.topic, mastered_pct: g.mastered_pct }));   // class-level numbers only
+          forAI.push({ class_id: classId, subject_id: Number(subjectId), subject, grade: l.grade_level, date: l.date,
+                       period: l.period, topic: tp.topic, objectives: tp.objectives ?? "", gaps: gap });
+        }
+      }
+    }
+    if (forAI.length) {
+      const chk = (await q("select * from app.ai_check($1, 'lesson_prep')", [school]))[0];
+      const model = MODEL_BY_PLAN[chk?.plan] ?? MODEL_BY_PLAN.standard;
+      // savepoint: if the budget says no, the free Library cards above are KEPT
+      await q("savepoint ai_res");
+      try {
+        await q("select app.ai_reserve($1, 'lesson_prep', $2, $3::jsonb)",
+                [school, EST_CENTS_PER_LESSON * forAI.length, JSON.stringify({ kind: "prep", model, lessons: forAI })]);
+        out.ai_queued = forAI.length;
+      } catch (e) {
+        await q("rollback to savepoint ai_res");
+        if (e.code !== "P0001") throw e;                                // only budget/plan refusals
+        out.ai_blocked = e.message;                                      // e.g. school_budget_reached
+        out.ai_skipped = forAI.length;
+      }
+    }
+    out.budget = (await q("select api.ai_budget('lesson_prep') as r"))[0].r;
+    return out;
+  });
+}
 
 // ---- http ------------------------------------------------------------------
 function send(res, code, body) {
@@ -432,6 +499,8 @@ const server = http.createServer(async (req, res) => {
   } catch (e) {
     // database permission errors are 403; never leak SQL details to the browser
     // input / data errors → 400 with the function's own short code (e.g. no_term_for_date)
+    if (e.code === "P0001" && ["school_budget_reached", "limit_reached", "plan_not_allowed"].includes(e.message))
+      return send(res, 402, { error: e.message, hint: "try_library" });
     if (["22023", "22P02", "22007", "22008", "23502", "23514", "P0001"].includes(e.code))
       return send(res, 400, { error: /^[a-z_]+$/.test(e.message) ? e.message : "bad_request" });
     const code = e.code === "42501" ? 403 : 500;

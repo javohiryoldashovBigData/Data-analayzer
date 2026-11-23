@@ -124,3 +124,27 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
   ready, day closed. **Problem inbox actions**: handled, or escalate to the director.
 - Tests: `db/test_school.sql` (17), `server/test_server.sh` (41).
 
+
+## Step 5: AI with a hard budget
+
+- **Prepare next week** (teacher, My day): our own code picks the next topics from the programme.
+  Checked **Library** cards are used first (free). Only the rest goes into **one** night job for
+  the AI (Message Batches, 50% cheaper; Haiku on Standard). In the morning the teacher sees
+  "AI draft" cards and checks them — AI never publishes anything by itself. A second click never
+  queues the same lesson twice.
+- **Topic review** (student + parent): made **only** for students the teacher marked "didn't get
+  it" in the exit check — **once per class + topic**, shared by those students. Parents see it with
+  "this is not a grade". Classmates who understood don't get it.
+- **Hard budget**: each school has a monthly AI cap (`schools.ai_monthly_cap_cents`, demo $8).
+  When it is reached, AI stops and **everything else keeps working** (Library cards are still
+  filled in). The director and school admin see spend vs cap; the zavuch and teachers don't see money.
+- **Privacy**: prompts carry the topic, grade, objectives and class-level numbers only — never
+  student names. Class, date and topic come from our database, not from the model.
+- **Who calls the AI**: only `server/ai-worker.mjs` (run at night: `node server/ai-worker.mjs once`)
+  holds the API key. The web server never calls the AI.
+- Tests: `db/test_ai.sql` (13), `server/test_ai_flow.sh` (12, against `server/fake-anthropic.mjs`
+  — no key, no cost), and a race test for two teachers at the school cap.
+  Run the flow test: start the API server and `PORT=8799 node server/fake-anthropic.mjs`, then
+  `DEMO_DB=maktab_demo ./server/test_ai_flow.sh` on a fresh demo database.
+
+Screens: `docs/screens/step5-*.png`.

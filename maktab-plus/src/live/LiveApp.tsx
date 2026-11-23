@@ -4,6 +4,7 @@ import { useLang, type I18n, type Lang } from "./i18n";
 import { FamilyHome } from "./Family";
 import { OfficeInbox } from "./Office";
 import { DayCheck, ProblemsCard, TeacherArea } from "./Step4";
+import { AiBudgetCard } from "./Step5";
 import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -269,6 +270,7 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
         <ProblemsCard i={i} home={home} reload={reload} />
       </div>
       <DayCheck i={i} />
+      <AiBudgetCard i={i} home={home} />
       <OfficeInbox i={i} home={home} reload={reload} />
       <Card><div className="row between"><span><Icon name="mail" /> {t("absence_pending")}</span><b className="tnum">{c.absence_pending}</b></div></Card>
     </>
