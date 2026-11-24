@@ -5,6 +5,7 @@ import { api, type Home } from "./api";
 import type { I18n } from "./i18n";
 import { Badge, Card, Empty, Icon, Progress, Tabs } from "../components/ui";
 import { TeacherHome } from "./Teacher";
+import { TeacherGrades } from "./Step6";
 
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 function useLoad<T>(path: string | null, deps: unknown[] = []) {
@@ -17,7 +18,7 @@ function useLoad<T>(path: string | null, deps: unknown[] = []) {
 const Loading = ({ i, err }: { i: I18n; err: boolean }) => <Card><Empty icon="loader">{err ? i.t("error") : i.t("loading")}</Empty></Card>;
 
 // ---------------------------------------------------------------- teacher area with tabs
-type TTab = "day" | "class" | "tests";
+type TTab = "day" | "class" | "tests" | "grades";
 export function TeacherArea({ i, home, reload }: { i: I18n; home: Home; reload: () => void }) {
   const { t } = i;
   const [tab, setTab] = useState<TTab>("day");
@@ -25,6 +26,7 @@ export function TeacherArea({ i, home, reload }: { i: I18n; home: Home; reload: 
     { id: "day" as TTab, label: t("tab_my_day"), icon: "calendar" },
     ...(home.isClassTeacher ? [{ id: "class" as TTab, label: t("tab_my_class"), icon: "users" }] : []),
     { id: "tests" as TTab, label: t("tab_tests"), icon: "checklist" },
+    { id: "grades" as TTab, label: t("tab_grades"), icon: "certificate" },
   ];
   return (
     <>
@@ -32,6 +34,7 @@ export function TeacherArea({ i, home, reload }: { i: I18n; home: Home; reload: 
       {tab === "day" && <TeacherHome i={i} home={home} reload={reload} />}
       {tab === "class" && <MyClass i={i} />}
       {tab === "tests" && <TeacherTests i={i} home={home} />}
+      {tab === "grades" && <TeacherGrades i={i} home={home} />}
     </>
   );
 }

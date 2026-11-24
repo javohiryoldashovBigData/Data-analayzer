@@ -5,6 +5,7 @@ import { api, ApiError, type DiaryLesson, type Home, type Kid } from "./api";
 import type { I18n } from "./i18n";
 import { StudentTests } from "./Step4";
 import { ReviewCards } from "./Step5";
+import { ReportCard } from "./Step6";
 import { Avatar, Badge, Card, Empty, GradePill, Icon, PageHead, Segmented, Stat, Tabs } from "../components/ui";
 
 type Tab = "home" | "diary" | "messages" | "tests";
@@ -99,6 +100,7 @@ function KidView({ i, home, kid, isParent }: { i: I18n; home: Home; kid: Kid; is
           )}
         </Card>
       </div>
+      <ReportCard i={i} kid={kid} />
       <div className="grid grid-2">
         <Card title={t("teachers")}>
           <div className="list">{teachers.map((x) => (

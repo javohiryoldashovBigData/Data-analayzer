@@ -302,6 +302,20 @@ async function officeReply(user, b) {
   });
 }
 
+// step 6 input checks: class + subject from the query; grade rows from the body
+function sheetArgs(url) {
+  const cls = url.searchParams.get("class") ?? "", subj = url.searchParams.get("subject") ?? "";
+  if (!UUID.test(cls) || !/^\d{1,4}$/.test(subj)) throw bad("bad_request");
+  return { cls, subj };
+}
+function gradeRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > 60) throw bad("bad_request");
+  return rows.map((r) => {
+    if (!UUID.test(r?.student_id) || !Number.isInteger(r?.value)) throw bad("bad_request");
+    return { student_id: r.student_id, value: r.value, note: String(r.note ?? "").slice(0, 500) };
+  });
+}
+
 // ---- step 4: weekly tests, My class, zavuch check ------------------------------
 const val = (user, sql, params) => asRole(user, async (q) => (await q(sql, params))[0]?.r ?? null);
 const step4 = {
@@ -342,6 +356,38 @@ const step4 = {
     return asRole(u, (q) => q("select api.save_answer($1::uuid, $2::uuid, $3)", [b.attempt_id, b.question_id, b.choice])).then(() => ({ ok: true }));
   },
   "POST /api/student/tests/submit": (u, b) => { if (!UUID.test(b.attempt_id)) throw bad("bad_request"); return val(u, "select app.submit_attempt($1::uuid) as r", [b.attempt_id]).then((score) => ({ score })); },
+  // quarter + yearly grades (step 6) — the database decides who may do what
+  "GET /api/grades/quarter": (u, b, url) => {
+    const { cls, subj } = sheetArgs(url), term = url.searchParams.get("term");
+    if (term && !UUID.test(term)) throw bad("bad_request");
+    return val(u, "select api.quarter_sheet($1::uuid, $2::smallint, $3::uuid) as r", [cls, subj, term || null]);
+  },
+  "POST /api/grades/quarter": (u, b) => {
+    if (!UUID.test(b.class_id) || !UUID.test(b.term_id) || !Number.isInteger(b.subject_id)) throw bad("bad_request");
+    return val(u, "select api.save_quarter_grades($1::uuid, $2::smallint, $3::uuid, $4::jsonb) as r",
+      [b.class_id, b.subject_id, b.term_id, JSON.stringify(gradeRows(b.rows))]);
+  },
+  "GET /api/grades/year": (u, b, url) => { const { cls, subj } = sheetArgs(url); return val(u, "select api.year_sheet($1::uuid, $2::smallint) as r", [cls, subj]); },
+  "POST /api/grades/year/propose": (u, b) => {
+    if (!UUID.test(b.class_id) || !Number.isInteger(b.subject_id)) throw bad("bad_request");
+    return val(u, "select api.propose_final_grades($1::uuid, $2::smallint, $3::jsonb) as r", [b.class_id, b.subject_id, JSON.stringify(gradeRows(b.rows))]);
+  },
+  "GET /api/office/grades": (u) => val(u, "select api.grades_overview() as r"),
+  "POST /api/office/grades/window": (u, b) => {
+    if (typeof b.open !== "boolean") throw bad("bad_request");
+    return val(u, "select api.set_final_window($1) as r", [b.open]);
+  },
+  "POST /api/office/grades/confirm": (u, b) => {
+    if (!UUID.test(b.class_id) || !Number.isInteger(b.subject_id)) throw bad("bad_request");
+    const changes = (Array.isArray(b.changes) ? b.changes : []).slice(0, 60).map((c) => ({
+      student_id: String(c.student_id), value: Number(c.value), reason: String(c.reason ?? "").slice(0, 500) }));
+    if (changes.some((c) => !UUID.test(c.student_id) || !Number.isInteger(c.value))) throw bad("bad_request");
+    return val(u, "select api.confirm_final_grades($1::uuid, $2::smallint, $3::jsonb) as r", [b.class_id, b.subject_id, JSON.stringify(changes)]);
+  },
+  "GET /api/family/report": (u, b, url) => {
+    const id = url.searchParams.get("student") ?? ""; if (!UUID.test(id)) throw bad("bad_request");
+    return val(u, "select api.report_card($1::uuid) as r", [id]);
+  },
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
   "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),
@@ -502,7 +548,8 @@ const server = http.createServer(async (req, res) => {
     if (e.code === "P0001" && ["school_budget_reached", "limit_reached", "plan_not_allowed"].includes(e.message))
       return send(res, 402, { error: e.message, hint: "try_library" });
     if (["22023", "22P02", "22007", "22008", "23502", "23514", "P0001"].includes(e.code))
-      return send(res, 400, { error: /^[a-z_]+$/.test(e.message) ? e.message : "bad_request" });
+      return send(res, 400, { error: /^[a-z_]+$/.test(e.message) ? e.message : "bad_request",
+                              ...(UUID.test(e.detail ?? "") ? { student_id: e.detail } : {}) });   // which row needs a reason
     const code = e.code === "42501" ? 403 : 500;
     if (code === 500) console.error(e);
     send(res, code, { error: code === 403 ? "not_allowed" : "server_error" });

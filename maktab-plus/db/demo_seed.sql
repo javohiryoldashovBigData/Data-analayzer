@@ -363,3 +363,15 @@ insert into library_items (subject_id, grade_level, topic, kind, title, status, 
   '{"plan":"1) Takrorlash: kvadratga ko''tarish (5 daq)\n2) Yangi mavzu: √a — kvadrati a ga teng bo''lgan son; maydon misoli (15 daq)\n3) Juftlikda mashq: √16, √49, √(25·4) (15 daq)\n4) Xatolar ustida ishlash (5 daq)\n5) Chiqish savollari (5 daq)",
     "homework":"52-bet, 1–6-misollar",
     "exit_questions":["√64 = ?","√9 + √16 = ?","Nega √(−4) haqiqiy son emas?"]}', null);
+
+-- ---- step 6: 1st-quarter grades already given (from each student's Q1 marks) --
+-- The 2nd quarter (current) is still open: teachers set it at the end of December.
+insert into grades (student_id, subject_id, term_id, grade_type, value, teacher_id, created_by, created_at)
+select cm.student_id, ta.subject_id, 'd7000000-0000-4000-8000-000000000001', 'quarter',
+       coalesce(app.suggest_grade((select avg(g.value) from grades g where g.student_id = cm.student_id
+                  and g.subject_id = ta.subject_id and g.term_id = 'd7000000-0000-4000-8000-000000000001'
+                  and g.grade_type = 'current')), 4),
+       ta.teacher_id, (select t.user_id from teachers t where t.id = ta.teacher_id), timestamptz '2026-11-01 15:00+05'
+from teacher_assignments ta
+join classes c on c.id = ta.class_id and c.school_id = 'd5000000-0000-4000-8000-000000000001'
+join class_members cm on cm.class_id = ta.class_id and cm.status = 'active';

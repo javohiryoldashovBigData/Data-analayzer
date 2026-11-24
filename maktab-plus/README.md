@@ -148,3 +148,22 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres ./dev.sh
   `DEMO_DB=maktab_demo ./server/test_ai_flow.sh` on a fresh demo database.
 
 Screens: `docs/screens/step5-*.png`.
+
+## Step 6: quarter and yearly grades
+
+- **Quarter grades (teacher, tab "Chorak va yillik baholar")**: for each class + subject the system
+  suggests a grade (the average of current marks, 3.5 → 4; it needs at least 3 marks). The teacher
+  decides. If the grade is 1+ point away from the suggestion (or there are too few marks), a short
+  reason is required. It never blocks the teacher, and the zavuch can see why.
+- **Yearly grades**: the zavuch or director **opens the window** (usually at the end of quarter 4).
+  The teacher **proposes** (suggestion = average of quarter + exam grades). The zavuch/director
+  **confirms** per class + subject; changing a grade needs a reason. Only a confirmed yearly grade
+  becomes a real grade. Then students and parents are told and see it on the report card ("Tabel").
+- **Rules in the database** (`db/final_grades.sql`): teachers can never write a yearly grade or
+  confirm their own proposal; parents never see proposals; another school sees nothing; every
+  change is in the audit log. No rankings.
+- Tests: `db/test_final.sql` (29), `server/test_server.sh` G1–G13 (now 54 checks).
+- Demo: 1st-quarter grades are already given; the 2nd quarter is open.
+
+Screens: `docs/screens/step6-*.png`. (For the screenshots the zavuch opened the yearly window in
+November, so the yearly grade uses quarters I–II only. In real use it opens in May.)

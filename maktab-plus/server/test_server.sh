@@ -78,6 +78,30 @@ PRB=$(curl -s $API/api/home -H "$ZV" | J "d['problems'][0]['id']")
 ok "W13 a teacher cannot handle problems"               "$(curl -s -X POST $API/api/office/problem -H "$AZ" -d "{\"id\":\"$PRB\",\"status\":\"handled\"}" | J "d['error']")" not_allowed
 ok "W14 zavuch escalates a problem to the director"     "$(curl -s -X POST $API/api/office/problem -H "$ZV" -d "{\"id\":\"$PRB\",\"status\":\"escalated\",\"note\":\"Ota-ona bilan uchrashuv\"}" | J "d['status']")" escalated
 
+# ---- step 6: quarter + yearly grades (Aziza, maths, 5-A; Temur's class) ----
+C5=d3000000-0000-4000-8000-000000000005; ZV2="authorization: Bearer $(tok 900000102)"
+QS=$(curl -s "$API/api/grades/quarter?class=$C5&subject=1" -H "$H")
+ok "G1 teacher opens the quarter sheet (12 students, suggestions)" "$(echo "$QS" | J "len(d['students'])")" 12
+ok "G2 a parent cannot open a grade sheet"  "$(curl -s "$API/api/grades/quarter?class=$C5&subject=1" -H "$PH" | J "d['error']")" not_allowed
+TERM=$(echo "$QS" | J "d['term']['id']")
+ROWS=$(echo "$QS" | J "json.dumps([{'student_id':x['student_id'],'value':x['suggested'] or 4,'note':'' if x['suggested'] else 'Kam baho, og\'zaki so\'raldi'} for x in d['students']])")
+ok "G3 teacher saves the quarter grades"    "$(curl -s -X POST $API/api/grades/quarter -H "$H" -d "{\"class_id\":\"$C5\",\"subject_id\":1,\"term_id\":\"$TERM\",\"rows\":$ROWS}" | J "d['saved']")" 12
+FAR=$(echo "$QS" | J "json.dumps([{'student_id':d['students'][0]['student_id'],'value':1}])")
+ok "G4 a grade far from the suggestion asks for a reason (and says whose)" "$(curl -s -X POST $API/api/grades/quarter -H "$H" -d "{\"class_id\":\"$C5\",\"subject_id\":1,\"term_id\":\"$TERM\",\"rows\":$FAR}" | J "d['error']+'|'+str(len(d.get('student_id','')))")" "reason_required|36"
+YS=$(curl -s "$API/api/grades/year?class=$C5&subject=1" -H "$H")
+YROWS=$(echo "$YS" | J "json.dumps([{'student_id':x['student_id'],'value':x['suggested'] or 4,'note':'' if x['suggested'] else 'x'} for x in d['students']])")
+ok "G5 yearly grades wait for the zavuch's window" "$(curl -s -X POST $API/api/grades/year/propose -H "$H" -d "{\"class_id\":\"$C5\",\"subject_id\":1,\"rows\":$YROWS}" | J "d['error']")" window_closed
+ok "G6 a teacher cannot open the window"    "$(curl -s -X POST $API/api/office/grades/window -H "$H" -d '{"open":true}' | J "d['error']")" not_allowed
+ok "G7 the zavuch opens the window"         "$(curl -s -X POST $API/api/office/grades/window -H "$ZV2" -d '{"open":true}' | J "d['open']")" True
+ok "G8 the teacher proposes yearly grades"  "$(curl -s -X POST $API/api/grades/year/propose -H "$H" -d "{\"class_id\":\"$C5\",\"subject_id\":1,\"rows\":$YROWS}" | J "d['proposed']")" 12
+ok "G9 the zavuch's overview shows 12 proposed for 5-A maths" "$(curl -s $API/api/office/grades -H "$ZV2" | J "[r['proposed'] for r in d['rows'] if r['class']=='5-A' and r['subject_id']==1][0]")" 12
+ok "G10 another teacher cannot confirm"     "$(curl -s -X POST $API/api/office/grades/confirm -H "authorization: Bearer $(tok 900000114)" -d "{\"class_id\":\"$C5\",\"subject_id\":1}" | J "d['error']")" not_allowed
+ok "G11 the zavuch confirms the class"      "$(curl -s -X POST $API/api/office/grades/confirm -H "$ZV2" -d "{\"class_id\":\"$C5\",\"subject_id\":1}" | J "d['confirmed']")" 12
+TEMUR=$(curl -s $API/api/home -H "$PH" | J "[k['id'] for k in d['kids'] if k['class']=='5-A'][0]")
+ok "G12 the parent sees Temur's yearly maths grade" "$(curl -s "$API/api/family/report?student=$TEMUR" -H "$PH" | J "[r['final'] is not None for r in d if r['subject_id']==1][0]")" True
+ok "G13 … and nobody else's child"          "$(curl -s "$API/api/family/report?student=d4000000-0000-4000-8000-000000000701" -H "$PH" | J "len(d)")" 0
+curl -s -X POST $API/api/office/grades/window -H "$ZV2" -d '{"open":false}' >/dev/null
+
 for k in 1 2 3 4 5; do login demo 900000116 bad$k >/dev/null; done
 ok "S7 6th try after 5 wrong passwords is paused" "$(login demo 900000116 maktab2026 | J "d['error']")" too_many_attempts
 echo "RESULT: $P passed, $F failed"; [ $F = 0 ]
