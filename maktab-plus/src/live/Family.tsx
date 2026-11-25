@@ -6,9 +6,10 @@ import type { I18n } from "./i18n";
 import { StudentTests } from "./Step4";
 import { ReviewCards } from "./Step5";
 import { ReportCard } from "./Step6";
+import { ParentFees } from "./Step7";
 import { Avatar, Badge, Card, Empty, GradePill, Icon, PageHead, Segmented, Stat, Tabs } from "../components/ui";
 
-type Tab = "home" | "diary" | "messages" | "tests";
+type Tab = "home" | "diary" | "messages" | "tests" | "fees";
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (s: string, n: number) => { const [y, m, d] = s.split("-").map(Number); return iso(new Date(y, m - 1, d + n)); };
 const monday = (s: string) => { const [y, m, d] = s.split("-").map(Number); const dt = new Date(y, m - 1, d); return addDays(s, -((dt.getDay() + 6) % 7)); };
@@ -30,7 +31,7 @@ export function FamilyHome({ i, home, reload }: { i: I18n; home: Home; reload: (
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "home", label: t("tab_home"), icon: "home" },
     { id: "diary", label: t("tab_diary"), icon: "notebook" },
-    ...(isParent ? [{ id: "messages" as Tab, label: t("tab_messages"), icon: "messages" }] : []),
+    ...(isParent ? [{ id: "messages" as Tab, label: t("tab_messages"), icon: "messages" }, { id: "fees" as Tab, label: t("tab_fees"), icon: "receipt" }] : []),
     ...(home.role === "student" ? [{ id: "tests" as Tab, label: t("tab_tests"), icon: "checklist" }] : []),
   ];
   return (
@@ -48,6 +49,7 @@ export function FamilyHome({ i, home, reload }: { i: I18n; home: Home; reload: (
       {tab === "home" && <KidView i={i} home={home} kid={kid} isParent={isParent} />}
       {tab === "diary" && <DiaryWeek i={i} home={home} kid={kid} />}
       {tab === "tests" && <StudentTests i={i} />}
+      {tab === "fees" && isParent && <ParentFees i={i} kid={kid} />}
       {tab === "messages" && <Messages i={i} home={home} kid={kid} onWrite={() => setModal("message")} />}
       {modal === "absence" && <AbsenceForm i={i} kid={kid} onClose={() => setModal(null)} onDone={() => done(t("absence_sent"))} />}
       {modal === "message" && <MessageForm i={i} home={home} kid={kid} onClose={() => setModal(null)} onDone={() => done(t("message_sent"))} />}

@@ -10,7 +10,7 @@ run() {
 }
 
 dropdb --if-exists maktab_t1 >/dev/null; createdb maktab_t1
-LOAD="-f local_compat.sql -f schema.sql -f seed.sql -f api_phase1.sql -f round4_roles_signals.sql -f weekly_tests_gen.sql -f curriculum.sql -f quiet_hours.sql -f family_api.sql -f school_api.sql -f ai_api.sql -f final_grades.sql"
+LOAD="-f local_compat.sql -f schema.sql -f seed.sql -f api_phase1.sql -f round4_roles_signals.sql -f weekly_tests_gen.sql -f curriculum.sql -f quiet_hours.sql -f family_api.sql -f school_api.sql -f ai_api.sql -f final_grades.sql -f finance.sql"
 psql -q -X -v ON_ERROR_STOP=1 -d maktab_t1 $LOAD >/dev/null
 echo "== 1. role matrix + v3 + plans (test_rls.sql) ==";  run maktab_t1 test_rls.sql
 echo "== 2. Perplexity's attacks (test_perplexity.sql) =="; run maktab_t1 test_perplexity.sql
@@ -35,6 +35,10 @@ echo "== 4e. quarter + yearly grades (test_final.sql) ==";
 dropdb --if-exists maktab_t6 >/dev/null; createdb maktab_t6
 psql -q -X -v ON_ERROR_STOP=1 -d maktab_t6 $LOAD >/dev/null
 run maktab_t6 test_final.sql
+echo "== 4f. fees, payments, accountant (test_finance.sql) ==";
+dropdb --if-exists maktab_t7 >/dev/null; createdb maktab_t7
+psql -q -X -v ON_ERROR_STOP=1 -d maktab_t7 $LOAD >/dev/null
+run maktab_t7 test_finance.sql
 echo "== 5. AI budget race, 2 connections ==";           PGDATABASE=maktab_t2 ./test_api_race.sh || FAILED=1
 
 if [ "$FAILED" = 0 ]; then echo "ALL TEST FILES GREEN"; else echo "SOMETHING FAILED (see above)"; exit 1; fi

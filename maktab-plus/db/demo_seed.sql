@@ -63,6 +63,7 @@ insert into demo_people values
  ('d1000000-0000-4000-8000-000000000001','Nodira','Sattorova','+998900000101','director','director'),
  ('d1000000-0000-4000-8000-000000000002','Jamshid','Tolipov','+998900000102','zavuch','zavuch'),
  ('d1000000-0000-4000-8000-000000000003','Oybek','Rahimov','+998900000103','school_admin','admin'),
+ ('d1000000-0000-4000-8000-000000000004','Barno','Xasanova','+998900000104','accountant','acc'),     -- step 7: money only
  ('d1000000-0000-4000-8000-000000000011','Aziza','Karimova','+998900000111','teacher','t1'),     -- maths, class teacher 7-A
  ('d1000000-0000-4000-8000-000000000012','Kamola','Yusupova','+998900000112','teacher','t2'),    -- English, class teacher 5-A
  ('d1000000-0000-4000-8000-000000000013','Shavkat','Ergashev','+998900000113','teacher','t3'),   -- Ona tili, class teacher 8-A
@@ -236,7 +237,7 @@ insert into guardians (parent_user_id, student_id, relation, is_primary) values
  ('d1000000-0000-4000-8000-000000000012', 'd4000000-0000-4000-8000-000000000502', 'mother', true);
 
 select app.set_password(id, coalesce(phone, 'sardor.r'), 'maktab2026')
-from demo_people where tag in ('director','zavuch','admin','t1','t2','t3','t4','t5','t6','parent','student');
+from demo_people where tag in ('director','zavuch','admin','acc','t1','t2','t3','t4','t5','t6','parent','student');
 
 -- ---- weekly tests (step 4) -------------------------------------------------
 -- The school's own question bank (checked by the teacher who wrote them).
@@ -375,3 +376,44 @@ select cm.student_id, ta.subject_id, 'd7000000-0000-4000-8000-000000000001', 'qu
 from teacher_assignments ta
 join classes c on c.id = ta.class_id and c.school_id = 'd5000000-0000-4000-8000-000000000001'
 join class_members cm on cm.class_id = ta.class_id and cm.status = 'active';
+
+-- ---- step 7: fees and payments (last 3 months) --------------------------------
+-- Monthly fee per grade (so'm), due on the 10th. Discounts need a reason.
+insert into fee_rates (school_id, grade_level, monthly_amount, updated_by) values
+ ('d5000000-0000-4000-8000-000000000001', 5, 2500000, 'd1000000-0000-4000-8000-000000000004'),
+ ('d5000000-0000-4000-8000-000000000001', 7, 2800000, 'd1000000-0000-4000-8000-000000000004'),
+ ('d5000000-0000-4000-8000-000000000001', 8, 3000000, 'd1000000-0000-4000-8000-000000000004');
+insert into fee_discounts (student_id, school_id, percent, reason, set_by) values
+ ('d4000000-0000-4000-8000-000000000501', 'd5000000-0000-4000-8000-000000000001', 10, 'Aka-uka: oiladagi ikkinchi farzand', 'd1000000-0000-4000-8000-000000000004'),
+ ('d4000000-0000-4000-8000-000000000502', 'd5000000-0000-4000-8000-000000000001', 50, 'Xodim farzandi (ingliz tili o''qituvchisi)', 'd1000000-0000-4000-8000-000000000004');
+
+insert into fee_invoices (school_id, student_id, period_month, amount, base_amount, discount_percent, due_date, created_at)
+select 'd5000000-0000-4000-8000-000000000001', cm.student_id, m.month,
+       round(r.monthly_amount * (100 - coalesce(d.percent, 0)) / 100.0, -3), r.monthly_amount, coalesce(d.percent, 0),
+       m.month + 9, m.month - 5
+from class_members cm
+join classes c on c.id = cm.class_id and c.school_id = 'd5000000-0000-4000-8000-000000000001'
+join fee_rates r on r.school_id = c.school_id and r.grade_level = c.grade_level
+left join fee_discounts d on d.student_id = cm.student_id
+cross join (select (date_trunc('month', current_date) - make_interval(months => k))::date as month from generate_series(0, 2) k) m
+where cm.status = 'active';
+
+-- Payments: older months nearly all paid; 2 families still owe for last month;
+-- this month most have paid, a few paid part. (Invented numbers.)
+create temp table demo_pay as
+select fi.id as invoice_id, fi.amount, fi.period_month, fi.due_date,
+       pg_temp.rnd(fi.student_id::text || fi.period_month) % 100 as dice,
+       fi.period_month = date_trunc('month', current_date)::date as this_month,
+       fi.period_month = (date_trunc('month', current_date) - interval '1 month')::date as last_month,
+       fi.student_id
+from fee_invoices fi where fi.school_id = 'd5000000-0000-4000-8000-000000000001';
+insert into payments (invoice_id, amount, provider, status, paid_at, created_at, recorded_by, note)
+select invoice_id,
+       case when this_month and dice between 70 and 84 then round(amount / 2, -3) else amount end,
+       (case when dice % 3 = 0 then 'bank' else 'cash' end)::pay_provider, 'completed',
+       due_date - (dice % 9) + 1 + interval '10 hours', due_date - (dice % 9) + 1 + interval '10 hours',
+       'd1000000-0000-4000-8000-000000000004', null
+from demo_pay
+where not (this_month and dice >= 85)
+  and not (last_month and student_id in ('d4000000-0000-4000-8000-000000000705', 'd4000000-0000-4000-8000-000000000809'))
+  and (not this_month or due_date - (dice % 9) + 1 <= current_date);

@@ -167,3 +167,25 @@ Screens: `docs/screens/step5-*.png`.
 
 Screens: `docs/screens/step6-*.png`. (For the screenshots the zavuch opened the yearly window in
 November, so the yearly grade uses quarters I–II only. In real use it opens in May.)
+
+## Step 7: school fees, payments, debts + the Accountant role
+
+- **Accountant** (new role, `db/finance.sql`): sees money only. No grades, attendance or student
+  records; it gets just names + class on the money screens. Only the school admin or director can
+  appoint one, and the director and school admin are notified when that happens.
+- **Who sees money**: director, school admin, accountant. **Never** the zavuch, teachers or children.
+  Debt is never shown at the gate and no child is ever stopped there.
+- **Fees**: a monthly fee per grade and a due day (the 10th). Discounts (siblings, staff children)
+  always need a reason. "Create this month's invoices" is safe to press twice.
+- **Payments**: cash or bank, partial payments allowed, never more than owed; each gets a receipt
+  number. A payment is never edited or deleted: a mistake is *cancelled with a reason*. Nobody can mark
+  an invoice "paid" by hand; only payments do that. Every money change is in the audit log.
+- **Debts and reminders**: overdue list for money roles only; "Remind parents" sends a gentle notice
+  to parents (never to the child), at most once a week per invoice.
+- **Parents**: a "To'lovlar" tab with each child's invoices and receipts.
+- **Not yet**: online payment through Click / Payme. That needs the school's merchant contract and
+  keys; their webhooks will write payments with the service role.
+- Tests: `db/test_finance.sql` (31), `server/test_server.sh` Y1–Y11 (now 65 checks).
+- Demo login: accountant `+998 90 000 01 04` (password `maktab2026`).
+
+Screens: `docs/screens/step7-*.png`.

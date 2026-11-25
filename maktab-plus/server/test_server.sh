@@ -102,6 +102,23 @@ ok "G12 the parent sees Temur's yearly maths grade" "$(curl -s "$API/api/family/
 ok "G13 … and nobody else's child"          "$(curl -s "$API/api/family/report?student=d4000000-0000-4000-8000-000000000701" -H "$PH" | J "len(d)")" 0
 curl -s -X POST $API/api/office/grades/window -H "$ZV2" -d '{"open":false}' >/dev/null
 
+# ---- step 7: money (accountant Barno; zavuch, teacher, parent, student) ----
+AC="authorization: Bearer $(tok 900000104)"
+ok "Y1 the accountant's home is the money screen"  "$(curl -s $API/api/home -H "$AC" | J "d['role']+'|'+str(d['seesMoney'])")" "accountant|True"
+OVR=$(curl -s $API/api/finance/overview -H "$AC")
+ok "Y2 the accountant sees families in debt"        "$(echo "$OVR" | J "d['families_in_debt'] > 0")" True
+ok "Y3 the zavuch never sees money"                 "$(curl -s $API/api/finance/overview -H "$ZV2" | J "d['error']")" not_allowed
+ok "Y4 a teacher never sees money"                  "$(curl -s $API/api/finance/students -H "$H" | J "d['error']")" not_allowed
+ok "Y5 the accountant cannot open grades"           "$(curl -s "$API/api/grades/quarter?class=$C5&subject=1" -H "$AC" | J "d['error']")" not_allowed
+ok "Y6 the parent sees only his 2 children's fees"  "$(curl -s $API/api/family/fees -H "$PH" | J "len(set(x['student_id'] for x in d))")" 2
+ok "Y7 a child never sees money"                    "$(curl -s $API/api/family/fees -H "authorization: Bearer $(tok sardor.r)" | J "len(d)")" 0
+DEB=$(echo "$OVR" | J "d['debtors'][0]['student_id']")
+INV=$(curl -s "$API/api/finance/student?id=$DEB" -H "$AC" | J "[x for x in d['invoices'] if x['overdue']][0]['id']")
+ok "Y8 more than is owed is refused"                "$(curl -s -X POST $API/api/finance/pay -H "$AC" -d "{\"invoice_id\":\"$INV\",\"amount\":99000000,\"method\":\"cash\"}" | J "d['error']")" bad_amount
+ok "Y9 a cash payment gives a receipt number"       "$(curl -s -X POST $API/api/finance/pay -H "$AC" -d "{\"invoice_id\":\"$INV\",\"amount\":500000,\"method\":\"cash\",\"note\":\"Kassaga\"}" | J "d['receipt_no'] > 0")" True
+ok "Y10 a parent cannot record a payment"           "$(curl -s -X POST $API/api/finance/pay -H "$PH" -d "{\"invoice_id\":\"$INV\",\"amount\":1000,\"method\":\"cash\"}" | J "d['error']")" not_allowed
+ok "Y11 reminders to parents: once a week at most"  "$(curl -s -X POST $API/api/finance/remind -H "$AC" | J "d['invoices'] > 0")|$(curl -s -X POST $API/api/finance/remind -H "$AC" | J "d['invoices']")" "True|0"
+
 for k in 1 2 3 4 5; do login demo 900000116 bad$k >/dev/null; done
 ok "S7 6th try after 5 wrong passwords is paused" "$(login demo 900000116 maktab2026 | J "d['error']")" too_many_attempts
 echo "RESULT: $P passed, $F failed"; [ $F = 0 ]

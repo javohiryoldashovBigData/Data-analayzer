@@ -156,7 +156,8 @@ async function home(user, wanted) {
     const roles = school?.roles ?? [];
     if (!roles.length) { const e = new Error("no_role"); e.code = "42501"; throw e; }
     const role = roles.includes(wanted) ? wanted : roles[0];
-    const out = { me, school, roles, role };
+    // money screens: director, school admin, accountant only (the database checks again)
+    const out = { me, school, roles, role, seesMoney: ["director", "school_admin", "accountant"].includes(role) };
     if (role === "teacher") {
       out.day = (await q(Q.myDay))[0].day;
       out.absenceToReview = await q(Q.absenceToReview);
@@ -388,6 +389,43 @@ const step4 = {
     const id = url.searchParams.get("student") ?? ""; if (!UUID.test(id)) throw bad("bad_request");
     return val(u, "select api.report_card($1::uuid) as r", [id]);
   },
+  // money (step 7) — director, school admin, accountant; the database checks every call
+  "GET /api/finance/overview": (u, b, url) => {
+    const m = url.searchParams.get("month"); if (m && !DATE.test(m)) throw bad("bad_request");
+    return val(u, "select api.finance_overview(coalesce($1::date, current_date)) as r", [m || null]);
+  },
+  "GET /api/finance/settings": (u) => val(u, "select api.fee_settings() as r"),
+  "GET /api/finance/students": (u) => val(u, "select api.finance_students() as r"),
+  "GET /api/finance/student": (u, b, url) => {
+    const id = url.searchParams.get("id") ?? ""; if (!UUID.test(id)) throw bad("bad_request");
+    return val(u, "select api.student_account($1::uuid) as r", [id]);
+  },
+  "POST /api/finance/rate": (u, b) => {
+    if (!Number.isInteger(b.grade_level) || b.grade_level < 1 || b.grade_level > 11 || typeof b.amount !== "number") throw bad("bad_request");
+    return asRole(u, (q) => q("select api.set_fee_rate($1::smallint, $2::numeric)", [b.grade_level, b.amount])).then(() => ({ ok: true }));
+  },
+  "POST /api/finance/discount": (u, b) => {
+    if (!UUID.test(b.student_id) || !Number.isInteger(b.percent)) throw bad("bad_request");
+    return asRole(u, (q) => q("select api.set_discount($1::uuid, $2::smallint, $3)", [b.student_id, b.percent, String(b.reason ?? "").slice(0, 300)])).then(() => ({ ok: true }));
+  },
+  "POST /api/finance/generate": (u, b) => {
+    if (b.month && !DATE.test(b.month)) throw bad("bad_request");
+    return val(u, "select api.generate_invoices(coalesce($1::date, current_date)) as r", [b.month || null]);
+  },
+  "POST /api/finance/pay": (u, b) => {
+    if (!UUID.test(b.invoice_id) || typeof b.amount !== "number" || !["cash", "bank"].includes(b.method)) throw bad("bad_request");
+    return val(u, "select api.record_payment($1::uuid, $2::numeric, $3, $4) as r", [b.invoice_id, b.amount, b.method, String(b.note ?? "").slice(0, 300)]);
+  },
+  "POST /api/finance/cancel-payment": (u, b) => {
+    if (!UUID.test(b.payment_id)) throw bad("bad_request");
+    return asRole(u, (q) => q("select api.cancel_payment($1::uuid, $2)", [b.payment_id, String(b.reason ?? "").slice(0, 300)])).then(() => ({ ok: true }));
+  },
+  "POST /api/finance/cancel-invoice": (u, b) => {
+    if (!UUID.test(b.invoice_id)) throw bad("bad_request");
+    return asRole(u, (q) => q("select api.cancel_invoice($1::uuid, $2)", [b.invoice_id, String(b.reason ?? "").slice(0, 300)])).then(() => ({ ok: true }));
+  },
+  "POST /api/finance/remind": (u) => val(u, "select api.send_fee_reminders() as r"),
+  "GET /api/family/fees": (u) => val(u, "select api.my_fees() as r"),
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
   "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),

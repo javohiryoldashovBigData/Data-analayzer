@@ -6,6 +6,7 @@ import { OfficeInbox } from "./Office";
 import { DayCheck, ProblemsCard, TeacherArea } from "./Step4";
 import { AiBudgetCard } from "./Step5";
 import { GradesOverview } from "./Step6";
+import { FinanceArea, FinanceSummaryCard } from "./Step7";
 import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -14,6 +15,7 @@ const ROLES: { id: string; icon: string; color: string }[] = [
   { id: "student", icon: "backpack", color: "#2a78d6" },
   { id: "director", icon: "building-community", color: "#7c3aed" },
   { id: "zavuch", icon: "clipboard-check", color: "#b45309" },
+  { id: "accountant", icon: "calculator", color: "#15803d" },
 ];
 
 function useTheme() {
@@ -45,6 +47,7 @@ const DEMO_ACCOUNTS: { role: string; name: string; login: string }[] = [
   { role: "student", name: "Sardor Rahimov", login: "sardor.r" },
   { role: "director", name: "Nodira Sattorova", login: "+998 90 000 01 01" },
   { role: "zavuch", name: "Jamshid Tolipov", login: "+998 90 000 01 02" },
+  { role: "accountant", name: "Barno Xasanova", login: "+998 90 000 01 04" },
 ];
 const DEMO_PASSWORD = "maktab2026";
 
@@ -244,6 +247,7 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         {home.day && <TeacherArea i={i} home={home} reload={onRefresh} />}
         {home.kids && <FamilyHome i={i} home={home} reload={onRefresh} />}
         {home.stats && <LeaderHome i={i} home={home} reload={onRefresh} />}
+        {home.role === "accountant" && <FinanceArea i={i} home={home} />}
       </main>
     </div>
   );
@@ -270,6 +274,7 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
         </Card>
         <ProblemsCard i={i} home={home} reload={reload} />
       </div>
+      <FinanceSummaryCard i={i} home={home} />
       <DayCheck i={i} />
       <GradesOverview i={i} />
       <AiBudgetCard i={i} home={home} />
