@@ -208,3 +208,21 @@ Screens: `docs/screens/step7-*.png`.
   server needs only the public bot name `TELEGRAM_BOT_USERNAME`.
 - Tests: `server/test_telegram.sh` (18 checks) against `server/fake-telegram.mjs`. No token is needed
   and no real messages are sent.
+
+## Step 8b: set up a school from one Excel file
+
+- The director or school admin downloads the template (sheets O'qituvchilar / O'quvchilar /
+  Dars jadvali plus an instructions sheet), fills it in and uploads it. The **browser** reads the file,
+  so the server never opens uploaded files.
+- `api.import_school` (`db/school_setup.sql`) checks **every row** and lists each problem in plain
+  words (sheet, row, what is wrong, what was written). If anything is wrong, **nothing is saved**.
+  When the file is correct, everything is saved in one go.
+- It creates classes, teachers (class teacher too), students, parents (siblings share one parent),
+  and the timetable plus teaching assignments. Existing people are found by phone and reused, so
+  uploading the same file again creates nothing twice. It understands 5-A / 5a / 5-А (Cyrillic),
+  21.05.2014 or Excel date cells, Dushanba…Shanba or 1–6, and o'g'il/qiz, ona/ota/buvi…
+- New logins get an 8-character first password, **shown once** to the admin as an Excel slip list
+  (a parent's slip names all their children). Only the school admin or director can import, only into
+  their own school, and never themselves. Every import goes into the audit log.
+- Try it: `docs/examples/namuna_6-A_sinf.xlsx` (correct) and `namuna_6-A_xatolar_bilan.xlsx` (with mistakes).
+- Tests: `db/test_setup.sql` (18). A browser test with real LibreOffice-made .xlsx files also passed.

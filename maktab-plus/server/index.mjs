@@ -159,7 +159,8 @@ async function home(user, wanted) {
     if (!roles.length) { const e = new Error("no_role"); e.code = "42501"; throw e; }
     const role = roles.includes(wanted) ? wanted : roles[0];
     // money screens: director, school admin, accountant only (the database checks again)
-    const out = { me, school, roles, role, seesMoney: ["director", "school_admin", "accountant"].includes(role) };
+    const out = { me, school, roles, role, seesMoney: ["director", "school_admin", "accountant"].includes(role),
+                  canSetup: ["director", "school_admin"].includes(role) };
     if (role === "teacher") {
       out.day = (await q(Q.myDay))[0].day;
       out.absenceToReview = await q(Q.absenceToReview);
@@ -435,6 +436,13 @@ const step4 = {
     return val(u, "select api.telegram_link_token() as r").then((token) => ({ url: `https://t.me/${TG_BOT}?start=${token}` }));
   },
   "POST /api/telegram/unlink": (u) => asRole(u, (q) => q("select api.telegram_unlink()")).then(() => ({ ok: true })),
+  // school setup from Excel (step 8b): the browser reads the file, the database checks every row
+  "POST /api/office/import": (u, b) => {
+    if (typeof b.data !== "object" || b.data === null || typeof b.commit !== "boolean") throw bad("bad_request");
+    const pick = (a) => (Array.isArray(a) ? a : []);
+    const data = { teachers: pick(b.data.teachers), students: pick(b.data.students), timetable: pick(b.data.timetable) };
+    return val(u, "select api.import_school($1::jsonb, $2) as r", [JSON.stringify(data), b.commit]);
+  },
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
   "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),
@@ -523,9 +531,9 @@ function send(res, code, body) {
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   res.end(JSON.stringify(body));
 }
-async function readJson(req) {
+async function readJson(req, limit = 1e5) {
   let s = "";
-  for await (const ch of req) { s += ch; if (s.length > 1e5) throw new Error("too_large"); }
+  for await (const ch of req) { s += ch; if (s.length > limit) throw new Error("too_large"); }
   return s ? JSON.parse(s) : {};
 }
 
@@ -572,7 +580,9 @@ const server = http.createServer(async (req, res) => {
     const s4 = step4[`${req.method} ${url.pathname}`];
     if (s4) {
       if (!user) return send(res, 401, { error: "login_required" });
-      return send(res, 200, await s4(user, req.method === "POST" ? await readJson(req) : {}, url));
+      // only the school-setup import may send a big body (a whole school's Excel rows)
+      const limit = url.pathname === "/api/office/import" ? 3e6 : 1e5;
+      return send(res, 200, await s4(user, req.method === "POST" ? await readJson(req, limit) : {}, url));
     }
     if (url.pathname.startsWith("/api/family/") || url.pathname === "/api/teacher/absence" || url.pathname === "/api/office/reply") {
       if (!user) return send(res, 401, { error: "login_required" });

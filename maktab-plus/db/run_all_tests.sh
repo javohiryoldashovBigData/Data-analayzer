@@ -39,6 +39,10 @@ echo "== 4f. fees, payments, accountant (test_finance.sql) ==";
 dropdb --if-exists maktab_t7 >/dev/null; createdb maktab_t7
 psql -q -X -v ON_ERROR_STOP=1 -d maktab_t7 $LOAD >/dev/null
 run maktab_t7 test_finance.sql
+echo "== 4g. school setup from Excel (test_setup.sql) ==";
+dropdb --if-exists maktab_t8 >/dev/null; createdb maktab_t8
+psql -q -X -v ON_ERROR_STOP=1 -d maktab_t8 $LOAD -f auth_local.sql -f school_setup.sql >/dev/null
+run maktab_t8 test_setup.sql
 echo "== 5. AI budget race, 2 connections ==";           PGDATABASE=maktab_t2 ./test_api_race.sh || FAILED=1
 
 if [ "$FAILED" = 0 ]; then echo "ALL TEST FILES GREEN"; else echo "SOMETHING FAILED (see above)"; exit 1; fi
