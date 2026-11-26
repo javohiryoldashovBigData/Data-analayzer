@@ -7,6 +7,7 @@ import { DayCheck, ProblemsCard, TeacherArea } from "./Step4";
 import { AiBudgetCard } from "./Step5";
 import { GradesOverview } from "./Step6";
 import { FinanceArea, FinanceSummaryCard } from "./Step7";
+import { TelegramCard } from "./Step8";
 import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -248,6 +249,7 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         {home.kids && <FamilyHome i={i} home={home} reload={onRefresh} />}
         {home.stats && <LeaderHome i={i} home={home} reload={onRefresh} />}
         {home.role === "accountant" && <FinanceArea i={i} home={home} />}
+        {home.role !== "student" && <TelegramCard key={home.role} i={i} />}
       </main>
     </div>
   );

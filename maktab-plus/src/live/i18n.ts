@@ -417,6 +417,17 @@ const D: Record<string, Record<Lang, string>> = {
   fin_receipt_line: { uz: "Kvitansiya №{n}: {s}, {d}", ru: "Квитанция №{n}: {s}, {d}", en: "Receipt №{n}: {s}, {d}" },
   fin_how_to_pay: { uz: "To'lov maktab kassasida yoki bank orqali. Click / Payme orqali onlayn to'lov maktab shartnomasidan keyin qo'shiladi.", ru: "Оплата в кассе школы или через банк. Онлайн-оплата Click / Payme появится после договора школы.", en: "Pay at the school cash desk or by bank. Online payment by Click / Payme comes once the school signs with them." },
   fin_parent_note: { uz: "Savol bo'lsa, maktab buxgalteriyasiga yozing. Bu ma'lumot farzandingizga ko'rinmaydi.", ru: "Если есть вопрос — напишите в бухгалтерию школы. Ребёнок эту информацию не видит.", en: "Questions? Write to the school's accounts office. Your child does not see this." },
+  // step 8a — Telegram
+  tg_title: { uz: "Telegram xabarlari", ru: "Сообщения в Telegram", en: "Telegram messages" },
+  tg_linked: { uz: "Ulangan", ru: "Подключено", en: "Connected" },
+  tg_linked_sub: { uz: "Maktab xabarlari Telegram'ingizga keladi. Botda /stop — to'xtatish.", ru: "Сообщения школы приходят в ваш Telegram. /stop в боте — остановить.", en: "School messages come to your Telegram. /stop in the bot stops them." },
+  tg_unlink: { uz: "Uzish", ru: "Отключить", en: "Disconnect" },
+  tg_why: { uz: "Farzandingiz maktabga kelgani, darsda yo'qligi, yangi baholar — darhol Telegram'da.", ru: "Пришёл ли ребёнок в школу, пропуски, новые оценки — сразу в Telegram.", en: "Arrived at school, missed lessons, new grades — straight to Telegram." },
+  tg_connect: { uz: "Telegram'ni ulash", ru: "Подключить Telegram", en: "Connect Telegram" },
+  tg_check: { uz: "Ulandimi? Tekshirish", ru: "Подключилось? Проверить", en: "Connected? Check" },
+  tg_waiting: { uz: "Telegram ochildi: u yerda \"Start\" tugmasini bosing. Havola 15 daqiqa amal qiladi.", ru: "Открылся Telegram: нажмите там «Start». Ссылка действует 15 минут.", en: "Telegram opened: tap \"Start\" there. The link works for 15 minutes." },
+  tg_not_ready: { uz: "Telegram bot hali sozlanmagan — maktab sozlagach, shu yerda ulaysiz.", ru: "Telegram-бот ещё не настроен — когда школа настроит, подключитесь здесь.", en: "The Telegram bot is not set up yet — once the school sets it up, connect here." },
+  tg_privacy: { uz: "Xabarlar faqat sizning shaxsiy chatingizga keladi, guruhlarga hech qachon.", ru: "Сообщения приходят только в ваш личный чат, никогда в группы.", en: "Messages go only to your private chat, never to groups." },
 };
 
 const MONTHS: Record<Lang, string[]> = {

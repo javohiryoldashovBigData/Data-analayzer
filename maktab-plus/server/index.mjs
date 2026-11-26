@@ -15,6 +15,8 @@ import crypto from "node:crypto";
 import pg from "pg";
 
 const PORT = Number(process.env.PORT || 8787);
+// public bot username (e.g. MaktabPlusBot) — not a secret; empty = bot not set up yet
+const TG_BOT = /^[A-Za-z0-9_]{5,32}$/.test(process.env.TELEGRAM_BOT_USERNAME ?? "") ? process.env.TELEGRAM_BOT_USERNAME : "";
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 // dates stay plain "YYYY-MM-DD" text (no timezone shift); numbers as numbers
 pg.types.setTypeParser(1082, (v) => v);
@@ -426,6 +428,13 @@ const step4 = {
   },
   "POST /api/finance/remind": (u) => val(u, "select api.send_fee_reminders() as r"),
   "GET /api/family/fees": (u) => val(u, "select api.my_fees() as r"),
+  // Telegram (step 8a): the web app only makes one-time links; the worker holds the bot token
+  "GET /api/telegram/status": (u) => val(u, "select api.telegram_status() as r").then((r) => ({ ...r, bot: TG_BOT || null })),
+  "POST /api/telegram/link": (u) => {
+    if (!TG_BOT) throw bad("telegram_not_configured");
+    return val(u, "select api.telegram_link_token() as r").then((token) => ({ url: `https://t.me/${TG_BOT}?start=${token}` }));
+  },
+  "POST /api/telegram/unlink": (u) => asRole(u, (q) => q("select api.telegram_unlink()")).then(() => ({ ok: true })),
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
   "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),

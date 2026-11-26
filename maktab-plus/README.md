@@ -189,3 +189,22 @@ November, so the yearly grade uses quarters I–II only. In real use it opens in
 - Demo login: accountant `+998 90 000 01 04` (password `maktab2026`).
 
 Screens: `docs/screens/step7-*.png`.
+
+## Step 8a: Telegram bot (first real delivery channel)
+
+- **Connect** in two safe ways: from the app ("Telegram'ni ulash" → a one-time link
+  `t.me/<bot>?start=<token>`, valid 15 minutes, stored only as a hash), or in the bot by sharing
+  **your own** phone (accepted only if the contact belongs to the sender and exactly one person in
+  Maktab+ has that number). `/stop` disconnects.
+- **Delivery**: `server/telegram-worker.mjs` (the only process holding the bot token) sends the
+  notification queue (gate in/out, absences, skipped lessons, grades, topic review, yearly grades,
+  fee reminders, parent messages, role-change alerts) in uz/ru/en. Quiet hours were already decided
+  by the database. It sends plain text only, to private chats only, never to groups.
+- **Failures are never silent**: no Telegram → `no_channel`; "too many requests" → retried later; the
+  user blocked the bot → link removed; repeated errors → `failed` with the reason.
+- **School setting** `telegram_details`: off → messages say only "new grade — see the app", with no
+  child name or grade.
+- Run: `TELEGRAM_BOT_TOKEN=… DATABASE_SERVICE_URL=… node server/telegram-worker.mjs loop`; the web
+  server needs only the public bot name `TELEGRAM_BOT_USERNAME`.
+- Tests: `server/test_telegram.sh` (18 checks) against `server/fake-telegram.mjs`. No token is needed
+  and no real messages are sent.
