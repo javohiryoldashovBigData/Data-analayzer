@@ -1,6 +1,9 @@
 import { useCallback, useState } from "react";
 
 export type Lang = "uz" | "ru" | "en";
+// school or learning center: set once the organisation is known (login page / home)
+let orgKind: "school" | "center" = "school";
+export const setOrgKind = (k: string | null | undefined) => { orgKind = k === "center" ? "center" : "school"; };
 const KEY = "maktab.live.lang";
 
 // Uzbek (Latin) is the source text; ru/en follow the same keys.
@@ -34,6 +37,8 @@ const D: Record<string, Record<Lang, string>> = {
   demo_student: { uz: "O'quvchi", ru: "Ученик", en: "Student" },
   demo_director: { uz: "Direktor", ru: "Директор", en: "Director" },
   demo_zavuch: { uz: "Zavuch", ru: "Завуч", en: "Deputy head" },
+  demo_center_admin: { uz: "Markaz menejeri (guruhlar)", ru: "Менеджер центра (группы)", en: "Center manager (groups)" },
+  demo_adult_student: { uz: "Katta yoshli o'quvchi", ru: "Взрослый ученик", en: "Adult student" },
   demo_accountant: { uz: "Buxgalter (faqat pul)", ru: "Бухгалтер (только финансы)", en: "Accountant (money only)" },
   who_today: { uz: "Bugun kim sifatida kirasiz?", ru: "Кем вы входите сегодня?", en: "Who are you today?" },
   who_today_sub: { uz: "Sizda bu maktabda bir nechta rol bor. Faqat o'z rollaringiz ko'rsatiladi.", ru: "У вас несколько ролей в этой школе. Показаны только ваши роли.", en: "You have more than one role in this school. Only your own roles are shown." },
@@ -498,6 +503,74 @@ const D: Record<string, Record<Lang, string>> = {
   ppl_no_phone: { uz: "Bu odamning telefoni yo'q — avval telefon raqamini kiriting.", ru: "У этого человека нет телефона — сначала добавьте номер.", en: "This person has no phone — add a phone number first." },
   ppl_given_note: { uz: "Faqat shu odamga, shaxsan bering. Kirganda o'z parolini o'rnatadi.", ru: "Передайте лично этому человеку. При входе он установит свой пароль.", en: "Give it to this person only, in person. They set their own password when they log in." },
   org_center: { uz: "O'quv markaz", ru: "Учебный центр", en: "Learning center" },
+  // step 10 — learning-center groups
+  day_1: { uz: "Du", ru: "Пн", en: "Mon" },
+  day_2: { uz: "Se", ru: "Вт", en: "Tue" },
+  day_3: { uz: "Cho", ru: "Ср", en: "Wed" },
+  day_4: { uz: "Pa", ru: "Чт", en: "Thu" },
+  day_5: { uz: "Ju", ru: "Пт", en: "Fri" },
+  day_6: { uz: "Sh", ru: "Сб", en: "Sat" },
+  day_1_full: { uz: "Dushanba", ru: "Понедельник", en: "Monday" },
+  day_2_full: { uz: "Seshanba", ru: "Вторник", en: "Tuesday" },
+  day_3_full: { uz: "Chorshanba", ru: "Среда", en: "Wednesday" },
+  day_4_full: { uz: "Payshanba", ru: "Четверг", en: "Thursday" },
+  day_5_full: { uz: "Juma", ru: "Пятница", en: "Friday" },
+  day_6_full: { uz: "Shanba", ru: "Суббота", en: "Saturday" },
+  cg_title: { uz: "Guruhlar", ru: "Группы", en: "Groups" },
+  cg_sub: { uz: "{n} ta faol guruh", ru: "Активных групп: {n}", en: "{n} active groups" },
+  cg_new: { uz: "Yangi guruh", ru: "Новая группа", en: "New group" },
+  cg_edit: { uz: "Guruhni tahrirlash", ru: "Изменить группу", en: "Edit group" },
+  cg_empty: { uz: "Hali guruh yo'q. \"Yangi guruh\" tugmasini bosing.", ru: "Групп пока нет. Нажмите «Новая группа».", en: "No groups yet. Tap \"New group\"." },
+  cg_archived: { uz: "arxivda", ru: "в архиве", en: "archived" },
+  cg_no_schedule: { uz: "jadval yo'q", ru: "нет расписания", en: "no timetable" },
+  cg_count: { uz: "{n} / {c} o'quvchi", ru: "{n} / {c} учеников", en: "{n} / {c} students" },
+  cg_students: { uz: "O'quvchilar", ru: "Ученики", en: "Students" },
+  cg_name: { uz: "Guruh nomi", ru: "Название группы", en: "Group name" },
+  cg_course: { uz: "Kurs", ru: "Курс", en: "Course" },
+  cg_capacity: { uz: "Necha o'rin", ru: "Мест в группе", en: "Places" },
+  cg_starts: { uz: "Boshlanishi", ru: "Начало", en: "Starts" },
+  cg_ends: { uz: "Tugashi", ru: "Конец", en: "Ends" },
+  cg_schedule: { uz: "Dars kunlari va vaqti", ru: "Дни и время занятий", en: "Lesson days and time" },
+  cg_archive: { uz: "Guruh tugadi (arxivga)", ru: "Группа закончилась (в архив)", en: "The group has finished (archive)" },
+  cg_e_name_taken: { uz: "Bunday nomli guruh bor.", ru: "Группа с таким названием уже есть.", en: "A group with this name already exists." },
+  cg_e_teacher_busy: { uz: "Bu o'qituvchining shu vaqtda boshqa guruhi bor.", ru: "У этого учителя в это время другая группа.", en: "This teacher has another group at that time." },
+  cg_e_bad_name: { uz: "Guruh nomini yozing (kamida 2 harf).", ru: "Введите название группы (минимум 2 буквы).", en: "Write the group name (at least 2 letters)." },
+  cg_e_bad_dates: { uz: "Tugash sanasi boshlanishidan oldin bo'lmasin.", ru: "Дата окончания не может быть раньше начала.", en: "The end date cannot be before the start." },
+  cg_e_bad_teacher: { uz: "O'qituvchini tanlang.", ru: "Выберите учителя.", en: "Choose a teacher." },
+  cg_e_bad_subject: { uz: "Fanni tanlang.", ru: "Выберите предмет.", en: "Choose a subject." },
+  cg_e_bad_schedule: { uz: "Dars vaqtini tekshiring.", ru: "Проверьте время занятий.", en: "Check the lesson times." },
+  cg_e_group_full: { uz: "Guruh to'la. Joy sonini oshiring yoki boshqa guruhni tanlang.", ru: "Группа заполнена. Увеличьте число мест или выберите другую группу.", en: "The group is full. Add places or choose another group." },
+  cg_e_not_allowed: { uz: "Ruxsat yo'q.", ru: "Нет доступа.", en: "Not allowed." },
+  cg_e_not_found: { uz: "Topilmadi.", ru: "Не найдено.", en: "Not found." },
+  cg_new_student: { uz: "Yangi o'quvchi", ru: "Новый ученик", en: "New student" },
+  cg_find_student: { uz: "Markazdagi o'quvchini qidiring va guruhga qo'shing…", ru: "Найдите ученика центра и добавьте в группу…", en: "Find a center student and add them to the group…" },
+  cg_no_group: { uz: "hali guruhi yo'q", ru: "пока без группы", en: "no group yet" },
+  cg_add: { uz: "Qo'shish", ru: "Добавить", en: "Add" },
+  cg_not_found: { uz: "Topilmadi — \"Yangi o'quvchi\" orqali qo'shing.", ru: "Не найдено — добавьте через «Новый ученик».", en: "Not found — add them with \"New student\"." },
+  cg_added: { uz: "O'quvchi guruhga qo'shildi.", ru: "Ученик добавлен в группу.", en: "The student was added to the group." },
+  cg_left: { uz: "O'quvchi guruhdan chiqarildi (tarixi saqlanadi).", ru: "Ученик выведен из группы (история сохраняется).", en: "The student left the group (their history is kept)." },
+  cg_remove: { uz: "Chiqarish", ru: "Вывести", en: "Remove" },
+  cg_own_login: { uz: "o'z logini", ru: "свой логин", en: "own login" },
+  cg_no_contact: { uz: "telefon yo'q", ru: "нет телефона", en: "no phone" },
+  cg_last: { uz: "Familiya", ru: "Фамилия", en: "Last name" },
+  cg_first: { uz: "Ism", ru: "Имя", en: "First name" },
+  cg_birth: { uz: "Tug'ilgan sana", ru: "Дата рождения", en: "Birth date" },
+  cg_adult: { uz: "Katta yoshli (o'zi xabar oladi)", ru: "Взрослый (сам получает сообщения)", en: "Adult (gets messages themselves)" },
+  cg_own_phone: { uz: "O'quvchining telefoni (login bo'ladi)", ru: "Телефон ученика (будет логином)", en: "Student's phone (becomes the login)" },
+  cg_parent_last: { uz: "Ota-ona familiyasi", ru: "Фамилия родителя", en: "Parent's last name" },
+  cg_parent_first: { uz: "Ota-ona ismi", ru: "Имя родителя", en: "Parent's first name" },
+  cg_parent_phone: { uz: "Ota-ona telefoni", ru: "Телефон родителя", en: "Parent's phone" },
+  cg_teen_phone: { uz: "O'quvchining o'z telefoni (ixtiyoriy)", ru: "Свой телефон ученика (необязательно)", en: "The student's own phone (optional)" },
+  role_center_admin: { uz: "Markaz menejeri", ru: "Менеджер центра", en: "Center manager" },
+  // learning-center wording (used automatically when the organisation is a center)
+  "by_class@center": { uz: "Guruhlar bo'yicha davomat", ru: "Посещаемость по группам", en: "Attendance by group" },
+  "teachers_classes@center": { uz: "{t} o'qituvchi · {c} guruh", ru: "{t} учителей · {c} групп", en: "{t} teachers · {c} groups" },
+  "no_ranking@center": { uz: "Reyting yo'q: ko'rsatkichlar guruh va markaz bo'yicha, o'quvchilar solishtirilmaydi.", ru: "Без рейтингов: показатели по группам и центру, учеников не сравниваем.", en: "No rankings: numbers are per group and center, students are never compared." },
+  "write_office@center": { uz: "Markazga yozish", ru: "Написать в центр", en: "Write to the center" },
+  "tab_my_class@center": { uz: "Mening guruhim", ru: "Моя группа", en: "My group" },
+  "contact_office@center": { uz: "O'qituvchi bilan bog'lanish markaz ma'muriyati orqali.", ru: "Связь с учителем — через администрацию центра.", en: "To contact a teacher, write to the center's office." },
+  "demo_title@center": { uz: "Namuna o'quv markazga bir bosishda kiring", ru: "Войдите в демо-центр одним нажатием", en: "Try the demo learning center in one tap" },
+  "demo_accounts@center": { uz: "Namuna markaz uchun test kirishlar", ru: "Тестовые входы для демо-центра", en: "Test logins for the demo center" },
 };
 
 const MONTHS: Record<Lang, string[]> = {
@@ -518,7 +591,9 @@ export function useLang() {
   });
   const setLang = (l: Lang) => { setLangState(l); try { localStorage.setItem(KEY, l); } catch { /* ignore */ } document.documentElement.lang = l; };
   const t = useCallback((k: string, vars: Record<string, string | number> = {}) => {
-    let s = D[k]?.[lang] ?? D[k]?.uz ?? k;
+    // a learning center sees its own words where they differ ("guruh", not "sinf")
+    const e = (orgKind === "center" && D[`${k}@center`]) || D[k];
+    let s = e?.[lang] ?? e?.uz ?? k;
     for (const [n, v] of Object.entries(vars)) s = s.replace(`{${n}}`, String(v));
     return s;
   }, [lang]);

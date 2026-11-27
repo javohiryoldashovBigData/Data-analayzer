@@ -46,7 +46,7 @@ export type Lesson = {
   card: { id: string; status: "draft" | "ai_draft" | "approved"; topic: string | null } | null;
   attendance_done: boolean; lesson_done: boolean; ask_first: AskFirst[];
 };
-export type Kid = { id: string; first_name: string; last_name: string; class: string; class_id: string };
+export type Kid = { id: string; first_name: string; last_name: string; class: string; class_id: string; class_ids?: string[] };
 export type Home = {
   me: { first_name: string; last_name: string };
   school: { school_id: string; slug: string; name: string; org_kind?: "school" | "center" } | null;

@@ -45,7 +45,10 @@ ok "TG9 the bot never answers in groups"                 "$(curl -s $TG/test/sen
 sql "insert into gate_events (school_id, student_id, direction) values ('d5000000-0000-4000-8000-000000000001', 'd4000000-0000-4000-8000-000000000801', 'in')" >/dev/null
 worker >/dev/null
 ok "TG10 gate alert reaches the father at once"          "$(last_to 5001 | grep -c 'Sardor maktabga keldi')" 1
-NC=$(sql "select count(*) from notification_outbox where status = 'no_channel'")
+sql "insert into notification_outbox (recipient_id, payload) values ('d1000000-0000-4000-8000-000000000001', '{\"kind\":\"system\",\"event\":\"no_tg_check\"}')" >/dev/null
+sql "update notification_outbox set deliver_after = null where payload->>'event' = 'no_tg_check'" >/dev/null
+worker >/dev/null
+NC=$(sql "select count(*) from notification_outbox where status = 'no_channel' and payload->>'event' = 'no_tg_check'")
 ok "TG11 people without Telegram are marked no_channel (not lost silently)" "$([ "$NC" -gt 0 ] && echo yes)" yes
 sql "update schools set telegram_details = false" >/dev/null
 sql "insert into notification_outbox (recipient_id, payload) values ('d1000000-0000-4000-8000-000000000021', '{\"kind\":\"gate_out\",\"student_id\":\"d4000000-0000-4000-8000-000000000801\",\"scanned_at\":\"2026-11-26T09:00:00Z\"}')" >/dev/null

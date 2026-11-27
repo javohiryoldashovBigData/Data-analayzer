@@ -243,12 +243,19 @@ create table classes (
   id               uuid primary key default gen_random_uuid(),
   school_id        uuid not null references schools(id) on delete cascade,
   academic_year_id smallint not null references academic_years(id) on delete cascade,
-  grade_level      smallint not null check (grade_level between 1 and 11),
-  letter           char(1) not null,
+  -- a school class has grade + letter ("5-A"); a learning-center GROUP has a name
+  -- ("IELTS 6.5 — kechki"). Both are rows here, so attendance, lessons, tests,
+  -- grades and alerts work the same for both. (v3.6)
+  grade_level      smallint check (grade_level between 1 and 11),
+  letter           char(1),
+  name             text check (length(btrim(name)) between 1 and 80),
   class_teacher_id uuid references teachers(id) on delete set null,     -- sinf rahbari
+  label            text generated always as (coalesce(name, grade_level::text || '-' || letter)) stored,
+  check (name is not null or (grade_level is not null and letter is not null)),
   unique (school_id, academic_year_id, grade_level, letter)
 );
 create index classes_school_year_idx on classes(school_id, academic_year_id);
+create unique index classes_name_uk on classes(school_id, academic_year_id, lower(name)) where name is not null;
 
 create table class_members (
   id          uuid primary key default gen_random_uuid(),

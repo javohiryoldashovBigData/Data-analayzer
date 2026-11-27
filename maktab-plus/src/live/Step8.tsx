@@ -61,8 +61,8 @@ const SHEETS = {
   teachers: { uz: "O'qituvchilar", alt: ["oqituvchilar", "учителя", "teachers"],
               cols: ["Familiya", "Ism", "Telefon", "Sinf rahbari (sinf)"], widths: [18, 16, 18, 20] },
   students: { uz: "O'quvchilar", alt: ["oquvchilar", "ученики", "students"],
-              cols: ["Familiya", "Ism", "Otasining ismi", "Sinf", "Tug'ilgan sana", "Jinsi", "Ota-ona familiyasi", "Ota-ona ismi", "Ota-ona telefoni", "Kim (ona/ota/...)"],
-              widths: [16, 14, 16, 8, 15, 10, 18, 14, 18, 16] },
+              cols: ["Familiya", "Ism", "Otasining ismi", "Sinf yoki guruh", "Tug'ilgan sana", "Jinsi", "Ota-ona familiyasi", "Ota-ona ismi", "Ota-ona telefoni", "Kim (ona/ota/...)", "O'quvchining o'z telefoni"],
+              widths: [16, 14, 16, 22, 15, 10, 18, 14, 18, 16, 22] },
   timetable: { uz: "Dars jadvali", alt: ["darsjadvali", "расписание", "timetable"],
                cols: ["Sinf", "Kun", "Dars (1-9)", "Fan", "O'qituvchi telefoni"], widths: [8, 14, 10, 18, 20] },
 } as const;
@@ -76,6 +76,7 @@ export function templateBlob(): Blob {
       ["2. Telefon: +998 90 123 45 67 yoki 901234567. Telefon — login bo'ladi."],
       ["3. Sinf: 5-A, 7-B kabi. Kun: Dushanba … Shanba yoki 1–6. Fan nomi Maktab+ dagidek: Matematika, Ingliz tili …"],
       ["4. Tug'ilgan sana: 21.05.2014. Jinsi: o'g'il / qiz. Kim: ona, ota, buvi, bobo, aka, opa."],
+      ["O'quv markaz: \"Sinf yoki guruh\" ustuniga guruh nomini yozing (guruh avval Maktab+ da ochilgan bo'lsin). Katta yoshli o'quvchining o'z telefonini oxirgi ustunga yozing — u o'zi login oladi."],
       ["5. Faylni Maktab+ ga yuklang: avval tekshiriladi, xato bo'lsa hech narsa saqlanmaydi. Qayta yuklash xavfsiz — takror yaratilmaydi."],
       ["Misol (O'quvchilar): Aliyev | Ali | Valiyevich | 5-A | 12.03.2015 | o'g'il | Aliyeva | Malika | +998935556677 | ona"],
     ] },
@@ -91,7 +92,7 @@ export function rowsFromSheets(sheets: Sheet[]) {
     data: {
       teachers: body(find("teachers")).map(({ r, row }) => ({ row, last_name: r[0], first_name: r[1], phone: r[2], class_teacher_of: r[3] })),
       students: body(find("students")).map(({ r, row }) => ({ row, last_name: r[0], first_name: r[1], middle_name: r[2], class: r[3],
-        birth_date: excelDate(r[4] ?? ""), gender: r[5], parent_last_name: r[6], parent_first_name: r[7], parent_phone: r[8], relation: r[9] })),
+        birth_date: excelDate(r[4] ?? ""), gender: r[5], parent_last_name: r[6], parent_first_name: r[7], parent_phone: r[8], relation: r[9], phone: r[10] })),
       timetable: body(find("timetable")).map(({ r, row }) => ({ row, class: r[0], day: r[1], period: r[2], subject: r[3], teacher_phone: r[4] })),
     },
   };

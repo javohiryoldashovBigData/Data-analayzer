@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { api, ApiError, getToken, schoolSlug, setToken, type Home, type SchoolWindow } from "./api";
-import { useLang, type I18n, type Lang } from "./i18n";
+import { useLang, type I18n, type Lang, setOrgKind } from "./i18n";
 import { FamilyHome } from "./Family";
 import { OfficeInbox } from "./Office";
 import { DayCheck, ProblemsCard, TeacherArea } from "./Step4";
@@ -9,6 +9,7 @@ import { GradesOverview } from "./Step6";
 import { FinanceArea, FinanceSummaryCard } from "./Step7";
 import { SchoolSetup, TelegramCard } from "./Step8";
 import { ChangePassword, PeopleCard } from "./Step9";
+import { CenterGroups } from "./Step10";
 import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -51,6 +52,14 @@ const DEMO_ACCOUNTS: { role: string; name: string; login: string }[] = [
   { role: "zavuch", name: "Jamshid Tolipov", login: "+998 90 000 01 02" },
   { role: "accountant", name: "Barno Xasanova", login: "+998 90 000 01 04" },
 ];
+// the demo learning center (?school=demo-markaz) — invented people
+const DEMO_CENTER_ACCOUNTS: { role: string; name: string; login: string }[] = [
+  { role: "center_admin", name: "Anvar Qodirov", login: "+998 90 000 02 03" },
+  { role: "teacher", name: "Nilufar Rashidova (IELTS)", login: "+998 90 000 02 11" },
+  { role: "adult_student", name: "Jasur Toshmatov", login: "+998 90 000 02 31" },
+  { role: "parent", name: "Malika Saidova", login: "+998 90 000 02 21" },
+  { role: "director", name: "Shaxlo Umarova", login: "+998 90 000 02 01" },
+];
 const DEMO_PASSWORD = "maktab2026";
 
 export default function LiveApp() {
@@ -67,7 +76,7 @@ export default function LiveApp() {
   const [mustChange, setMustChange] = useState<{ old: string | null; roles: string[] } | null>(null);
 
   useEffect(() => {
-    api<SchoolWindow>(`/window/${slug}`).then((w) => { setWin(w); document.title = `${w.name} · Maktab+`; }).catch(() => setWinErr(true));
+    api<SchoolWindow>(`/window/${slug}`).then((w) => { setOrgKind(w.org_kind); setWin(w); document.title = `${w.name} · Maktab+`; }).catch(() => setWinErr(true));
   }, [slug]);
 
   const open = async (role: string | null) => {
@@ -112,7 +121,7 @@ export default function LiveApp() {
       {home ? <Shell i={i} win={win} home={home} onLogout={logout} onRefresh={() => open(home.role)} onSwitch={() => setRoles(home.roles)} busy={busy} />
        : mustChange ? <Frame i={i} win={win}><ChangePassword i={i} oldPassword={mustChange.old} onDone={passwordChanged} onCancel={logout} /></Frame>
        : roles ? <Frame i={i} win={win}><RoleChooser i={i} roles={roles} onPick={open} onCancel={logout} busy={busy} /></Frame>
-       : <Frame i={i} win={win}><LoginForm i={i} demo={slug === "demo"} onLogin={login} busy={busy} err={err} /></Frame>}
+       : <Frame i={i} win={win}><LoginForm i={i} demo={slug === "demo" ? DEMO_ACCOUNTS : slug === "demo-markaz" ? DEMO_CENTER_ACCOUNTS : null} onLogin={login} busy={busy} err={err} /></Frame>}
       {home && roles && (
         <div className="modal-scrim" onClick={() => setRoles(null)}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
@@ -161,7 +170,7 @@ function Frame({ i, win, children }: { i: I18n; win: SchoolWindow | null; childr
   );
 }
 
-function LoginForm({ i, demo, onLogin, busy, err }: { i: I18n; demo: boolean; onLogin: (l: string, p: string) => void; busy: boolean; err: string }) {
+function LoginForm({ i, demo, onLogin, busy, err }: { i: I18n; demo: typeof DEMO_ACCOUNTS | null; onLogin: (l: string, p: string) => void; busy: boolean; err: string }) {
   const { t } = i;
   const [login, setLogin] = useState("");
   const [pw, setPw] = useState("");
@@ -194,7 +203,7 @@ function LoginForm({ i, demo, onLogin, busy, err }: { i: I18n; demo: boolean; on
           <summary style={{ cursor: "pointer", fontWeight: 600 }}>{t("demo_accounts")}</summary>
           <p className="small muted" style={{ margin: "8px 0" }}>{t("demo_sub")} {t("password")}: <b>{DEMO_PASSWORD}</b></p>
           <div className="list">
-            {DEMO_ACCOUNTS.map((a) => (
+            {demo.map((a) => (
               <div key={a.login} className="list-item">
                 <div className="grow"><b>{t(`demo_${a.role}`)}</b><div className="small muted">{a.name} · {a.login}</div></div>
                 <button type="button" className="btn btn-sm" disabled={busy} onClick={() => onLogin(a.login, DEMO_PASSWORD)}>{t("enter_as")}</button>
@@ -244,7 +253,7 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         <Logo win={win} />
         <div style={{ minWidth: 0 }}>
           <div className="topbar-title hide-narrow" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{win?.name ?? home.school?.name}</div>
-          <div className="small muted" style={{ whiteSpace: "nowrap" }}>{t(`role_${role}`)}{home.school?.org_kind === "center" && <> · {t("org_center")}</>}</div>
+          <div className="small muted" style={{ whiteSpace: "nowrap" }}>{t(home.school?.org_kind === "center" && role === "school_admin" ? "role_center_admin" : `role_${role}`)}{home.school?.org_kind === "center" && <> · {t("org_center")}</>}</div>
         </div>
         <div className="topbar-spacer" />
         {home.roles.length > 1 && <button className="btn" onClick={onSwitch}><Icon name="switch-horizontal" /><span className="user-text">{t("switch_role")}</span></button>}
@@ -274,7 +283,7 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
       <PageHead title={t("hello", { n: home.me.first_name })} sub={t("teachers_classes", { t: c.teachers, c: c.classes })} />
       <div className="grid grid-4">
         <Stat icon="users" label={t("students")} value={s.students} />
-        <Stat icon="door-enter" label={t("arrived_today")} value={`${c.arrived_today} / ${s.students}`} />
+        {home.school?.org_kind !== "center" && <Stat icon="door-enter" label={t("arrived_today")} value={`${c.arrived_today} / ${s.students}`} />}
         <Stat icon="calendar-check" label={t("attendance_rate")} value={s.attendance_rate != null ? `${s.attendance_rate}%` : "—"} />
         <Stat icon="star" label={t("avg_school")} value={s.avg_current_grade ?? "—"} />
       </div>
@@ -286,6 +295,7 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
         </Card>
         <ProblemsCard i={i} home={home} reload={reload} />
       </div>
+      {home.school?.org_kind === "center" && <CenterGroups i={i} />}
       <FinanceSummaryCard i={i} home={home} />
       {home.canSetup && <SchoolSetup i={i} />}
       {home.canSetup && <PeopleCard i={i} />}

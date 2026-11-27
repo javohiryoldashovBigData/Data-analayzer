@@ -215,7 +215,7 @@ returns jsonb language sql stable security invoker set search_path = public, pg_
         'start',       bp.start_time,
         'end',         bp.end_time,
         'class_id',    l.class_id,
-        'class',       c.grade_level || '-' || c.letter,
+        'class',       c.label,
         'subject_id',  l.subject_id,
         'subject',     sub.name_uz,
         'room_id',     l.room_id,

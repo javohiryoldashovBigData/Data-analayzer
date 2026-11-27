@@ -64,7 +64,7 @@ begin
   if v_class.id is null then raise exception 'not_a_class_teacher' using errcode = '42501'; end if;
   return jsonb_build_object(
     'class_id', v_class.id,
-    'class', v_class.grade_level || '-' || v_class.letter,
+    'class', v_class.label,
     'students', coalesce((
       select jsonb_agg(row_to_json(s) order by s.signals_count desc, s.last_name, s.first_name) from (
         select st.id, st.first_name, st.last_name,
@@ -147,7 +147,7 @@ begin
   if not app.owns_test(p_test_id) then raise exception 'not_allowed' using errcode = '42501'; end if;
   return jsonb_build_object(
     'test', (select jsonb_build_object('id', wt.id, 'topic', wt.topic, 'status', wt.status, 'test_date', wt.test_date,
-                    'class', c.grade_level || '-' || c.letter, 'subject', sub.name_uz)
+                    'class', c.label, 'subject', sub.name_uz)
              from weekly_tests wt join classes c on c.id = wt.class_id join subjects sub on sub.id = wt.subject_id
              where wt.id = p_test_id),
     'students', coalesce((select jsonb_agg(jsonb_build_object(
@@ -172,7 +172,7 @@ end $$;
 create or replace function api.teacher_tests()
 returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
   select coalesce(jsonb_agg(jsonb_build_object(
-           'test_id', wt.id, 'class', c.grade_level || '-' || c.letter, 'subject', sub.name_uz, 'class_id', wt.class_id,
+           'test_id', wt.id, 'class', c.label, 'subject', sub.name_uz, 'class_id', wt.class_id,
            'subject_id', wt.subject_id, 'topic', wt.topic, 'test_date', wt.test_date, 'status', wt.status,
            'questions', (select count(*) from test_questions q where q.test_id = wt.id),
            'submitted', (select count(*) from test_attempts ta where ta.test_id = wt.id and ta.submitted_at is not null))

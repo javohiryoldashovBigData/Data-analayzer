@@ -136,6 +136,22 @@ ok "K6 the office resets a forgotten password: old one dead, new one must be cha
 ok "K7 a zavuch cannot see the people list"                  "$(curl -s "$API/api/office/people?q=a" -H "$ZV2" | J "d['error']")" not_allowed
 ok "K8 the login page knows: school or learning center"      "$(curl -s $API/api/window/demo | J "d['org_kind']")" school
 
+# ---- step 10: the demo learning center (?school=demo-markaz) ----
+ctok() { login demo-markaz "$1" maktab2026 | J "d['token']"; }
+CM="authorization: Bearer $(ctok 900000203)"                          # center manager
+ok "Z1 the center window says 'center'"                      "$(curl -s $API/api/window/demo-markaz | J "d['org_kind']")" center
+ok "Z2 the manager sees 3 groups with timetables"            "$(curl -s $API/api/center/groups -H "$CM" | J "str(len(d))+'|'+str(all(len(g['schedule'])>0 for g in d))")" "3|True"
+ok "Z3 a school's admin cannot open center groups"           "$(curl -s $API/api/center/groups -H "$AD" | J "d['error']")" not_allowed
+ok "Z4 the adult student logs in himself and sees his group" "$(curl -s $API/api/home -H "authorization: Bearer $(ctok 900000231)" | J "d['role']+'|'+d['kids'][0]['class']")" "student|IELTS 6.5 — kechki"
+ok "Z5 the mother sees both children, each once"             "$(curl -s $API/api/home -H "authorization: Bearer $(ctok 900000221)" | J "sorted(k['first_name'] for k in d['kids'])")" "['Ali', 'Bekzod']"
+G1=$(curl -s $API/api/center/groups -H "$CM" | J "[g['id'] for g in d if g['name'].startswith('IELTS')][0]")
+ok "Z6 a student in two groups is listed once with both"     "$(curl -s "$API/api/center/students?q=Hakimov" -H "$CM" | J "len(d[0]['groups'])")" 2
+NG=$(curl -s -X POST $API/api/center/group -H "$CM" -d '{"name":"Speaking Club","subject_id":2,"teacher_id":"e2000000-0000-4000-8000-000000000001","capacity":1,"schedule":[{"day":1,"period":7}]}' | J "d['error']")
+ok "Z7 the IELTS teacher is busy on Monday 18:30 → refused"  "$NG" teacher_busy
+SC=$(curl -s -X POST $API/api/center/group -H "$CM" -d '{"name":"Speaking Club","subject_id":2,"teacher_id":"e2000000-0000-4000-8000-000000000001","capacity":1,"schedule":[{"day":6,"period":3}]}' | J "d['id']")
+curl -s -X POST $API/api/center/enroll -H "$CM" -d "{\"group_id\":\"$SC\",\"student_id\":\"e4000000-0000-4000-8000-000000000001\",\"active\":true}" >/dev/null
+ok "Z8 a new group at another time; full after 1 student"    "$(curl -s -X POST $API/api/center/enroll -H "$CM" -d "{\"group_id\":\"$SC\",\"student_id\":\"e4000000-0000-4000-8000-000000000002\",\"active\":true}" | J "d['error']")" group_full
+
 for k in 1 2 3 4 5; do login demo 900000116 bad$k >/dev/null; done
 ok "S7 6th try after 5 wrong passwords is paused" "$(login demo 900000116 maktab2026 | J "d['error']")" too_many_attempts
 echo "RESULT: $P passed, $F failed"; [ $F = 0 ]

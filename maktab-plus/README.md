@@ -240,3 +240,20 @@ Screens: `docs/screens/step7-*.png`.
   page and header show it; school-only parts (quarter/yearly grades) are hidden for centers. The
   center screens themselves (groups, packages, trial lessons…) come in step 10.
 - Tests: `db/test_accounts.sql` (18) and `server/test_server.sh` K1–K8 (now 73 checks).
+
+## Step 10: learning centers — groups
+
+- **A group is a class with a name** ("IELTS 6.5 — kechki"). `classes` gained `name` and a shared
+  `label`, so everything built for schools works for groups too: attendance, lesson cards, the
+  teacher's day, tests, grades, AI help and Telegram alerts. School classes ("5-A") are unchanged.
+- **Groups** (`db/centers.sql`): course, subject, teacher, start/end dates, capacity, lesson days and
+  times. The same name twice is refused, and so is a teacher in two groups at once. A full group says so.
+- **Students of any age**: a child is reached through the parent; an adult (or a teen with a phone)
+  gets their **own login** and receives messages directly. One student can be in **several groups**
+  and stays one person.
+- **Adding students**: search the center's students and add them to a group, or "Yangi o'quvchi".
+  Both use the same checked import as the Excel file. In a center the "Sinf yoki guruh" column holds
+  the group name, and a new last column holds the student's own phone.
+- **Center wording** is used automatically ("guruh", "Markazga yozish", no school gate card).
+- **Demo center**: `?school=demo-markaz` (logins listed on its login page, password `maktab2026`).
+- Tests: `db/test_centers.sql` (15), `server/test_server.sh` Z1–Z8 (now 81 checks).

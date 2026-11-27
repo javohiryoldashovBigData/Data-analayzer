@@ -94,7 +94,7 @@ $$;
 create or replace function app.finance_students(p_school_id uuid)
 returns table (student_id uuid, first_name text, last_name text, class_id uuid, class text, grade_level smallint)
 language sql stable security definer set search_path = public as $$
-  select s.id, s.first_name, s.last_name, c.id, c.grade_level || '-' || c.letter, c.grade_level
+  select s.id, s.first_name, s.last_name, c.id, c.label, c.grade_level
   from students s
   join class_members cm on cm.student_id = s.id and cm.status = 'active'
   join classes c on c.id = cm.class_id

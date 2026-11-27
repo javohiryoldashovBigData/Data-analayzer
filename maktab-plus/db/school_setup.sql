@@ -87,6 +87,26 @@ returns text language sql volatile set search_path = public, extensions as $$
   from (select gen_random_bytes(8) as b) x, generate_series(0, 7) i
 $$;
 
+-- the class (school: grade + letter) or group (center: name) a row points at
+create or replace function app.imp_class(p_school uuid, p_year smallint, p_center boolean, p_name text, p_grade smallint, p_letter text)
+returns uuid language sql stable security definer set search_path = public as $$
+  select k.id from classes k where k.school_id = p_school and k.academic_year_id = p_year
+    and case when p_center then lower(k.name) = lower(btrim(p_name)) else k.grade_level = p_grade and k.letter = p_letter end
+  limit 1
+$$;
+-- the same student again? school: same name + birth date in that class;
+-- center: same name + birth date anywhere in the center (one person, many groups)
+create or replace function app.imp_find_student(p_school uuid, p_center boolean, p_class uuid, p_last text, p_first text, p_birth date)
+returns uuid language sql stable security definer set search_path = public as $$
+  select st.id from students st
+  where st.school_id = p_school and lower(st.last_name) = lower(p_last) and lower(st.first_name) = lower(p_first)
+    and st.birth_date is not distinct from p_birth
+    and (p_center or exists (select 1 from class_members cm where cm.student_id = st.id and cm.class_id = p_class and cm.status = 'active'))
+  limit 1
+$$;
+revoke execute on function app.imp_class(uuid, smallint, boolean, text, smallint, text),
+  app.imp_find_student(uuid, boolean, uuid, text, text, date) from public, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- The import
 -- ---------------------------------------------------------------------------
@@ -99,7 +119,7 @@ $$;
 create or replace function api.import_school(p_data jsonb, p_commit boolean default false)
 returns jsonb language plpgsql volatile security definer set search_path = public, extensions, pg_temp as $$
 declare
-  v_school uuid; v_year smallint; v_me_phone text;
+  v_school uuid; v_year smallint; v_me_phone text; v_center boolean;
   v_err jsonb := '[]'; v_warn jsonb := '[]'; v_logins jsonb := '[]';
   r record; v_user uuid; v_teacher uuid; v_student uuid; v_class uuid; v_pw text; v_n int;
   c_classes_new int; c_t_new int; c_t_old int; c_s_new int; c_s_old int; c_p_new int; c_p_old int; c_slots int;
@@ -114,6 +134,8 @@ begin
     raise exception 'file_too_big' using errcode = '22023';
   end if;
   select phone into v_me_phone from profiles where user_id = auth.uid();
+  -- learning center: "class" in the file = an existing GROUP name (step 10)
+  select coalesce(to_jsonb(s)->>'org_kind', 'school') = 'center' into v_center from schools s where s.id = v_school;
 
   -- ---- stage the rows (parsed) ----
   perform set_config('client_min_messages', 'warning', true);
@@ -130,7 +152,9 @@ begin
          app.parse_gender(x->>'gender') as gender,
          nullif(btrim(x->>'parent_last_name'), '') as p_last, nullif(btrim(x->>'parent_first_name'), '') as p_first,
          nullif(btrim(x->>'parent_phone'), '') as p_phone_raw, app.norm_phone(x->>'parent_phone') as p_phone,
-         app.parse_relation(x->>'relation') as relation
+         app.parse_relation(x->>'relation') as relation,
+         nullif(btrim(x->>'class'), '') as cname,
+         nullif(btrim(x->>'phone'), '') as phone_raw, app.norm_phone(x->>'phone') as phone   -- the student's OWN login (adults, teens)
   from jsonb_array_elements(coalesce(p_data->'students', '[]')) x;
   create temp table imp_tt on commit drop as
   select (x->>'row')::int as row, x->>'class' as class_raw, (app.parse_class(x->>'class')).*,
@@ -138,8 +162,16 @@ begin
          case when btrim(x->>'period') ~ '^[1-9]$' then btrim(x->>'period')::smallint end as period,
          x->>'subject' as subject_raw,
          (select sb.id from subjects sb where lower(btrim(x->>'subject')) in (lower(sb.name_uz), lower(sb.name_ru), lower(sb.code)) limit 1) as subject_id,
-         app.norm_phone(x->>'teacher_phone') as t_phone, x->>'teacher_phone' as t_phone_raw
+         app.norm_phone(x->>'teacher_phone') as t_phone, x->>'teacher_phone' as t_phone_raw,
+         nullif(btrim(x->>'class'), '') as cname
   from jsonb_array_elements(coalesce(p_data->'timetable', '[]')) x;
+  -- every row gets the id of its class / group (null = a school class that will be created)
+  if v_center then
+    update imp_s set grade = null, letter = null; update imp_tt set grade = null, letter = null; update imp_t set grade = null, letter = null;
+  end if;
+  alter table imp_s add column cid uuid; alter table imp_tt add column cid uuid;
+  update imp_s set cid = app.imp_class(v_school, v_year, v_center, cname, grade, letter);
+  update imp_tt set cid = app.imp_class(v_school, v_year, v_center, cname, grade, letter);
 
   -- ---- check teachers ----
   v_err := v_err
@@ -150,7 +182,7 @@ begin
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','teachers','row',row,'field','phone','code','duplicate_phone','value',phone))
                  from imp_t t where phone is not null and exists (select 1 from imp_t t2 where t2.phone = t.phone and t2.row < t.row)), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','teachers','row',row,'field','class_teacher_of','code','bad_class','value',ct_raw))
-                 from imp_t where ct_raw is not null and grade is null), '[]')
+                 from imp_t where ct_raw is not null and grade is null and not v_center), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','teachers','row',t.row,'field','phone','code','teacher_other_school','value',t.phone))
                  from imp_t t join profiles p on p.phone = t.phone join teachers te on te.user_id = p.user_id
                  where te.school_id <> v_school), '[]')
@@ -162,25 +194,33 @@ begin
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','name','code','missing_name'))
                  from imp_s where last_name is null or first_name is null), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','class','code','bad_class','value',class_raw))
-                 from imp_s where grade is null), '[]')
+                 from imp_s where grade is null and not v_center), '[]')
+    || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','class','code','unknown_group','value',cname))
+                 from imp_s where cid is null and v_center), '[]')
+    || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','phone','code','bad_phone','value',phone_raw))
+                 from imp_s where phone_raw is not null and phone is null), '[]')
+    || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','phone','code','is_you','value',phone))
+                 from imp_s where phone = v_me_phone), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','birth_date','code','bad_date','value',birth_raw))
                  from imp_s where birth_raw is not null and birth_date is null), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','parent_phone','code','bad_phone','value',p_phone_raw))
                  from imp_s where p_phone_raw is not null and p_phone is null), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',s.row,'field','name','code','duplicate_student'))
                  from imp_s s where exists (select 1 from imp_s s2 where s2.row < s.row and lower(s2.last_name) = lower(s.last_name)
-                   and lower(s2.first_name) = lower(s.first_name) and s2.grade = s.grade and s2.letter = s.letter
+                   and lower(s2.first_name) = lower(s.first_name) and coalesce(s2.cid::text, s2.grade || s2.letter) = coalesce(s.cid::text, s.grade || s.letter)
                    and s2.birth_date is not distinct from s.birth_date)), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','parent_phone','code','is_you','value',p_phone))
                  from imp_s where p_phone = v_me_phone), '[]');
   v_warn := v_warn
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','students','row',row,'field','parent_phone','code','no_parent_phone'))
-                 from imp_s where p_phone_raw is null), '[]');
+                 from imp_s where p_phone_raw is null and phone_raw is null), '[]');
 
   -- ---- check timetable ----
   v_err := v_err
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','timetable','row',row,'field','class','code','bad_class','value',class_raw))
-                 from imp_tt where grade is null), '[]')
+                 from imp_tt where grade is null and not v_center), '[]')
+    || coalesce((select jsonb_agg(jsonb_build_object('sheet','timetable','row',row,'field','class','code','unknown_group','value',cname))
+                 from imp_tt where cid is null and v_center), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','timetable','row',row,'field','day','code','bad_day','value',day_raw))
                  from imp_tt where day is null), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','timetable','row',row,'field','period','code','bad_period'))
@@ -192,8 +232,8 @@ begin
                    exists (select 1 from imp_t t where t.phone = tt.t_phone)
                    or exists (select 1 from profiles p join teachers te on te.user_id = p.user_id and te.school_id = v_school where p.phone = tt.t_phone))), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','timetable','row',a.row,'field','period','code','class_clash'))
-                 from imp_tt a where a.grade is not null and exists (select 1 from imp_tt b where b.row < a.row and b.grade = a.grade
-                   and b.letter = a.letter and b.day = a.day and b.period = a.period)), '[]')
+                 from imp_tt a where coalesce(a.cid::text, a.grade || a.letter) is not null and exists (select 1 from imp_tt b where b.row < a.row
+                   and coalesce(b.cid::text, b.grade || b.letter) = coalesce(a.cid::text, a.grade || a.letter) and b.day = a.day and b.period = a.period)), '[]')
     || coalesce((select jsonb_agg(jsonb_build_object('sheet','timetable','row',a.row,'field','teacher_phone','code','teacher_clash'))
                  from imp_tt a where a.t_phone is not null and exists (select 1 from imp_tt b where b.row < a.row and b.t_phone = a.t_phone
                    and b.day = a.day and b.period = a.period)), '[]');
@@ -207,10 +247,8 @@ begin
   select count(*) filter (where p.user_id is null), count(*) filter (where p.user_id is not null) into c_t_new, c_t_old
     from imp_t t left join profiles p on p.phone = t.phone where t.phone is not null;
   select count(*) filter (where ex.id is null), count(*) filter (where ex.id is not null) into c_s_new, c_s_old
-    from imp_s s left join lateral (select st.id from students st join class_members cm on cm.student_id = st.id and cm.status = 'active'
-        join classes k on k.id = cm.class_id and k.grade_level = s.grade and k.letter = s.letter and k.academic_year_id = v_year
-        where st.school_id = v_school and lower(st.last_name) = lower(s.last_name) and lower(st.first_name) = lower(s.first_name)
-          and st.birth_date is not distinct from s.birth_date limit 1) ex on true where s.grade is not null;
+    from imp_s s left join lateral (select app.imp_find_student(v_school, v_center, s.cid, s.last_name, s.first_name, s.birth_date) as id) ex on true
+    where s.cid is not null or s.grade is not null;
   select count(*) filter (where p.user_id is null), count(*) filter (where p.user_id is not null) into c_p_new, c_p_old
     from (select distinct p_phone from imp_s where p_phone is not null and p_phone not in (select phone from imp_t where phone is not null)) s
     left join profiles p on p.phone = s.p_phone;
@@ -225,6 +263,8 @@ begin
   -- ======================= COMMIT (all or nothing) =========================
   insert into classes (school_id, academic_year_id, grade_level, letter)
   select v_school, v_year, grade, letter from imp_c on conflict (school_id, academic_year_id, grade_level, letter) do nothing;
+  update imp_s set cid = app.imp_class(v_school, v_year, v_center, cname, grade, letter) where cid is null;
+  update imp_tt set cid = app.imp_class(v_school, v_year, v_center, cname, grade, letter) where cid is null;
 
   -- people: one helper block for "find by phone or create with a first password"
   for r in select * from imp_t order by row loop
@@ -246,16 +286,31 @@ begin
   end loop;
 
   for r in select * from imp_s order by row loop
-    select id into v_class from classes where school_id = v_school and academic_year_id = v_year and grade_level = r.grade and letter = r.letter;
-    select st.id into v_student from students st join class_members cm on cm.student_id = st.id and cm.class_id = v_class and cm.status = 'active'
-     where st.school_id = v_school and lower(st.last_name) = lower(r.last_name) and lower(st.first_name) = lower(r.first_name)
-       and st.birth_date is not distinct from r.birth_date limit 1;
+    v_class := r.cid;
+    v_student := app.imp_find_student(v_school, v_center, v_class, r.last_name, r.first_name, r.birth_date);
     if v_student is null then
       insert into students (school_id, first_name, last_name, middle_name, gender, birth_date)
       values (v_school, r.first_name, r.last_name, r.middle_name, r.gender, r.birth_date) returning id into v_student;
-      insert into class_members (class_id, student_id) values (v_class, v_student);
     end if;
-    if r.p_phone is not null then
+    -- (a center student can be in several groups; leaving and coming back re-activates)
+    insert into class_members (class_id, student_id) values (v_class, v_student)
+    on conflict (class_id, student_id) do update set status = 'active';
+    -- the student's own login (adults, teens with a phone)
+    if r.phone is not null then
+      select user_id into v_user from profiles where phone = r.phone;
+      if v_user is null then
+        v_user := gen_random_uuid(); v_pw := app.temp_password();
+        insert into auth.users (id) values (v_user);
+        insert into profiles (user_id, first_name, last_name, phone) values (v_user, r.first_name, r.last_name, r.phone);
+        perform app.set_password(v_user, r.phone, v_pw);
+        v_logins := v_logins || jsonb_build_object('name', r.last_name || ' ' || r.first_name, 'role', 'student', 'login', r.phone, 'password', v_pw);
+      end if;
+      update students set user_id = v_user where id = v_student and user_id is null
+        and not exists (select 1 from students x where x.user_id = v_user);
+      insert into user_school_roles (user_id, role, school_id)
+      select v_user, 'student', v_school where not exists (select 1 from user_school_roles x where x.user_id = v_user and x.role = 'student' and x.school_id = v_school);
+    end if;
+    if r.p_phone is not null and r.p_phone is distinct from r.phone then
       select user_id into v_user from profiles where phone = r.p_phone;
       if v_user is null then
         v_user := gen_random_uuid(); v_pw := app.temp_password();
@@ -276,20 +331,16 @@ begin
 
   -- timetable: the file replaces the timetable of the classes it lists, from today
   if exists (select 1 from imp_tt) then
-    delete from timetable_slots ts using classes k, imp_c c
-     where ts.class_id = k.id and k.school_id = v_school and k.academic_year_id = v_year and k.grade_level = c.grade and k.letter = c.letter
-       and exists (select 1 from imp_tt t where t.grade = c.grade and t.letter = c.letter) and ts.effective_from >= current_date;
-    update timetable_slots ts set effective_to = current_date - 1 from classes k
-     where ts.class_id = k.id and k.school_id = v_school and k.academic_year_id = v_year and ts.effective_to is null
-       and exists (select 1 from imp_tt t where t.grade = k.grade_level and t.letter = k.letter);
+    delete from timetable_slots ts where ts.class_id in (select cid from imp_tt) and ts.effective_from >= current_date;
+    update timetable_slots ts set effective_to = current_date - 1 where ts.class_id in (select cid from imp_tt) and ts.effective_to is null;
     insert into timetable_slots (class_id, day_of_week, period, subject_id, teacher_id, effective_from)
     select k.id, t.day, t.period, t.subject_id, te.id, current_date
     from imp_tt t
-    join classes k on k.school_id = v_school and k.academic_year_id = v_year and k.grade_level = t.grade and k.letter = t.letter
+    join classes k on k.id = t.cid
     join profiles p on p.phone = t.t_phone join teachers te on te.user_id = p.user_id and te.school_id = v_school;
     insert into teacher_assignments (teacher_id, class_id, subject_id, academic_year_id)
     select distinct te.id, k.id, t.subject_id, v_year from imp_tt t
-    join classes k on k.school_id = v_school and k.academic_year_id = v_year and k.grade_level = t.grade and k.letter = t.letter
+    join classes k on k.id = t.cid
     join profiles p on p.phone = t.t_phone join teachers te on te.user_id = p.user_id and te.school_id = v_school
     on conflict do nothing;
   end if;

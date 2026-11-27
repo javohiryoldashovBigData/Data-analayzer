@@ -47,6 +47,10 @@ echo "== 4h. accounts: first password, office reset, school/center (test_account
 dropdb --if-exists maktab_t9 >/dev/null; createdb maktab_t9
 psql -q -X -v ON_ERROR_STOP=1 -d maktab_t9 $LOAD -f auth_local.sql -f school_setup.sql -f accounts.sql >/dev/null
 run maktab_t9 test_accounts.sql
+echo "== 4i. learning centers: groups (test_centers.sql) ==";
+dropdb --if-exists maktab_t10 >/dev/null; createdb maktab_t10
+psql -q -X -v ON_ERROR_STOP=1 -d maktab_t10 $LOAD -f auth_local.sql -f school_setup.sql -f accounts.sql -f centers.sql >/dev/null
+run maktab_t10 test_centers.sql
 echo "== 5. AI budget race, 2 connections ==";           PGDATABASE=maktab_t2 ./test_api_race.sh || FAILED=1
 
 if [ "$FAILED" = 0 ]; then echo "ALL TEST FILES GREEN"; else echo "SOMETHING FAILED (see above)"; exit 1; fi

@@ -84,12 +84,15 @@ const Q = {
   me: `select p.first_name, p.last_name from profiles p where p.user_id = auth.uid()`,
   mySchools: `select school_id, slug, name, roles::text[] as roles, app.org_kind(slug) as org_kind from app.my_schools()`,
   myDay: `select api.my_day(current_date) as day`,
-  kids: `select s.id, s.first_name, s.last_name, c.grade_level || '-' || c.letter as class, c.id as class_id
+  // one row per child; a learning-center student in several groups shows all of them
+  kids: `select s.id, s.first_name, s.last_name, string_agg(c.label, ', ' order by c.label) as class,
+                (array_agg(c.id order by c.label))[1] as class_id, array_agg(c.id order by c.label) as class_ids
          from students s join class_members cm on cm.student_id = s.id and cm.status = 'active'
          join classes c on c.id = cm.class_id
          where s.user_id = auth.uid()
             or exists (select 1 from guardians g where g.student_id = s.id and g.parent_user_id = auth.uid())
-         order by c.grade_level desc`,
+         group by s.id, s.first_name, s.last_name
+         order by max(c.grade_level) desc nulls last, s.first_name`,
   gateToday: `select student_id, direction, scanned_at from gate_events
               where scanned_at >= (current_date::timestamp at time zone 'Asia/Tashkent') order by scanned_at`,
   grades: `select g.student_id, g.value, g.grade_type, g.comment, g.created_at, sub.name_uz as subject
@@ -111,7 +114,7 @@ const Q = {
                from contact_requests cr where cr.parent_user_id = auth.uid() order by cr.created_at desc limit 20`,
   // class teacher: parents' absence reports waiting for a decision
   absenceToReview: `select r.id, r.student_id, r.absence_date, r.reason, s.first_name, s.last_name,
-                      c.grade_level || '-' || c.letter as class
+                      c.label as class
                     from parent_absence_reports r join students s on s.id = r.student_id
                     join class_members cm on cm.student_id = s.id and cm.status = 'active'
                     join classes c on c.id = cm.class_id
@@ -122,7 +125,7 @@ const Q = {
                   where cr.forwarded_to = app.my_teacher_id() order by cr.created_at desc limit 10`,
   // leaders
   inbox: `select cr.id, cr.topic, cr.body, cr.status, cr.reply, cr.created_at, cr.forwarded_to,
-                 s.first_name || ' ' || s.last_name as student, c.grade_level || '-' || c.letter as class,
+                 s.first_name || ' ' || s.last_name as student, c.label as class,
                  p.first_name || ' ' || p.last_name as parent,
                  (select tp.first_name || ' ' || tp.last_name from teachers t join profiles tp on tp.user_id = t.user_id
                    where t.id = cr.about_teacher_id) as about_teacher
@@ -141,10 +144,10 @@ const Q = {
                     where direction = 'in' and scanned_at >= (current_date::timestamp at time zone 'Asia/Tashkent')) as arrived_today`,
   problems: `select p.id, p.category, p.severity, p.description, p.status, p.created_at from problems p
              where p.status <> 'handled' order by (p.severity = 'serious') desc, p.created_at desc limit 10`,
-  classAttendance: `select c.grade_level || '-' || c.letter as class,
+  classAttendance: `select c.label as class,
                       round(100.0 * count(*) filter (where a.status in ('present','late')) / nullif(count(*), 0), 1) as rate
                     from attendance_logs a join classes c on c.id = a.class_id
-                    where a.date >= current_date - 30 group by c.grade_level, c.letter order by c.grade_level`,
+                    where a.date >= current_date - 30 group by c.label, c.grade_level order by c.grade_level nulls last, c.label`,
 };
 
 // `wanted` = the role the person picked in the chooser. It only selects WHICH
@@ -166,7 +169,7 @@ async function home(user, wanted) {
       out.absenceToReview = await q(Q.absenceToReview);
       out.forwarded = await q(Q.forwardedToMe);
       out.isClassTeacher = (await q("select exists (select 1 from classes where class_teacher_id = app.my_teacher_id()) as r"))[0].r;
-      out.assignments = await q(`select ta.class_id, c.grade_level || '-' || c.letter as class, ta.subject_id, sub.name_uz as subject
+      out.assignments = await q(`select ta.class_id, c.label as class, ta.subject_id, sub.name_uz as subject
                                  from teacher_assignments ta join classes c on c.id = ta.class_id join subjects sub on sub.id = ta.subject_id
                                  where ta.teacher_id = app.my_teacher_id() order by c.grade_level, sub.name_uz`);
     }
@@ -215,7 +218,7 @@ const teacher = {
     if (!UUID.test(cardId)) throw bad("bad_request");
     return asRole(user, async (q) => {
       const [card] = await q(`select lc.id, lc.class_id, lc.subject_id, lc.lesson_date, lc.period, lc.topic, lc.plan,
-                                     lc.homework, lc.status, lc.questions, c.grade_level || '-' || c.letter as class,
+                                     lc.homework, lc.status, lc.questions, c.label as class,
                                      sub.name_uz as subject
                               from lesson_cards lc join classes c on c.id = lc.class_id
                               join subjects sub on sub.id = lc.subject_id
@@ -448,6 +451,27 @@ const step4 = {
   "POST /api/office/reset-password": (u, b) => {
     if (!UUID.test(b.user_id)) throw bad("bad_request");
     return val(u, "select api.reset_password($1::uuid) as r", [b.user_id]);
+  },
+  // learning centers (step 10): groups and who is in them — the database checks it is a center
+  "GET /api/center/groups": (u) => val(u, "select api.center_groups() as r"),
+  "GET /api/center/options": (u) => val(u, "select api.center_options() as r"),
+  "POST /api/center/group": (u, b) => {
+    if (typeof b !== "object" || typeof b.name !== "string") throw bad("bad_request");
+    const g = { id: UUID.test(b.id ?? "") ? b.id : null, name: b.name.slice(0, 80), course: String(b.course ?? "").slice(0, 80),
+      subject_id: Number(b.subject_id) || null, teacher_id: UUID.test(b.teacher_id ?? "") ? b.teacher_id : null,
+      starts_on: DATE.test(b.starts_on ?? "") ? b.starts_on : null, ends_on: DATE.test(b.ends_on ?? "") ? b.ends_on : null,
+      capacity: Number.isInteger(b.capacity) ? b.capacity : null, archived: b.archived === true,
+      schedule: (Array.isArray(b.schedule) ? b.schedule : []).slice(0, 20).map((x) => ({ day: Number(x.day), period: Number(x.period) })) };
+    return val(u, "select api.save_group($1::jsonb) as r", [JSON.stringify(g)]).then((id) => ({ id }));
+  },
+  "GET /api/center/group/students": (u, b, url) => {
+    const id = url.searchParams.get("id") ?? ""; if (!UUID.test(id)) throw bad("bad_request");
+    return val(u, "select api.group_students($1::uuid) as r", [id]);
+  },
+  "GET /api/center/students": (u, b, url) => val(u, "select api.center_students($1) as r", [(url.searchParams.get("q") ?? "").slice(0, 60)]),
+  "POST /api/center/enroll": (u, b) => {
+    if (!UUID.test(b.group_id) || !UUID.test(b.student_id) || typeof b.active !== "boolean") throw bad("bad_request");
+    return asRole(u, (q) => q("select api.set_enrollment($1::uuid, $2::uuid, $3)", [b.group_id, b.student_id, b.active])).then(() => ({ ok: true }));
   },
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),

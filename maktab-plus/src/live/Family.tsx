@@ -67,14 +67,14 @@ function KidView({ i, home, kid, isParent }: { i: I18n; home: Home; kid: Kid; is
   const avg = grades.length ? grades.reduce((s, g) => s + g.value, 0) / grades.length : null;
   const att = (home.attendance ?? []).find((a) => a.student_id === kid.id);
   const rate = att && att.total ? Math.round((100 * att.present) / att.total) : null;
-  const hw = (home.homework ?? []).filter((h) => h.class_id === kid.class_id);
+  const hw = (home.homework ?? []).filter((h) => (kid.class_ids ?? [kid.class_id]).includes(h.class_id));
   const teachers = dedupeTeachers((home.teachers ?? []).filter((x) => x.student_id === kid.id));
   const reports = (home.absenceReports ?? []).filter((r) => r.student_id === kid.id);
   return (
     <>
       <ReviewCards i={i} home={home} kid={kid} />
       <div className="grid grid-3">
-        <Card title={t("at_school_today")}>
+        {home.school?.org_kind !== "center" && <Card title={t("at_school_today")}>
           <div className="row" style={{ gap: 14 }}>
             <span className="role-icon" style={{ width: 52, height: 52, fontSize: 26, background: last ? "var(--good-soft)" : "var(--warn-soft)", color: last ? "var(--good)" : "var(--warn)" }}>
               <Icon name={last ? (last.direction === "in" ? "door-enter" : "door-exit") : "clock"} />
@@ -82,7 +82,7 @@ function KidView({ i, home, kid, isParent }: { i: I18n; home: Home; kid: Kid; is
             <b style={{ fontSize: 17 }}>{last ? t(last.direction === "in" ? "arrived" : "left", { t: i.time(last.scanned_at) }) : t("not_arrived")}</b>
           </div>
           <p className="small muted" style={{ marginTop: 10 }}><Icon name="shield-lock" /> {t("gate_note")}</p>
-        </Card>
+        </Card>}
         <Stat icon="star" label={t("avg_grade")} value={avg ? avg.toFixed(1) : "—"} />
         <Stat icon="calendar-check" label={t("attendance30")} value={rate != null ? `${rate}%` : "—"} foot={att ? t("late_absent", { l: att.late, a: att.absent }) : undefined} />
       </div>
@@ -147,7 +147,7 @@ function DiaryWeek({ i, home, kid }: { i: I18n; home: Home; kid: Kid }) {
   }, [kid.class_id, start]);  // eslint-disable-line react-hooks/exhaustive-deps
   const days = Array.from({ length: 6 }, (_, k) => addDays(start, k));
   const grades = (home.grades ?? []).filter((g) => g.student_id === kid.id);
-  const hw = (home.homework ?? []).filter((h) => h.class_id === kid.class_id);
+  const hw = (home.homework ?? []).filter((h) => (kid.class_ids ?? [kid.class_id]).includes(h.class_id));
   return (
     <>
       <div className="row" style={{ gap: 6 }}>

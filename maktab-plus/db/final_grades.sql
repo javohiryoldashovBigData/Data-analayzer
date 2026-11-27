@@ -313,7 +313,7 @@ begin
     'term_number', v_tnum,
     'rows', coalesce((select jsonb_agg(x order by x->>'grade_level', x->>'class', x->>'subject') from (
       select jsonb_build_object(
-        'class_id', c.id, 'class', c.grade_level || '-' || c.letter, 'grade_level', lpad(c.grade_level::text, 2, '0'),
+        'class_id', c.id, 'class', c.label, 'grade_level', lpad(coalesce(c.grade_level, 99)::text, 2, '0'),
         'subject_id', ta.subject_id, 'subject', sub.name_uz,
         'teacher', p.first_name || ' ' || p.last_name,
         'students', st.n,
