@@ -8,6 +8,7 @@ import { AiBudgetCard } from "./Step5";
 import { GradesOverview } from "./Step6";
 import { FinanceArea, FinanceSummaryCard } from "./Step7";
 import { SchoolSetup, TelegramCard } from "./Step8";
+import { ChangePassword, PeopleCard } from "./Step9";
 import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -62,6 +63,8 @@ export default function LiveApp() {
   const [roles, setRoles] = useState<string[] | null>(null);   // set after login when the person must choose
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // first password → must be changed before anything else (the server enforces it too)
+  const [mustChange, setMustChange] = useState<{ old: string | null; roles: string[] } | null>(null);
 
   useEffect(() => {
     api<SchoolWindow>(`/window/${slug}`).then((w) => { setWin(w); document.title = `${w.name} · Maktab+`; }).catch(() => setWinErr(true));
@@ -76,6 +79,7 @@ export default function LiveApp() {
       // Only a real "session expired" (401) logs you out. With no internet we keep
       // the screen you have, so offline-saved lessons can still sync later.
       if (e instanceof ApiError && e.status === 401) setHome(null);
+      else if (e instanceof ApiError && e.code === "password_change_required") { setHome(null); setMustChange({ old: null, roles: [] }); }
       else setErr(t("error"));
     }
     finally { setBusy(false); }
@@ -85,8 +89,9 @@ export default function LiveApp() {
   const login = async (loginName: string, password: string) => {
     setBusy(true); setErr("");
     try {
-      const r = await api<{ token: string; roles: string[] }>("/login", { method: "POST", body: JSON.stringify({ slug, login: loginName, password }) });
+      const r = await api<{ token: string; roles: string[]; mustChange?: boolean }>("/login", { method: "POST", body: JSON.stringify({ slug, login: loginName, password }) });
       setToken(r.token); putRole(null);
+      if (r.mustChange) { setMustChange({ old: password, roles: r.roles }); setBusy(false); return; }
       if (r.roles.length > 1) { setRoles(r.roles); setBusy(false); }   // "who are you today?"
       else await open(r.roles[0]);
     } catch (e) {
@@ -95,12 +100,17 @@ export default function LiveApp() {
       setBusy(false);
     }
   };
-  const logout = () => { setToken(null); putRole(null); setHome(null); setRoles(null); };
+  const logout = () => { setToken(null); putRole(null); setHome(null); setRoles(null); setMustChange(null); };
+  const passwordChanged = (token: string) => {
+    const rs = mustChange?.roles ?? []; setToken(token); setMustChange(null);
+    if (rs.length > 1) setRoles(rs); else open(rs[0] ?? getRole());
+  };
 
   if (winErr) return <div className="login"><Card><Empty icon="building-off">{t("not_found")}</Empty></Card></div>;
   return (
     <div style={{ ...brandStyle(win), minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {home ? <Shell i={i} win={win} home={home} onLogout={logout} onRefresh={() => open(home.role)} onSwitch={() => setRoles(home.roles)} busy={busy} />
+       : mustChange ? <Frame i={i} win={win}><ChangePassword i={i} oldPassword={mustChange.old} onDone={passwordChanged} onCancel={logout} /></Frame>
        : roles ? <Frame i={i} win={win}><RoleChooser i={i} roles={roles} onPick={open} onCancel={logout} busy={busy} /></Frame>
        : <Frame i={i} win={win}><LoginForm i={i} demo={slug === "demo"} onLogin={login} busy={busy} err={err} /></Frame>}
       {home && roles && (
@@ -234,7 +244,7 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         <Logo win={win} />
         <div style={{ minWidth: 0 }}>
           <div className="topbar-title hide-narrow" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{win?.name ?? home.school?.name}</div>
-          <div className="small muted" style={{ whiteSpace: "nowrap" }}>{t(`role_${role}`)}</div>
+          <div className="small muted" style={{ whiteSpace: "nowrap" }}>{t(`role_${role}`)}{home.school?.org_kind === "center" && <> · {t("org_center")}</>}</div>
         </div>
         <div className="topbar-spacer" />
         {home.roles.length > 1 && <button className="btn" onClick={onSwitch}><Icon name="switch-horizontal" /><span className="user-text">{t("switch_role")}</span></button>}
@@ -278,8 +288,9 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
       </div>
       <FinanceSummaryCard i={i} home={home} />
       {home.canSetup && <SchoolSetup i={i} />}
+      {home.canSetup && <PeopleCard i={i} />}
       <DayCheck i={i} />
-      <GradesOverview i={i} />
+      {home.school?.org_kind !== "center" && <GradesOverview i={i} />}
       <AiBudgetCard i={i} home={home} />
       <OfficeInbox i={i} home={home} reload={reload} />
       <Card><div className="row between"><span><Icon name="mail" /> {t("absence_pending")}</span><b className="tnum">{c.absence_pending}</b></div></Card>

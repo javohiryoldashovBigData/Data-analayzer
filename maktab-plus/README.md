@@ -226,3 +226,17 @@ Screens: `docs/screens/step7-*.png`.
   their own school, and never themselves. Every import goes into the audit log.
 - Try it: `docs/examples/namuna_6-A_sinf.xlsx` (correct) and `namuna_6-A_xatolar_bilan.xlsx` (with mistakes).
 - Tests: `db/test_setup.sql` (18). A browser test with real LibreOffice-made .xlsx files also passed.
+
+## Step 9: safe accounts for pilots + school or learning center
+
+- **First passwords must be changed.** People created by the Excel import (or given a new password
+  by the office) must set their own password at the first login. The **server** refuses every other
+  request until they do (`password_change_required`), not only the screen. Passwords need at least 8
+  characters and may not be the phone number, 12345678, the same as the old one, and so on.
+- **Forgot your password?** The school admin or director finds the person ("Odamlar va parollar")
+  and gives a new first password, shown once. This works only for people below them in their own
+  school, never for themselves, and every reset goes into the audit log.
+- **School or learning center**: every organisation has `org_kind` = `school` | `center`. The login
+  page and header show it; school-only parts (quarter/yearly grades) are hidden for centers. The
+  center screens themselves (groups, packages, trial lessons…) come in step 10.
+- Tests: `db/test_accounts.sql` (18) and `server/test_server.sh` K1–K8 (now 73 checks).

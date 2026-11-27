@@ -26,7 +26,7 @@ export function TeacherArea({ i, home, reload }: { i: I18n; home: Home; reload: 
     { id: "day" as TTab, label: t("tab_my_day"), icon: "calendar" },
     ...(home.isClassTeacher ? [{ id: "class" as TTab, label: t("tab_my_class"), icon: "users" }] : []),
     { id: "tests" as TTab, label: t("tab_tests"), icon: "checklist" },
-    { id: "grades" as TTab, label: t("tab_grades"), icon: "certificate" },
+    ...(home.school?.org_kind !== "center" ? [{ id: "grades" as TTab, label: t("tab_grades"), icon: "certificate" }] : []),
   ];
   return (
     <>

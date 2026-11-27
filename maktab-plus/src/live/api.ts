@@ -38,7 +38,7 @@ export function schoolSlug(): string {
 }
 
 // ---- shapes returned by /api/home ----------------------------------------------
-export type SchoolWindow = { school_id: string; name: string; logo_url: string | null; brand_color: string; mode: "private" | "government" };
+export type SchoolWindow = { school_id: string; name: string; logo_url: string | null; brand_color: string; mode: "private" | "government"; org_kind?: "school" | "center" };
 export type AskFirst = { student_id: string; name: string; score: number };
 export type Lesson = {
   period: number; start: string | null; end: string | null; class: string; class_id: string;
@@ -49,7 +49,7 @@ export type Lesson = {
 export type Kid = { id: string; first_name: string; last_name: string; class: string; class_id: string };
 export type Home = {
   me: { first_name: string; last_name: string };
-  school: { school_id: string; slug: string; name: string } | null;
+  school: { school_id: string; slug: string; name: string; org_kind?: "school" | "center" } | null;
   roles: string[];
   role: string;
   day?: { date: string; lessons: Lesson[]; absence_reports_pending: number; closed: boolean };

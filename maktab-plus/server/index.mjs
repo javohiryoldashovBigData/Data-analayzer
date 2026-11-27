@@ -82,7 +82,7 @@ async function asRole(user, fn) {
 // ---- what each home screen needs (read-only; RLS filters every row) ---------
 const Q = {
   me: `select p.first_name, p.last_name from profiles p where p.user_id = auth.uid()`,
-  mySchools: `select school_id, slug, name, roles::text[] as roles from app.my_schools()`,
+  mySchools: `select school_id, slug, name, roles::text[] as roles, app.org_kind(slug) as org_kind from app.my_schools()`,
   myDay: `select api.my_day(current_date) as day`,
   kids: `select s.id, s.first_name, s.last_name, c.grade_level || '-' || c.letter as class, c.id as class_id
          from students s join class_members cm on cm.student_id = s.id and cm.status = 'active'
@@ -443,6 +443,12 @@ const step4 = {
     const data = { teachers: pick(b.data.teachers), students: pick(b.data.students), timetable: pick(b.data.timetable) };
     return val(u, "select api.import_school($1::jsonb, $2) as r", [JSON.stringify(data), b.commit]);
   },
+  // the office (step 9): find a person, give a new first password
+  "GET /api/office/people": (u, b, url) => val(u, "select api.school_people($1) as r", [(url.searchParams.get("q") ?? "").slice(0, 60)]),
+  "POST /api/office/reset-password": (u, b) => {
+    if (!UUID.test(b.user_id)) throw bad("bad_request");
+    return val(u, "select api.reset_password($1::uuid) as r", [b.user_id]);
+  },
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
   "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),
@@ -545,7 +551,9 @@ const server = http.createServer(async (req, res) => {
     let m = url.pathname.match(/^\/api\/window\/([a-z0-9-]{1,42})$/);
     if (m && req.method === "GET") {
       const rows = await asRole(null, (q) => q("select * from app.school_window($1)", [m[1]]));
-      return rows.length ? send(res, 200, rows[0]) : send(res, 404, { error: "school_not_found" });
+      if (!rows.length) return send(res, 404, { error: "school_not_found" });
+      const kind = (await asRole(null, (q) => q("select app.org_kind($1) as k", [m[1]])))[0]?.k ?? "school";
+      return send(res, 200, { ...rows[0], org_kind: kind });
     }
     // public: log in to ONE school window with login + password
     if (url.pathname === "/api/login" && req.method === "POST") {
@@ -559,9 +567,25 @@ const server = http.createServer(async (req, res) => {
       if (!rows.length) { fail(key); fail(ip); return send(res, 401, { error: "bad_credentials" }); }
       fails.delete(key);
       const u = rows[0];
-      const token = sign({ sub: u.user_id, school: slug.toLowerCase(), exp: Date.now() + SESSION_HOURS * 3600e3 });
-      return send(res, 200, { token, user: { first_name: u.first_name, last_name: u.last_name }, roles: u.roles });
+      // a first password (import / office reset) must be changed before anything else
+      const token = sign({ sub: u.user_id, school: slug.toLowerCase(), exp: Date.now() + SESSION_HOURS * 3600e3, ...(u.must_change ? { mc: 1 } : {}) });
+      return send(res, 200, { token, user: { first_name: u.first_name, last_name: u.last_name }, roles: u.roles, mustChange: !!u.must_change });
     }
+    // change my password → a fresh session without the "must change" mark
+    if (url.pathname === "/api/password/change" && req.method === "POST") {
+      if (!user) return send(res, 401, { error: "login_required" });
+      const { old_password, new_password } = await readJson(req);
+      if (typeof old_password !== "string" || typeof new_password !== "string" || new_password.length > 200) return send(res, 400, { error: "bad_request" });
+      const key = `pw|${user.sub}`;
+      if (blocked(key, 5)) return send(res, 429, { error: "too_many_attempts" });
+      try { await asRole(user, (q) => q("select api.change_my_password($1, $2)", [old_password, new_password])); }
+      catch (e) { if (e.message === "wrong_password") fail(key); throw e; }
+      fails.delete(key);
+      const { mc, ...rest } = user;
+      return send(res, 200, { token: sign({ ...rest, exp: Date.now() + SESSION_HOURS * 3600e3 }) });
+    }
+    // the server (not only the screen) refuses everything else until the first password is changed
+    if (user?.mc) return send(res, 403, { error: "password_change_required" });
     // logged in
     if (url.pathname === "/api/home" && req.method === "GET") {
       if (!user) return send(res, 401, { error: "login_required" });

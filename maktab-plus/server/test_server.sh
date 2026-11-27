@@ -119,6 +119,23 @@ ok "Y9 a cash payment gives a receipt number"       "$(curl -s -X POST $API/api/
 ok "Y10 a parent cannot record a payment"           "$(curl -s -X POST $API/api/finance/pay -H "$PH" -d "{\"invoice_id\":\"$INV\",\"amount\":1000,\"method\":\"cash\"}" | J "d['error']")" not_allowed
 ok "Y11 reminders to parents: once a week at most"  "$(curl -s -X POST $API/api/finance/remind -H "$AC" | J "d['invoices'] > 0")|$(curl -s -X POST $API/api/finance/remind -H "$AC" | J "d['invoices']")" "True|0"
 
+# ---- step 9: first password, office reset, school/center ----
+AD="authorization: Bearer $(tok 900000103)"                          # school admin Oybek
+TMP=$(curl -s -X POST $API/api/office/import -H "$AD" -d '{"commit":true,"data":{"teachers":[{"row":2,"last_name":"Sobirova","first_name":"Lola","phone":"+998 90 555 44 33"}]}}' | J "d['logins'][0]['password']")
+LR=$(login demo "+998905554433" "$TMP")
+ok "K1 a first password: the login says 'change it first'"   "$(echo "$LR" | J "d['mustChange']")" True
+MT="authorization: Bearer $(echo "$LR" | J "d['token']")"
+ok "K2 … and the server refuses everything else until then"  "$(curl -s $API/api/home -H "$MT" | J "d['error']")" password_change_required
+ok "K3 the old password must be right"                       "$(curl -s -X POST $API/api/password/change -H "$MT" -d '{"old_password":"xxxxxxxx","new_password":"Yangi-parol-77"}' | J "d['error']")" wrong_password
+NT=$(curl -s -X POST $API/api/password/change -H "$MT" -d "{\"old_password\":\"$TMP\",\"new_password\":\"Yangi-parol-77\"}" | J "d['token']")
+ok "K4 after the change the new session works"               "$(curl -s $API/api/home -H "authorization: Bearer $NT" | J "d['role']")" teacher
+ok "K5 next login: no 'change' step any more"                "$(login demo "+998905554433" "Yangi-parol-77" | J "d['mustChange']")" False
+UID2=$(curl -s "$API/api/office/people?q=Sobirova" -H "$AD" | J "d[0]['user_id']")
+RP=$(curl -s -X POST $API/api/office/reset-password -H "$AD" -d "{\"user_id\":\"$UID2\"}" | J "d['password']")
+ok "K6 the office resets a forgotten password: old one dead, new one must be changed" "$(login demo "+998905554433" "Yangi-parol-77" | J "d['error']")|$(login demo "+998905554433" "$RP" | J "d['mustChange']")" "bad_credentials|True"
+ok "K7 a zavuch cannot see the people list"                  "$(curl -s "$API/api/office/people?q=a" -H "$ZV2" | J "d['error']")" not_allowed
+ok "K8 the login page knows: school or learning center"      "$(curl -s $API/api/window/demo | J "d['org_kind']")" school
+
 for k in 1 2 3 4 5; do login demo 900000116 bad$k >/dev/null; done
 ok "S7 6th try after 5 wrong passwords is paused" "$(login demo 900000116 maktab2026 | J "d['error']")" too_many_attempts
 echo "RESULT: $P passed, $F failed"; [ $F = 0 ]
