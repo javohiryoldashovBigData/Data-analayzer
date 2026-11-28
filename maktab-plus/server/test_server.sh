@@ -152,6 +152,18 @@ SC=$(curl -s -X POST $API/api/center/group -H "$CM" -d '{"name":"Speaking Club",
 curl -s -X POST $API/api/center/enroll -H "$CM" -d "{\"group_id\":\"$SC\",\"student_id\":\"e4000000-0000-4000-8000-000000000001\",\"active\":true}" >/dev/null
 ok "Z8 a new group at another time; full after 1 student"    "$(curl -s -X POST $API/api/center/enroll -H "$CM" -d "{\"group_id\":\"$SC\",\"student_id\":\"e4000000-0000-4000-8000-000000000002\",\"active\":true}" | J "d['error']")" group_full
 
+# ---- step 11: website sign-up ----
+ok "U1 the sign-up page gets all 14 regions"                 "$(curl -s $API/api/signup/regions | J "len(d)")" 14
+ok "U2 a reserved address is not free"                       "$(curl -s "$API/api/signup/slug?s=demo" | J "d['free']")" False
+SU='{"kind":"center","org_name":"Zukko IELTS markazi","slug":"zukko-ielts","region_id":5,"first_name":"Aziz","last_name":"Karimov","phone":"+998 99 876 54 32","password":"Zukko-2026-yaxshi"'
+ok "U3 no consent → refused"                                 "$(curl -s -X POST $API/api/signup -d "$SU}" | J "d['error']")" must_agree
+SR=$(curl -s -X POST $API/api/signup -d "$SU,\"agree\":true}")
+ST="authorization: Bearer $(echo "$SR" | J "d['token']")"
+ok "U4 sign-up: logged in at once as the director of a center" "$(curl -s $API/api/home -H "$ST" | J "d['role']+'|'+d['school']['org_kind']+'|'+d['school']['slug']")" "director|center|zukko-ielts"
+ok "U5 first steps start at zero"                            "$(curl -s $API/api/office/first-steps -H "$ST" | J "str(d['teachers'])+str(d['classes'])+str(d['students'])")" 000
+ok "U6 the new director adds a teacher (one row, no Excel)"  "$(curl -s -X POST $API/api/office/import -H "$ST" -d '{"commit":true,"data":{"teachers":[{"row":1,"last_name":"Yangi","first_name":"Ustoz","phone":"+998 99 111 00 22"}]}}' | J "d['committed']")" True
+ok "U7 the same phone cannot sign up twice"                  "$(curl -s -X POST $API/api/signup -d "${SU/zukko-ielts/zukko-ikki},\"agree\":true}" | J "d['error']")" phone_taken
+
 for k in 1 2 3 4 5; do login demo 900000116 bad$k >/dev/null; done
 ok "S7 6th try after 5 wrong passwords is paused" "$(login demo 900000116 maktab2026 | J "d['error']")" too_many_attempts
 echo "RESULT: $P passed, $F failed"; [ $F = 0 ]

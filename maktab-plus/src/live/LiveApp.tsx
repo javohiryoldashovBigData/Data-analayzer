@@ -10,6 +10,7 @@ import { FinanceArea, FinanceSummaryCard } from "./Step7";
 import { SchoolSetup, TelegramCard } from "./Step8";
 import { ChangePassword, PeopleCard } from "./Step9";
 import { CenterGroups } from "./Step10";
+import { FirstSteps } from "./Step11";
 import { Avatar, Card, Empty, Icon, PageHead, Progress, Stat } from "../components/ui";
 
 const ROLES: { id: string; icon: string; color: string }[] = [
@@ -268,7 +269,7 @@ function Shell({ i, win, home, onLogout, onRefresh, onSwitch, busy }: { i: I18n;
         {home.kids && <FamilyHome i={i} home={home} reload={onRefresh} />}
         {home.stats && <LeaderHome i={i} home={home} reload={onRefresh} />}
         {home.role === "accountant" && <FinanceArea i={i} home={home} />}
-        {home.role !== "student" && <TelegramCard key={home.role} i={i} />}
+        {home.role !== "student" && <div id="sec-telegram"><TelegramCard key={home.role} i={i} /></div>}
       </main>
     </div>
   );
@@ -295,9 +296,10 @@ function LeaderHome({ i, home, reload }: { i: I18n; home: Home; reload: () => vo
         </Card>
         <ProblemsCard i={i} home={home} reload={reload} />
       </div>
-      {home.school?.org_kind === "center" && <CenterGroups i={i} />}
+      {home.canSetup && <FirstSteps i={i} />}
+      {home.school?.org_kind === "center" && <div id="sec-groups"><CenterGroups i={i} /></div>}
       <FinanceSummaryCard i={i} home={home} />
-      {home.canSetup && <SchoolSetup i={i} />}
+      {home.canSetup && <div id="sec-setup"><SchoolSetup i={i} /></div>}
       {home.canSetup && <PeopleCard i={i} />}
       <DayCheck i={i} />
       {home.school?.org_kind !== "center" && <GradesOverview i={i} />}

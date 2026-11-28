@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 DB=${DEMO_DB:-maktab_demo}
 echo "== building the demo database ($DB)"
 dropdb --if-exists "$DB"; createdb "$DB"
-for f in local_compat schema api_phase1 family_api round4_roles_signals weekly_tests_gen curriculum quiet_hours school_api ai_api final_grades finance telegram auth_local school_setup accounts centers demo_seed demo_center_seed; do
+for f in local_compat schema api_phase1 family_api round4_roles_signals weekly_tests_gen curriculum quiet_hours school_api ai_api final_grades finance telegram auth_local school_setup accounts centers signup demo_seed demo_center_seed; do
   psql -q -X -v ON_ERROR_STOP=1 -d "$DB" -f "db/$f.sql" >/dev/null
 done
 echo "== starting API server on :8787"

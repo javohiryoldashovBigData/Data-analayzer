@@ -34,7 +34,7 @@ export function CenterGroups({ i }: { i: I18n }) {
     : `${g.schedule.map((s) => t(DAYS[s.day])).join(", ")} · ${hm(g.schedule[0].start)}${g.schedule.some((s) => s.start !== g.schedule[0].start) ? "…" : ""}`;
   return (
     <Card title={<span><Icon name="users-group" /> {t("cg_title")}</span>} sub={t("cg_sub", { n: groups.data.filter((g) => !g.archived).length })}
-      right={<button className="btn btn-sm btn-primary" onClick={() => setEdit({ schedule: [] })}><Icon name="plus" />{t("cg_new")}</button>}>
+      right={<button className="btn btn-sm btn-primary" onClick={() => { opts.reload(); setEdit({ schedule: [] }); }}><Icon name="plus" />{t("cg_new")}</button>}>
       {groups.data.length === 0 ? <Empty icon="users-group">{t("cg_empty")}</Empty> : (
         <div className="list">{groups.data.map((g) => {
           const pct = g.capacity ? Math.round((100 * g.students) / g.capacity) : null;
@@ -51,7 +51,7 @@ export function CenterGroups({ i }: { i: I18n }) {
                 <Badge tone={pct !== null && pct >= 100 ? "warn" : "brand"}>{t("cg_count", { n: g.students, c: g.capacity ?? "—" })}</Badge>
                 <div className="row" style={{ gap: 6 }}>
                   <button className="btn btn-sm" onClick={() => setOpen(g)}><Icon name="list" />{t("cg_students")}</button>
-                  <button className="btn btn-sm btn-ghost" aria-label={t("cg_edit")} onClick={() => setEdit(g)}><Icon name="pencil" /></button>
+                  <button className="btn btn-sm btn-ghost" aria-label={t("cg_edit")} onClick={() => { opts.reload(); setEdit(g); }}><Icon name="pencil" /></button>
                 </div>
               </div>
             </div>);
@@ -68,6 +68,7 @@ function GroupForm({ i, g, opts, onClose, onSaved }: { i: I18n; g: Partial<Group
     teacher_id: g.teacher_id ?? opts.teachers[0]?.id ?? "", starts_on: g.starts_on ?? "", ends_on: g.ends_on ?? "",
     capacity: g.capacity ? String(g.capacity) : "", archived: g.archived ?? false });
   const [slots, setSlots] = useState<Record<number, number>>(Object.fromEntries((g.schedule ?? []).map((s) => [s.day, s.period])));
+  useEffect(() => { if (!f.teacher_id && opts.teachers[0]) setF((x) => ({ ...x, teacher_id: opts.teachers[0].id })); }, [opts.teachers]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const save = async () => {
     setBusy(true); setErr("");
@@ -102,6 +103,7 @@ function GroupForm({ i, g, opts, onClose, onSaved }: { i: I18n; g: Partial<Group
                 {opts.periods.map((p) => <option key={p.number} value={p.number}>{hm(p.start)}–{hm(p.end)}</option>)}</select>}
             </div>))}</div></div>
         {g.id && <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={f.archived} onChange={(e) => setF({ ...f, archived: e.target.checked })} />{t("cg_archive")}</label>}
+        {opts.teachers.length === 0 && <div className="callout callout-warn"><Icon name="user-plus" /><div>{t("cg_need_teacher")}</div></div>}
         {err && <div className="callout callout-warn"><Icon name="alert-triangle" /><div>{err}</div></div>}
         <button className="btn btn-primary" disabled={busy || f.name.trim().length < 2 || !f.teacher_id} onClick={save}><Icon name="check" />{t("save")}</button>
       </div>

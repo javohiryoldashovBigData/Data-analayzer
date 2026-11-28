@@ -473,6 +473,7 @@ const step4 = {
     if (!UUID.test(b.group_id) || !UUID.test(b.student_id) || typeof b.active !== "boolean") throw bad("bad_request");
     return asRole(u, (q) => q("select api.set_enrollment($1::uuid, $2::uuid, $3)", [b.group_id, b.student_id, b.active])).then(() => ({ ok: true }));
   },
+  "GET /api/office/first-steps": (u) => val(u, "select api.first_steps() as r"),
   // AI (step 5)
   "POST /api/teacher/ai/prep": (u, b) => prepareWeek(u, b),
   "GET /api/ai/budget": (u) => val(u, "select api.ai_budget('lesson_prep') as r"),
@@ -594,6 +595,29 @@ const server = http.createServer(async (req, res) => {
       // a first password (import / office reset) must be changed before anything else
       const token = sign({ sub: u.user_id, school: slug.toLowerCase(), exp: Date.now() + SESSION_HOURS * 3600e3, ...(u.must_change ? { mc: 1 } : {}) });
       return send(res, 200, { token, user: { first_name: u.first_name, last_name: u.last_name }, roles: u.roles, mustChange: !!u.must_change });
+    }
+    // ---- website sign-up (public): a director creates their school / center ----
+    if (url.pathname === "/api/signup/regions" && req.method === "GET")
+      return send(res, 200, await asRole(null, async (q) => (await q("select api.signup_regions() as r"))[0].r));
+    if (url.pathname === "/api/signup/slug" && req.method === "GET") {
+      const sl = (url.searchParams.get("s") ?? "").toLowerCase().slice(0, 40);
+      return send(res, 200, { free: await asRole(null, async (q) => (await q("select api.slug_free($1) as r", [sl]))[0].r) });
+    }
+    if (url.pathname === "/api/signup" && req.method === "POST") {
+      const ip = req.socket.remoteAddress ?? "?";
+      if (blocked(`signup|${ip}`, 3) || blocked(`signup-try|${ip}`, 20)) return send(res, 429, { error: "too_many_attempts" });
+      fail(`signup-try|${ip}`);
+      const b = await readJson(req);
+      const p = { kind: b.kind, org_name: String(b.org_name ?? "").slice(0, 80), slug: String(b.slug ?? "").slice(0, 40),
+        region_id: Number(b.region_id) || null, first_name: String(b.first_name ?? "").slice(0, 40), last_name: String(b.last_name ?? "").slice(0, 40),
+        phone: String(b.phone ?? "").slice(0, 30), password: String(b.password ?? "").slice(0, 200) };
+      if (b.agree !== true) return send(res, 400, { error: "must_agree" });
+      const r = await asRole(null, async (q) => (await q("select api.signup_org($1::jsonb) as r", [JSON.stringify(p)]))[0].r);
+      fail(`signup|${ip}`);                                       // counts successful sign-ups per address too
+      const rows = await asRole(null, (q) => q("select * from app.password_login($1, $2, $3)", [r.slug, r.login, p.password]));
+      const u = rows[0];
+      const token = sign({ sub: u.user_id, school: r.slug, exp: Date.now() + SESSION_HOURS * 3600e3 });
+      return send(res, 200, { token, slug: r.slug });
     }
     // change my password → a fresh session without the "must change" mark
     if (url.pathname === "/api/password/change" && req.method === "POST") {

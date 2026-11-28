@@ -257,3 +257,21 @@ Screens: `docs/screens/step7-*.png`.
 - **Center wording** is used automatically ("guruh", "Markazga yozish", no school gate card).
 - **Demo center**: `?school=demo-markaz` (logins listed on its login page, password `maktab2026`).
 - Tests: `db/test_centers.sql` (15), `server/test_server.sh` Z1–Z8 (now 81 checks).
+
+## Step 11: the public website + self sign-up
+
+- **`index.html` is now the website**: what Maktab+ does for centers and schools, buttons to the
+  two demos, the sign-up form and "log in to my school". The old prototype moved to `prototype.html`.
+- **Self sign-up** (`db/signup.sql`): a director chooses school or learning center, the name, the
+  region (all 14) and an address (`?school=<address>`, checked while typing), then their name, phone
+  and password, and ticks a consent line. The organisation, its director, and default lesson times are
+  created, and the director lands logged in in their own window.
+- **Safety**: a website visitor can run exactly three things (regions, "is the address free", sign
+  up). New api functions are closed by default. The role guard's single new exception (R0) only lets
+  sign-up create the first director of an organisation made in the same transaction, and it cannot
+  be used on an existing school, even with the mark set by hand. Limits: per address in the server,
+  and 30 sign-ups per hour platform-wide in the database. Every sign-up is recorded.
+- **First steps** card for a new director (teachers, groups/classes, students, Telegram) with a quick
+  "add a teacher" form, no Excel needed.
+- **Open item**: the phone number is not yet verified (no SMS / Telegram check at sign-up).
+- Tests: `db/test_signup.sql` (15), `server/test_server.sh` U1–U7 (now 88 checks).
